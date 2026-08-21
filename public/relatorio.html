@@ -12,20 +12,80 @@
   .logo span { color:#a688ff; position:relative; }
   .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
     background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
+  a.voltar { color:#a1a5c4; text-decoration:none; font-size:13px; }
   main { max-width:720px; margin:0 auto; padding:32px; }
   .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:24px; margin-bottom:24px; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  .sub { color:#a1a5c4; font-size:13px; margin-bottom:24px; }
-  h2 { font-size:14px; color:#a1a5c4; margin:0 0 12px; text-transform:uppercase; letter-spacing:.04em; }
-  .barra-linha { margin-bottom:14px; }
+  h2 { font-size:12px; color:#a1a5c4; margin:0 0 16px; text-transform:uppercase; letter-spacing:.06em; }
+
+  /* Cabeçalho do candidato */
+  .topo { text-align:center; margin-bottom:32px; }
+  .avatar { width:64px; height:64px; border-radius:50%; border:2px solid #a688ff; display:flex;
+    align-items:center; justify-content:center; margin:0 auto 16px; font-weight:800; font-size:20px; color:#a688ff; }
+  .topo h1 { font-size:22px; margin:0 0 6px; text-transform:capitalize; }
+  .topo .tags { color:#a688ff; font-weight:700; font-size:13px; margin-bottom:8px; }
+  .topo .tagline { color:#a1a5c4; font-size:13px; }
+
+  /* Perfil identificado */
+  .pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+  .pill { font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; }
+  .pill.perfil { background:#2a2050; color:#c9b6ff; }
+  .pill.mbti { background:#0f3630; color:#7ee7a6; }
+  .pill.traco { background:#3a3410; color:#e6c65a; }
+  .card ul.bullets { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#d8daea; }
+
+  /* Radar */
+  .radar-legenda { display:flex; gap:20px; justify-content:center; font-size:12px; color:#a1a5c4; margin-top:8px; }
+  .radar-legenda span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+  /* Barras comparativas */
+  .barra-linha { margin-bottom:16px; }
   .barra-label { display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
-  .barra-fundo { background:#232847; border-radius:6px; height:8px; overflow:hidden; }
-  .barra-preenchida { background:#a688ff; height:100%; }
-  .gap { font-size:13px; padding:8px 0; border-bottom:1px solid #232847; }
-  .gap:last-child { border-bottom:none; }
-  button { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
+  .barra-label .valores { color:#a1a5c4; font-size:12px; }
+  .barra-fundo { background:#232847; border-radius:6px; height:8px; overflow:hidden; margin-bottom:3px; }
+  .barra-preenchida { height:100%; border-radius:6px; }
+  .barra-fundo.r2 { height:5px; }
+
+  /* Gaps */
+  .gap-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .gap-box { border-radius:12px; padding:14px 16px; font-size:12px; }
+  .gap-box.alinhamento { background:#1c2350; color:#c7cdf5; }
+  .gap-box.atencao { background:#3a2418; color:#f5c7a8; }
+  .gap-box h3 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px; opacity:.8; }
+  .gap-box div.item { padding:2px 0; }
+
+  /* MBTI */
+  .mbti-tipo { text-align:center; margin-bottom:20px; }
+  .mbti-tipo .letras { font-size:32px; font-weight:800; color:#a688ff; letter-spacing:.04em; }
+  .mbti-tipo .nome { font-size:14px; color:#f2f2f7; margin-top:4px; }
+  .mbti-tipo .desc { font-size:12px; color:#a1a5c4; margin-top:4px; }
+  .dicotomia { margin-bottom:14px; }
+  .dicotomia-labels { display:flex; justify-content:space-between; font-size:12px; color:#6b7094; margin-bottom:6px; }
+  .dicotomia-labels .ativo { color:#7ee7a6; font-weight:700; }
+  .dicotomia-track { position:relative; height:6px; background:#232847; border-radius:6px; }
+  .dicotomia-preenchido { position:absolute; top:0; left:0; height:100%; background:#7ee7a6; border-radius:6px; }
+  .dicotomia-marcador { position:absolute; top:50%; width:12px; height:12px; background:#a688ff; border-radius:50%;
+    transform:translate(-50%,-50%); border:2px solid #080b14; }
+
+  /* OCEAN */
+  .ocean-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:520px) { .ocean-grid, .gap-grid { grid-template-columns:1fr; } }
+  .ocean-card { background:#0d1024; border:1px solid #232847; border-radius:12px; padding:14px; }
+  .ocean-card .nome-valor { display:flex; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:8px; }
+  .ocean-card .desc { font-size:11px; color:#a1a5c4; margin-top:8px; line-height:1.5; }
+
+  /* Relação com o perfil */
+  .rel-secao { margin-bottom:18px; }
+  .rel-secao:last-child { margin-bottom:0; }
+  .rel-secao h3 { font-size:12px; margin:0 0 8px; }
+  .rel-secao.fortes h3 { color:#7ee7a6; }
+  .rel-secao.atencao h3 { color:#f5a878; }
+  .rel-secao.aproveitar h3 { color:#a688ff; }
+  .rel-secao ul { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#d8daea; }
+
+  button, .btn { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
     padding:10px 18px; font-size:14px; cursor:pointer; }
-  a.voltar { color:#a1a5c4; text-decoration:none; font-size:13px; }
+  .acoes { display:flex; gap:10px; justify-content:center; margin-top:20px; }
 </style>
 </head>
 <body>
@@ -41,23 +101,105 @@
     const id = new URLSearchParams(window.location.search).get('id');
 
     const NOMES = { A: 'Analista', C: 'Comunicador', E: 'Executor', P: 'Planejador' };
+    const CORES_PERFIL = { A: '#a688ff', C: '#7ee7a6', E: '#f5a878', P: '#e6c65a' };
 
-    function barras(profiler) {
+    function svgRadar(r1, r2) {
+      const cx = 120, cy = 120, raio = 88;
+      const eixos = [
+        { chave: 'A', angulo: -Math.PI / 2 },
+        { chave: 'C', angulo: 0 },
+        { chave: 'E', angulo: Math.PI / 2 },
+        { chave: 'P', angulo: Math.PI },
+      ];
+      const ponto = (angulo, escala) => `${cx + Math.cos(angulo) * raio * escala},${cy + Math.sin(angulo) * raio * escala}`;
+      const poligono = (dados) => eixos.map((e) => ponto(e.angulo, dados[e.chave] / 100)).join(' ');
+
+      const grades = [0.25, 0.5, 0.75, 1].map((escala) =>
+        `<polygon points="${eixos.map((e) => ponto(e.angulo, escala)).join(' ')}" fill="none" stroke="#232847" stroke-width="1"/>`
+      ).join('');
+      const linhas = eixos.map((e) => `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(e.angulo) * raio}" y2="${cy + Math.sin(e.angulo) * raio}" stroke="#232847" stroke-width="1"/>`).join('');
+      const labelPos = eixos.map((e) => {
+        const lx = cx + Math.cos(e.angulo) * (raio + 22);
+        const ly = cy + Math.sin(e.angulo) * (raio + 22);
+        return `<text x="${lx}" y="${ly}" fill="#a1a5c4" font-size="12" text-anchor="middle" dominant-baseline="middle">${NOMES[e.chave]}</text>`;
+      }).join('');
+
+      return `
+        <svg viewBox="0 0 240 240" width="100%" style="max-width:320px;display:block;margin:0 auto">
+          ${grades}${linhas}
+          <polygon points="${poligono(r1)}" fill="#a688ff" fill-opacity="0.18" stroke="#a688ff" stroke-width="2"/>
+          <polygon points="${poligono(r2)}" fill="#7ee7a6" fill-opacity="0.12" stroke="#7ee7a6" stroke-width="2" stroke-dasharray="4,3"/>
+          ${labelPos}
+        </svg>`;
+    }
+
+    function barrasComparativas(r1, r2) {
       return Object.keys(NOMES).map((p) => `
         <div class="barra-linha">
-          <div class="barra-label"><span>${NOMES[p]}</span><span>${profiler[p]}%</span></div>
-          <div class="barra-fundo"><div class="barra-preenchida" style="width:${profiler[p]}%"></div></div>
+          <div class="barra-label"><span>${NOMES[p]}</span><span class="valores">${r1[p]}% / ${r2[p]}%</span></div>
+          <div class="barra-fundo"><div class="barra-preenchida" style="width:${r1[p]}%;background:${CORES_PERFIL[p]}"></div></div>
+          <div class="barra-fundo r2"><div class="barra-preenchida" style="width:${r2[p]}%;background:${CORES_PERFIL[p]};opacity:.5"></div></div>
         </div>
       `).join('');
     }
 
-    function ocean(bigFive) {
-      return Object.values(bigFive).map((t) => `
-        <div class="barra-linha">
-          <div class="barra-label"><span>${t.nome}</span><span>${t.percentil}% (${t.nivel})</span></div>
-          <div class="barra-fundo"><div class="barra-preenchida" style="width:${t.percentil}%"></div></div>
-        </div>
-      `).join('');
+    function gapCards(gaps) {
+      const alinhados = Object.values(gaps).filter((g) => g.leitura === 'Alinhamento');
+      const seVe = Object.values(gaps).filter((g) => g.leitura === 'Você se vê mais assim');
+      const outros = Object.values(gaps).filter((g) => g.leitura === 'Os outros te veem mais assim');
+
+      let html = '<div class="gap-grid">';
+      if (alinhados.length) {
+        html += `<div class="gap-box alinhamento"><h3>Alinhamento</h3>${alinhados.map((g) => `<div class="item">${g.nome}</div>`).join('')}</div>`;
+      }
+      const divergentes = [...seVe, ...outros];
+      if (divergentes.length) {
+        html += `<div class="gap-box atencao"><h3>Divergências</h3>${divergentes.map((g) => `<div class="item">${g.nome}: ${g.leitura} (${g.diff > 0 ? '+' : ''}${g.diff}%)</div>`).join('')}</div>`;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    const DICOTOMIAS = [
+      { chave: 'ei', neg: 'Introversão', pos: 'Extroversão' },
+      { chave: 'sn', neg: 'Intuição', pos: 'Sensação' },
+      { chave: 'tf', neg: 'Sentimento', pos: 'Pensamento' },
+      { chave: 'jp', neg: 'Percepção', pos: 'Julgamento' },
+    ];
+
+    function mbtiDicotomias(mbti) {
+      return DICOTOMIAS.map((d) => {
+        const info = mbti.dicotomias[d.chave];
+        const posicao = ((info.normalizado + 100) / 200) * 100;
+        const negAtivo = info.normalizado < 0;
+        return `
+          <div class="dicotomia">
+            <div class="dicotomia-labels">
+              <span class="${negAtivo ? 'ativo' : ''}">${d.neg}</span>
+              <span class="${!negAtivo ? 'ativo' : ''}">${d.pos}</span>
+            </div>
+            <div class="dicotomia-track">
+              <div class="dicotomia-preenchido" style="width:${posicao}%"></div>
+              <div class="dicotomia-marcador" style="left:${posicao}%"></div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function oceanCards(bigFive, tracoDescricoes) {
+      return `<div class="ocean-grid">${Object.keys(bigFive).map((chave) => {
+        const t = bigFive[chave];
+        return `
+          <div class="ocean-card">
+            <div class="nome-valor"><span>${t.nome}</span><span>${t.percentil}%</span></div>
+            <div class="barra-fundo"><div class="barra-preenchida" style="width:${t.percentil}%;background:#a688ff"></div></div>
+            <div class="desc">${tracoDescricoes[chave]}</div>
+          </div>`;
+      }).join('')}</div>`;
+    }
+
+    function listaItens(itens) {
+      return itens.map((i) => `<li>${i}</li>`).join('');
     }
 
     async function carregar() {
@@ -71,45 +213,68 @@
         return;
       }
       const r = c.resultado;
+      const resumo = c.resumo;
 
       document.getElementById('conteudo').innerHTML = `
-        <div class="card">
+        <div class="topo">
+          <div class="avatar">${resumo.iniciais}</div>
           <h1>${c.nome}</h1>
-          <div class="sub">Perfil dominante: ${r.perfilDominante.nome} · concluído em ${new Date(c.concluido_em).toLocaleDateString('pt-BR')}</div>
-          <button id="btn-pdf">Exportar PDF</button>
+          <div class="tags">${NOMES[r.perfilDominante.perfil]} · ${r.mbti.tipo} · OCEAN</div>
+          <div class="tagline">${resumo.tagline}</div>
         </div>
 
         <div class="card">
-          <h2>Profiler — Rodada 1 (como eu me vejo)</h2>
-          ${barras(r.rodada1.profiler)}
+          <h2>Perfil identificado</h2>
+          <div class="pills">
+            <span class="pill perfil">${NOMES[r.perfilDominante.perfil]}</span>
+            <span class="pill mbti">${r.mbti.tipo} — ${resumo.mbtiNome}</span>
+            ${resumo.tracosMarcantes.map((t) => `<span class="pill traco">${t.nome} elevado</span>`).join('')}
+          </div>
+          <ul class="bullets">${listaItens(resumo.bulletsResumo)}</ul>
         </div>
 
         <div class="card">
-          <h2>Profiler — Rodada 2 (como os outros me veem)</h2>
-          ${barras(r.rodada2.profiler)}
+          <h2>Profiler comportamental</h2>
+          ${svgRadar(r.rodada1.profiler, r.rodada2.profiler)}
+          <div class="radar-legenda">
+            <span><span class="dot" style="background:#a688ff"></span>Como me vejo</span>
+            <span><span class="dot" style="background:#7ee7a6"></span>Como os outros me veem</span>
+          </div>
+        </div>
+
+        <div class="card">
+          ${barrasComparativas(r.rodada1.profiler, r.rodada2.profiler)}
         </div>
 
         <div class="card">
           <h2>Análise de gaps</h2>
-          ${Object.values(r.gaps).map((g) => `
-            <div class="gap">${g.nome}: ${g.diff > 0 ? '+' : ''}${g.diff} pontos — ${g.leitura}</div>
-          `).join('')}
+          ${gapCards(r.gaps)}
         </div>
 
         <div class="card">
-          <h2>MBTI</h2>
-          <div class="gap">Rodada 1: ${r.rodada1.mbti.tipo}</div>
-          <div class="gap">Rodada 2: ${r.rodada2.mbti.tipo}</div>
+          <h2>Tipo MBTI detalhado</h2>
+          <div class="mbti-tipo">
+            <div class="letras">${r.mbti.tipo}</div>
+            <div class="nome">${resumo.mbtiNome}</div>
+            <div class="desc">${resumo.mbtiDescricao}</div>
+          </div>
+          ${mbtiDicotomias(r.mbti)}
         </div>
 
         <div class="card">
-          <h2>Big Five — Rodada 1</h2>
-          ${ocean(r.rodada1.bigFive)}
+          <h2>Big Five — OCEAN</h2>
+          ${oceanCards(r.bigFive, resumo.tracoDescricoes)}
         </div>
 
         <div class="card">
-          <h2>Big Five — Rodada 2</h2>
-          ${ocean(r.rodada2.bigFive)}
+          <h2>Relação com o perfil</h2>
+          <div class="rel-secao fortes"><h3>Pontos fortes</h3><ul>${listaItens(resumo.pontosFortes)}</ul></div>
+          <div class="rel-secao atencao"><h3>Pontos de atenção</h3><ul>${listaItens(resumo.pontosAtencao)}</ul></div>
+          <div class="rel-secao aproveitar"><h3>Como aproveitar melhor esse perfil</h3><ul>${listaItens(resumo.comoAproveitar)}</ul></div>
+        </div>
+
+        <div class="acoes">
+          <button id="btn-pdf">Exportar PDF</button>
         </div>
       `;
 

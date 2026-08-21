@@ -49,8 +49,8 @@ test('calcularResultado: monta o objeto completo com as 2 rodadas, perfil domina
 
   assert.equal(resultado.rodada1.profiler.A, 100);
   assert.equal(resultado.rodada2.profiler.C, 100);
-  assert.ok(resultado.rodada1.mbti.tipo.length === 4);
-  assert.ok(resultado.rodada1.bigFive.o.nivel);
+  assert.ok(resultado.mbti.tipo.length === 4);
+  assert.ok(resultado.bigFive.o.nivel);
   assert.equal(resultado.perfilDominante.perfil, 'A');
   assert.equal(resultado.gaps.A.leitura, 'Você se vê mais assim');
 });

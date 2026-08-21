@@ -10,6 +10,7 @@ const fastifyStatic = require('@fastify/static');
 const { pool, migrar } = require('./lib/db');
 const { validarCpf, normalizar } = require('./lib/cpf');
 const { calcularResultado, CARACTERISTICAS } = require('./lib/inferencia');
+const { montarResumo } = require('./lib/conteudo');
 const { enviarLinkAvaliacao } = require('./lib/email');
 const { gerarRelatorioPdf } = require('./lib/pdf');
 
@@ -89,7 +90,7 @@ async function build() {
     if (candidato.status !== 'concluido') {
       return reply.code(409).send({ error: 'Avaliação ainda não foi concluída' });
     }
-    return candidato;
+    return { ...candidato, resumo: montarResumo(candidato.resultado, candidato.nome) };
   });
 
   fastify.get('/people/api/candidatos/:id/relatorio.pdf', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -102,8 +103,46 @@ async function build() {
 
     reply.header('Content-Type', 'application/pdf');
     reply.header('Content-Disposition', `attachment; filename="relatorio-${candidato.nome.replace(/\s+/g, '-')}.pdf"`);
-    const doc = gerarRelatorioPdf(candidato);
+    const resumo = montarResumo(candidato.resultado, candidato.nome);
+    const doc = gerarRelatorioPdf(candidato, resumo);
     return reply.send(doc);
+  });
+
+  // Arquiva a tentativa atual em `candidatos_historico` e reseta o candidato
+  // pra 'pendente', mantendo o mesmo token/link — decisão da psicóloga, o
+  // candidato não pode se autodestravar depois de concluído.
+  fastify.post('/people/api/candidatos/:id/refazer', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query('select * from candidatos where id = $1', [request.params.id]);
+    const candidato = rows[0];
+    if (!candidato) return reply.code(404).send({ error: 'Candidato não encontrado' });
+    if (candidato.status !== 'concluido') {
+      return reply.code(409).send({ error: 'Só é possível refazer uma avaliação já concluída' });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      await client.query(
+        `insert into candidatos_historico (id, candidato_id, respostas_rodada1, respostas_rodada2, resultado, concluido_em)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [crypto.randomUUID(), candidato.id, candidato.respostas_rodada1, candidato.respostas_rodada2, candidato.resultado, candidato.concluido_em]
+      );
+      await client.query(
+        `update candidatos
+         set status = 'pendente', respostas_rodada1 = null, respostas_rodada2 = null,
+             resultado = null, iniciado_em = null, concluido_em = null
+         where id = $1`,
+        [candidato.id]
+      );
+      await client.query('commit');
+    } catch (err) {
+      await client.query('rollback');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    return { ok: true, link: `${PUBLIC_URL}/people/avaliacao/${candidato.token}` };
   });
 
   // --- Avaliação pública (candidato, sem login — gate por CPF) ---

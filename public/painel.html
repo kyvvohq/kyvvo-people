@@ -101,6 +101,7 @@
           <td>${c.status === 'concluido' ? `
             <a class="acao" href="/people/relatorio.html?id=${c.id}">Ver relatório</a>
             <a class="acao" href="#" data-pdf="${c.id}" data-nome="${c.nome}">Exportar PDF</a>
+            <a class="acao" href="#" data-refazer="${c.id}" data-nome="${c.nome}">Refazer avaliação</a>
           ` : ''}</td>
         </tr>
       `).join('') || '<tr><td colspan="5">Nenhum candidato cadastrado ainda.</td></tr>';
@@ -133,18 +134,32 @@
     });
 
     document.getElementById('tabela-candidatos').addEventListener('click', async (e) => {
-      const alvo = e.target.closest('[data-pdf]');
-      if (!alvo) return;
-      e.preventDefault();
-      const res = await apiFetch(`/people/api/candidatos/${alvo.dataset.pdf}/relatorio.pdf`);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-${alvo.dataset.nome.replace(/\s+/g, '-')}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const pdf = e.target.closest('[data-pdf]');
+      if (pdf) {
+        e.preventDefault();
+        const res = await apiFetch(`/people/api/candidatos/${pdf.dataset.pdf}/relatorio.pdf`);
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio-${pdf.dataset.nome.replace(/\s+/g, '-')}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      const refazer = e.target.closest('[data-refazer]');
+      if (refazer) {
+        e.preventDefault();
+        const confirmar = confirm(`Refazer a avaliação de ${refazer.dataset.nome}? O resultado atual vai para o histórico e o mesmo link poderá ser usado de novo.`);
+        if (!confirmar) return;
+        const res = await apiFetch(`/people/api/candidatos/${refazer.dataset.refazer}/refazer`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Falha ao refazer avaliação'); return; }
+        alert(`Avaliação resetada. Link: ${data.link}`);
+        carregarCandidatos();
+      }
     });
 
     carregarCandidatos();
