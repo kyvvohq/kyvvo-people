@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Login</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
+  .card { width:100%; max-width:360px; background:#12162a; border:1px solid #232847; border-radius:16px; padding:32px; }
+  .logo { font-size:22px; font-weight:800; letter-spacing:-.03em; margin-bottom:24px; }
+  .logo span { color:#a688ff; }
+  label { display:block; font-size:12px; color:#a1a5c4; margin:16px 0 6px; }
+  input { width:100%; box-sizing:border-box; background:#080b14; border:1px solid #232847; border-radius:8px;
+    padding:10px 12px; color:#f2f2f7; font-size:14px; }
+  button { width:100%; margin-top:24px; background:#a688ff; color:#080b14; font-weight:700; border:none;
+    border-radius:10px; padding:12px; font-size:14px; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .erro { color:#ff8080; font-size:13px; margin-top:12px; min-height:16px; }
+</style>
+</head>
+<body>
+  <form class="card" id="form">
+    <div class="logo">ky<span>vv</span>o people</div>
+    <label for="email">E-mail</label>
+    <input id="email" type="email" required autocomplete="username">
+    <label for="senha">Senha</label>
+    <input id="senha" type="password" required autocomplete="current-password">
+    <div class="erro" id="erro"></div>
+    <button type="submit" id="btn">Entrar</button>
+  </form>
+  <script>
+    const form = document.getElementById('form');
+    const erro = document.getElementById('erro');
+    const btn = document.getElementById('btn');
+
+    if (localStorage.getItem('people_token')) {
+      window.location.href = '/people/painel.html';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      erro.textContent = '';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/people/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            senha: document.getElementById('senha').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha no login');
+        localStorage.setItem('people_token', data.token);
+        window.location.href = '/people/painel.html';
+      } catch (err) {
+        erro.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

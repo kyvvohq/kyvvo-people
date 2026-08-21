@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Relatório</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid #232847; }
+  .logo { font-size:20px; font-weight:800; letter-spacing:-.03em; }
+  .logo span { color:#a688ff; }
+  main { max-width:720px; margin:0 auto; padding:32px; }
+  .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:24px; margin-bottom:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:#a1a5c4; font-size:13px; margin-bottom:24px; }
+  h2 { font-size:14px; color:#a1a5c4; margin:0 0 12px; text-transform:uppercase; letter-spacing:.04em; }
+  .barra-linha { margin-bottom:14px; }
+  .barra-label { display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
+  .barra-fundo { background:#232847; border-radius:6px; height:8px; overflow:hidden; }
+  .barra-preenchida { background:#a688ff; height:100%; }
+  .gap { font-size:13px; padding:8px 0; border-bottom:1px solid #232847; }
+  .gap:last-child { border-bottom:none; }
+  button { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
+    padding:10px 18px; font-size:14px; cursor:pointer; }
+  a.voltar { color:#a1a5c4; text-decoration:none; font-size:13px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">ky<span>vv</span>o people</div>
+    <a class="voltar" href="/people/painel.html">← Voltar ao painel</a>
+  </header>
+  <main id="conteudo">Carregando...</main>
+
+  <script>
+    const token = localStorage.getItem('people_token');
+    if (!token) window.location.href = '/people/login.html';
+    const id = new URLSearchParams(window.location.search).get('id');
+
+    const NOMES = { A: 'Analista', C: 'Comunicador', E: 'Executor', P: 'Planejador' };
+
+    function barras(profiler) {
+      return Object.keys(NOMES).map((p) => `
+        <div class="barra-linha">
+          <div class="barra-label"><span>${NOMES[p]}</span><span>${profiler[p]}%</span></div>
+          <div class="barra-fundo"><div class="barra-preenchida" style="width:${profiler[p]}%"></div></div>
+        </div>
+      `).join('');
+    }
+
+    function ocean(bigFive) {
+      return Object.values(bigFive).map((t) => `
+        <div class="barra-linha">
+          <div class="barra-label"><span>${t.nome}</span><span>${t.percentil}% (${t.nivel})</span></div>
+          <div class="barra-fundo"><div class="barra-preenchida" style="width:${t.percentil}%"></div></div>
+        </div>
+      `).join('');
+    }
+
+    async function carregar() {
+      const res = await fetch(`/people/api/candidatos/${id}/relatorio`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) { window.location.href = '/people/login.html'; return; }
+      const c = await res.json();
+      if (!res.ok) {
+        document.getElementById('conteudo').textContent = c.error || 'Erro ao carregar relatório';
+        return;
+      }
+      const r = c.resultado;
+
+      document.getElementById('conteudo').innerHTML = `
+        <div class="card">
+          <h1>${c.nome}</h1>
+          <div class="sub">Perfil dominante: ${r.perfilDominante.nome} · concluído em ${new Date(c.concluido_em).toLocaleDateString('pt-BR')}</div>
+          <button id="btn-pdf">Exportar PDF</button>
+        </div>
+
+        <div class="card">
+          <h2>Profiler — Rodada 1 (como eu me vejo)</h2>
+          ${barras(r.rodada1.profiler)}
+        </div>
+
+        <div class="card">
+          <h2>Profiler — Rodada 2 (como os outros me veem)</h2>
+          ${barras(r.rodada2.profiler)}
+        </div>
+
+        <div class="card">
+          <h2>Análise de gaps</h2>
+          ${Object.values(r.gaps).map((g) => `
+            <div class="gap">${g.nome}: ${g.diff > 0 ? '+' : ''}${g.diff} pontos — ${g.leitura}</div>
+          `).join('')}
+        </div>
+
+        <div class="card">
+          <h2>MBTI</h2>
+          <div class="gap">Rodada 1: ${r.rodada1.mbti.tipo}</div>
+          <div class="gap">Rodada 2: ${r.rodada2.mbti.tipo}</div>
+        </div>
+
+        <div class="card">
+          <h2>Big Five — Rodada 1</h2>
+          ${ocean(r.rodada1.bigFive)}
+        </div>
+
+        <div class="card">
+          <h2>Big Five — Rodada 2</h2>
+          ${ocean(r.rodada2.bigFive)}
+        </div>
+      `;
+
+      document.getElementById('btn-pdf').addEventListener('click', async () => {
+        const res = await fetch(`/people/api/candidatos/${id}/relatorio.pdf`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio-${c.nome.replace(/\s+/g, '-')}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

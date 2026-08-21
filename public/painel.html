@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Painel</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid #232847; }
+  .logo { font-size:20px; font-weight:800; letter-spacing:-.03em; }
+  .logo span { color:#a688ff; }
+  main { max-width:840px; margin:0 auto; padding:32px; }
+  .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:24px; margin-bottom:24px; }
+  h2 { font-size:16px; margin:0 0 16px; }
+  .linha { display:flex; gap:12px; flex-wrap:wrap; }
+  .linha input { flex:1; min-width:160px; box-sizing:border-box; background:#080b14; border:1px solid #232847;
+    border-radius:8px; padding:10px 12px; color:#f2f2f7; font-size:14px; }
+  button { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
+    padding:10px 18px; font-size:14px; cursor:pointer; }
+  button.secundario { background:transparent; color:#a1a5c4; border:1px solid #232847; font-weight:600; }
+  .msg { font-size:13px; margin-top:12px; min-height:16px; }
+  .msg.erro { color:#ff8080; }
+  .msg.ok { color:#7ee7a6; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #232847; }
+  th { color:#a1a5c4; font-weight:600; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+  .badge.pendente { background:#232847; color:#a1a5c4; }
+  .badge.iniciado { background:#3a3410; color:#e6c65a; }
+  .badge.concluido { background:#123a25; color:#7ee7a6; }
+  a.acao { color:#a688ff; text-decoration:none; font-size:12px; font-weight:600; margin-right:12px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">ky<span>vv</span>o people</div>
+    <button class="secundario" id="sair">Sair</button>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Cadastrar candidato</h2>
+      <form id="form-candidato">
+        <div class="linha">
+          <input id="nome" placeholder="Nome completo" required>
+          <input id="email" type="email" placeholder="E-mail" required>
+          <input id="cpf" placeholder="CPF (só números)" required>
+          <button type="submit">Enviar avaliação</button>
+        </div>
+        <div class="msg" id="msg-candidato"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Candidatos</h2>
+      <table>
+        <thead>
+          <tr><th>Nome</th><th>E-mail</th><th>Status</th><th>Cadastrado em</th><th></th></tr>
+        </thead>
+        <tbody id="tabela-candidatos"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    const token = localStorage.getItem('people_token');
+    if (!token) window.location.href = '/people/login.html';
+
+    async function apiFetch(url, opts = {}) {
+      const res = await fetch(url, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
+      });
+      if (res.status === 401) {
+        localStorage.removeItem('people_token');
+        window.location.href = '/people/login.html';
+        throw new Error('Sessão expirada');
+      }
+      return res;
+    }
+
+    document.getElementById('sair').addEventListener('click', () => {
+      localStorage.removeItem('people_token');
+      window.location.href = '/people/login.html';
+    });
+
+    const STATUS_LABEL = { pendente: 'Pendente', iniciado: 'Em andamento', concluido: 'Concluído' };
+
+    async function carregarCandidatos() {
+      const res = await apiFetch('/people/api/candidatos');
+      const candidatos = await res.json();
+      const corpo = document.getElementById('tabela-candidatos');
+      corpo.innerHTML = candidatos.map((c) => `
+        <tr>
+          <td>${c.nome}</td>
+          <td>${c.email}</td>
+          <td><span class="badge ${c.status}">${STATUS_LABEL[c.status]}</span></td>
+          <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
+          <td>${c.status === 'concluido' ? `
+            <a class="acao" href="/people/relatorio.html?id=${c.id}">Ver relatório</a>
+            <a class="acao" href="#" data-pdf="${c.id}" data-nome="${c.nome}">Exportar PDF</a>
+          ` : ''}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">Nenhum candidato cadastrado ainda.</td></tr>';
+    }
+
+    document.getElementById('form-candidato').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('msg-candidato');
+      msg.textContent = '';
+      msg.className = 'msg';
+      try {
+        const res = await apiFetch('/people/api/candidatos', {
+          method: 'POST',
+          body: JSON.stringify({
+            nome: document.getElementById('nome').value,
+            email: document.getElementById('email').value,
+            cpf: document.getElementById('cpf').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha ao cadastrar candidato');
+        msg.textContent = 'Candidato cadastrado e link enviado por e-mail.';
+        msg.className = 'msg ok';
+        e.target.reset();
+        carregarCandidatos();
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = 'msg erro';
+      }
+    });
+
+    document.getElementById('tabela-candidatos').addEventListener('click', async (e) => {
+      const alvo = e.target.closest('[data-pdf]');
+      if (!alvo) return;
+      e.preventDefault();
+      const res = await apiFetch(`/people/api/candidatos/${alvo.dataset.pdf}/relatorio.pdf`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-${alvo.dataset.nome.replace(/\s+/g, '-')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    carregarCandidatos();
+  </script>
+</body>
+</html>
