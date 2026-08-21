@@ -41,6 +41,8 @@ async function build() {
     prefix: '/people/',
   });
 
+  fastify.get('/', async (request, reply) => reply.redirect('/people/login.html'));
+
   // --- Auth (psicóloga, usuário fixo via env vars) ---
   fastify.post('/people/api/login', async (request, reply) => {
     const { email, senha } = request.body || {};
