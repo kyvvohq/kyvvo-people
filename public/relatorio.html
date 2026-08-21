@@ -9,7 +9,9 @@
   body { margin:0; background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
   header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid #232847; }
   .logo { font-size:20px; font-weight:800; letter-spacing:-.03em; }
-  .logo span { color:#a688ff; }
+  .logo span { color:#a688ff; position:relative; }
+  .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
   main { max-width:720px; margin:0 auto; padding:32px; }
   .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:24px; margin-bottom:24px; }
   h1 { font-size:20px; margin:0 0 4px; }

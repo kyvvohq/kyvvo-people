@@ -10,7 +10,9 @@
     background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
   .card { width:100%; max-width:360px; background:#12162a; border:1px solid #232847; border-radius:16px; padding:32px; }
   .logo { font-size:22px; font-weight:800; letter-spacing:-.03em; margin-bottom:24px; }
-  .logo span { color:#a688ff; }
+  .logo span { color:#a688ff; position:relative; }
+  .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
   label { display:block; font-size:12px; color:#a1a5c4; margin:16px 0 6px; }
   input { width:100%; box-sizing:border-box; background:#080b14; border:1px solid #232847; border-radius:8px;
     padding:10px 12px; color:#f2f2f7; font-size:14px; }
