@@ -125,7 +125,14 @@ async function build() {
       await client.query(
         `insert into candidatos_historico (id, candidato_id, respostas_rodada1, respostas_rodada2, resultado, concluido_em)
          values ($1, $2, $3, $4, $5, $6)`,
-        [crypto.randomUUID(), candidato.id, candidato.respostas_rodada1, candidato.respostas_rodada2, candidato.resultado, candidato.concluido_em]
+        [
+          crypto.randomUUID(),
+          candidato.id,
+          JSON.stringify(candidato.respostas_rodada1),
+          JSON.stringify(candidato.respostas_rodada2),
+          JSON.stringify(candidato.resultado),
+          candidato.concluido_em,
+        ]
       );
       await client.query(
         `update candidatos
