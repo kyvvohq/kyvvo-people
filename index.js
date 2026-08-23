@@ -2,7 +2,6 @@ require('dotenv').config();
 
 const path = require('path');
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const Fastify = require('fastify');
 const fastifyJwt = require('@fastify/jwt');
 const fastifyStatic = require('@fastify/static');
@@ -16,6 +15,7 @@ const { gerarRelatorioPdf } = require('./lib/pdf');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
+const KYVVO_APP_URL = process.env.KYVVO_APP_URL || 'https://app.kyvvo.com.br';
 
 // Lista pública das características (sem os pesos MBTI/OCEAN — só o que o
 // candidato precisa ver na tela de avaliação).
@@ -43,16 +43,51 @@ async function build() {
 
   fastify.get('/', async (request, reply) => reply.redirect('/people/login.html'));
 
-  // --- Auth (psicóloga, usuário fixo via env vars) ---
+  // --- Auth: valida contra o serviço de login do Kyvvo principal em vez de
+  // credencial fixa (qualquer usuário Kyvvo com o módulo "people" ativo pode
+  // entrar). O People nunca vê/toca usuarios/tenants — só confia numa
+  // checagem servidor-a-servidor e emite seu próprio JWT interno depois.
   fastify.post('/people/api/login', async (request, reply) => {
     const { email, senha } = request.body || {};
-    const emailOk = email && email.toLowerCase() === (process.env.PEOPLE_ADMIN_EMAIL || '').toLowerCase();
-    const senhaOk = emailOk && senha && bcrypt.compareSync(senha, process.env.PEOPLE_ADMIN_PASSWORD_HASH || '');
-    if (!emailOk || !senhaOk) {
-      return reply.code(401).send({ error: 'E-mail ou senha inválidos' });
+    if (!email || !senha) {
+      return reply.code(400).send({ error: 'E-mail e senha são obrigatórios' });
     }
-    const token = fastify.jwt.sign({ email }, { expiresIn: '12h' });
-    return { token };
+
+    let loginRes;
+    try {
+      loginRes = await fetch(`${KYVVO_APP_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha }),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (err) {
+      request.log.error(`Falha ao contatar login do Kyvvo: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível validar o login agora. Tente novamente em instantes.' });
+    }
+    if (!loginRes.ok) {
+      const dados = await loginRes.json().catch(() => ({}));
+      return reply.code(401).send({ error: dados.error || 'E-mail ou senha inválidos' });
+    }
+    const { token: kyvvoToken, nome } = await loginRes.json();
+
+    let acessoRes;
+    try {
+      acessoRes = await fetch(`${KYVVO_APP_URL}/api/auth/people/acesso`, {
+        headers: { Authorization: `Bearer ${kyvvoToken}` },
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (err) {
+      request.log.error(`Falha ao checar acesso ao módulo people: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível validar o login agora. Tente novamente em instantes.' });
+    }
+    if (!acessoRes.ok) {
+      return reply.code(403).send({ error: 'Sua conta Kyvvo não tem acesso ao módulo People.' });
+    }
+    const { tenantId } = await acessoRes.json();
+
+    const token = fastify.jwt.sign({ tenantId, email, nome }, { expiresIn: '12h' });
+    return { token, nome };
   });
 
   // --- Portal da psicóloga (autenticado) ---
@@ -68,8 +103,8 @@ async function build() {
     const id = crypto.randomUUID();
     const token = crypto.randomUUID();
     await pool.query(
-      'insert into candidatos (id, nome, email, cpf, token) values ($1, $2, $3, $4, $5)',
-      [id, nome, email, normalizar(cpf), token]
+      'insert into candidatos (id, nome, email, cpf, token, tenant_id) values ($1, $2, $3, $4, $5, $6)',
+      [id, nome, email, normalizar(cpf), token, request.user.tenantId]
     );
 
     const link = `${PUBLIC_URL}/people/avaliacao/${token}`;
@@ -78,15 +113,16 @@ async function build() {
     return reply.code(201).send({ id, token, link });
   });
 
-  fastify.get('/people/api/candidatos', { preHandler: fastify.authenticate }, async () => {
+  fastify.get('/people/api/candidatos', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      'select id, nome, email, status, criado_em, concluido_em from candidatos order by criado_em desc'
+      'select id, nome, email, status, criado_em, concluido_em from candidatos where tenant_id = $1 order by criado_em desc',
+      [request.user.tenantId]
     );
     return rows;
   });
 
   fastify.get('/people/api/candidatos/:id/relatorio', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { rows } = await pool.query('select * from candidatos where id = $1', [request.params.id]);
+    const { rows } = await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
     const candidato = rows[0];
     if (!candidato) return reply.code(404).send({ error: 'Candidato não encontrado' });
     if (candidato.status !== 'concluido') {
@@ -96,7 +132,7 @@ async function build() {
   });
 
   fastify.get('/people/api/candidatos/:id/relatorio.pdf', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { rows } = await pool.query('select * from candidatos where id = $1', [request.params.id]);
+    const { rows } = await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
     const candidato = rows[0];
     if (!candidato) return reply.code(404).send({ error: 'Candidato não encontrado' });
     if (candidato.status !== 'concluido') {
@@ -114,7 +150,7 @@ async function build() {
   // pra 'pendente', mantendo o mesmo token/link — decisão da psicóloga, o
   // candidato não pode se autodestravar depois de concluído.
   fastify.post('/people/api/candidatos/:id/refazer', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { rows } = await pool.query('select * from candidatos where id = $1', [request.params.id]);
+    const { rows } = await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
     const candidato = rows[0];
     if (!candidato) return reply.code(404).send({ error: 'Candidato não encontrado' });
     if (candidato.status !== 'concluido') {

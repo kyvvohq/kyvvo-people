@@ -2,21 +2,15 @@
 
 Avaliação comportamental (Profiler + MBTI + Big Five) para processos seletivos, via link único protegido por CPF — sem o candidato precisar criar conta.
 
-MVP mínimo: uso privado por uma psicóloga (login fixo) para conduzir um único processo seletivo. Serviço separado do Kyvvo principal — banco de dados, container e segredos isolados. Deploy em `people.kyvvo.com.br`.
+Multi-tenant: login valida contra o serviço de auth do Kyvvo principal (`POST /api/auth/login` + `GET /api/auth/people/acesso`, server-to-server) — qualquer usuário Kyvvo com o módulo "people" ativo no tenant consegue entrar, dados de candidatos ficam isolados por `tenant_id`. Serviço separado do Kyvvo principal — banco de dados, container e segredos isolados; o People nunca acessa `usuarios`/`tenants` diretamente. Deploy em `people.kyvvo.com.br`.
 
 ## Rodando localmente
 
 ```
 cp .env.example .env
-# preencher DATABASE_URL (Postgres local) e PEOPLE_ADMIN_PASSWORD_HASH
+# preencher DATABASE_URL (Postgres local) e KYVVO_APP_URL (aponte pro painel Kyvvo rodando local ou em produção)
 npm install
 npm start
-```
-
-Gerar o hash da senha da psicóloga:
-
-```
-node -e "console.log(require('bcryptjs').hashSync('SUA_SENHA', 10))"
 ```
 
 Sem `RESEND_API_KEY` configurada, o link de avaliação é apenas logado no console (modo dev).
