@@ -57,6 +57,7 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Falha no login');
         localStorage.setItem('people_token', data.token);
+        localStorage.setItem('people_nome', data.nome || '');
         window.location.href = '/people/painel.html';
       } catch (err) {
         erro.textContent = err.message;

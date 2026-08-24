@@ -4,156 +4,67 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — Vagas</title>
+<link rel="stylesheet" href="/people/shell.css">
 <style>
-  :root { color-scheme: dark; }
-  body { margin:0; background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
-  header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid #232847; }
-  .logo { font-size:20px; font-weight:800; letter-spacing:-.03em; }
-  .logo span { color:#a688ff; position:relative; }
-  .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
-    background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
-  nav { display:flex; gap:20px; }
-  nav a { color:#a1a5c4; text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; border-bottom:2px solid transparent; }
-  nav a.ativo { color:#f2f2f7; border-color:#a688ff; }
-  main { max-width:920px; margin:0 auto; padding:32px; }
-  .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:24px; margin-bottom:24px; }
-  h2 { font-size:16px; margin:0 0 16px; }
-  label { display:block; font-size:12px; color:#a1a5c4; margin:14px 0 6px; }
-  input, textarea, select { width:100%; box-sizing:border-box; background:#080b14; border:1px solid #232847; border-radius:8px;
-    padding:10px 12px; color:#f2f2f7; font-size:14px; font-family:inherit; }
-  textarea { min-height:70px; resize:vertical; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
-  @media(max-width:600px) { .grid2 { grid-template-columns:1fr; } }
-  button { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
-    padding:10px 18px; font-size:14px; cursor:pointer; margin-top:20px; }
-  button.secundario { background:transparent; color:#a1a5c4; border:1px solid #232847; font-weight:600; }
-  .msg { font-size:13px; margin-top:12px; min-height:16px; }
-  .msg.erro { color:#ff8080; }
-  .msg.ok { color:#7ee7a6; }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #232847; }
-  th { color:#a1a5c4; font-weight:600; }
-  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
-  .badge.nova { background:#232847; color:#a1a5c4; }
-  .badge.em_andamento { background:#3a3410; color:#e6c65a; }
-  .badge.pausada { background:#3a2418; color:#f5a878; }
-  .badge.encerrada { background:#123a25; color:#7ee7a6; }
-  a.acao { color:#a688ff; text-decoration:none; font-size:12px; font-weight:600; margin-right:12px; }
-  .candidaturas-lista { margin-top:16px; }
-  .candidaturas-lista .item { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #232847; font-size:13px; }
+  @media(max-width:520px) { .grid2 { grid-template-columns:1fr; } }
+  .candidaturas-lista .item { display:flex; justify-content:space-between; align-items:center; gap:12px;
+    padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .candidaturas-lista .item:last-child { border-bottom:none; }
 </style>
 </head>
 <body>
-  <header>
-    <div class="logo">ky<span>vv</span>o people</div>
-    <nav>
-      <a href="/people/painel.html">Candidatos</a>
-      <a href="/people/vagas.html" class="ativo">Vagas</a>
-    </nav>
-  </header>
-  <main>
-    <div class="card">
-      <h2 id="titulo-form">Nova vaga</h2>
-      <form id="form-vaga">
-        <input type="hidden" id="vaga-id">
-        <div class="grid2">
-          <div>
-            <label for="codigo">Código da vaga</label>
-            <input id="codigo">
-          </div>
-          <div>
-            <label for="nome">Nome da vaga *</label>
-            <input id="nome" required>
-          </div>
+  <div class="topbar">
+    <a class="logo" href="/people/painel.html" aria-label="Ir para o início">ky<span>vv</span>o people</a>
+    <div class="user-menu" id="user-menu">
+      <button class="user-menu-toggle" id="user-menu-toggle" type="button">
+        <div class="user-menu-avatar" id="user-menu-avatar"></div>
+        <div class="user-menu-textos">
+          <div class="user-menu-nome" id="user-menu-nome"></div>
+          <div class="user-menu-empresa">Kyvvo People</div>
         </div>
-        <label for="descricao">Descrição *</label>
-        <textarea id="descricao" required></textarea>
-        <div class="grid2">
-          <div>
-            <label for="salario">Salário</label>
-            <input id="salario" placeholder="Ex: A combinar, R$ 3.000 a R$ 4.000">
-          </div>
-          <div>
-            <label for="modalidade">Modalidade</label>
-            <select id="modalidade">
-              <option value="">Selecione</option>
-              <option>Presencial</option>
-              <option>Remoto</option>
-              <option>Híbrido</option>
-            </select>
-          </div>
-        </div>
-        <div class="grid2">
-          <div>
-            <label for="nivel_experiencia">Nível de experiência *</label>
-            <input id="nivel_experiencia" placeholder="Ex: Júnior, Pleno, Sênior" required>
-          </div>
-          <div>
-            <label for="cargo">Cargo *</label>
-            <input id="cargo" required>
-          </div>
-        </div>
-        <label for="requisitos">Requisitos *</label>
-        <textarea id="requisitos" required></textarea>
-        <label for="competencias">Competências *</label>
-        <textarea id="competencias" required></textarea>
-        <div id="campo-status" style="display:none">
-          <label for="status">Status</label>
-          <select id="status">
-            <option value="nova">Nova</option>
-            <option value="em_andamento">Em andamento</option>
-            <option value="pausada">Pausada</option>
-            <option value="encerrada">Encerrada</option>
-          </select>
-        </div>
-        <div class="msg" id="msg-form"></div>
-        <button type="submit" id="btn-salvar">Criar vaga</button>
-        <button type="button" class="secundario" id="btn-cancelar" style="display:none">Cancelar edição</button>
-      </form>
+        <span class="user-menu-chevron">▾</span>
+      </button>
+      <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
+        <button class="user-menu-sair" id="btn-sair" type="button"><span aria-hidden="true">⎋</span> Sair</button>
+      </div>
     </div>
+  </div>
+  <div class="painel-shell">
+    <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="menu">
+        <a class="menu-item" href="/people/painel.html">Início</a>
+        <a class="menu-item" href="/people/vagas.html">Vagas</a>
+        <a class="menu-item" href="/people/candidatos.html">Candidatos</a>
+        <a class="menu-item" href="/people/whatsapp.html">WhatsApp</a>
+        <a class="menu-item" href="/people/configuracoes.html">Configurações</a>
+      </nav>
+    </aside>
+    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="Ocultar menu" title="Ocultar menu" type="button">&lt;</button>
+    <div class="painel-main">
+      <div class="conteudo">
+        <div class="cabecalho-pagina">
+          <h1>Vagas</h1>
+          <button class="btn" id="btn-nova-vaga" type="button">+ Nova vaga</button>
+        </div>
 
-    <div class="card">
-      <h2>Vagas cadastradas</h2>
-      <table>
-        <thead><tr><th>Nome</th><th>Cargo</th><th>Status</th><th>Criada em</th><th></th></tr></thead>
-        <tbody id="tabela-vagas"></tbody>
-      </table>
+        <div class="card">
+          <table>
+            <thead><tr><th>Nome</th><th>Cargo</th><th>Status</th><th>Criada em</th><th></th></tr></thead>
+            <tbody id="tabela-vagas"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
+  </div>
+  <footer class="rodape-app">
+    <p class="rodape-app-copy">© 2026 <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo" class="rodape-logo-img">. Todos os direitos reservados.</p>
+  </footer>
 
-    <div class="card" id="card-candidaturas" style="display:none">
-      <h2 id="titulo-candidaturas">Candidaturas</h2>
-      <div class="candidaturas-lista" id="lista-candidaturas"></div>
-    </div>
-  </main>
-
+  <script src="/people/shell.js"></script>
   <script>
-    const token = localStorage.getItem('people_token');
-    if (!token) window.location.href = '/people/login.html';
-
-    async function apiFetch(url, opts = {}) {
-      const res = await fetch(url, {
-        ...opts,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem('people_token');
-        window.location.href = '/people/login.html';
-        throw new Error('Sessão expirada');
-      }
-      return res;
-    }
-
     const STATUS_LABEL = { nova: 'Nova', em_andamento: 'Em andamento', pausada: 'Pausada', encerrada: 'Encerrada' };
     const CAMPOS = ['codigo', 'nome', 'descricao', 'salario', 'modalidade', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
-
-    function limparForm() {
-      document.getElementById('vaga-id').value = '';
-      CAMPOS.forEach((c) => { document.getElementById(c).value = ''; });
-      document.getElementById('titulo-form').textContent = 'Nova vaga';
-      document.getElementById('btn-salvar').textContent = 'Criar vaga';
-      document.getElementById('btn-cancelar').style.display = 'none';
-      document.getElementById('campo-status').style.display = 'none';
-    }
 
     async function carregarVagas() {
       const res = await apiFetch('/people/api/vagas');
@@ -171,77 +82,121 @@
             <a class="acao" href="#" data-link="${v.id}">Copiar link</a>
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="5">Nenhuma vaga cadastrada ainda.</td></tr>';
+      `).join('') || '<tr><td colspan="5" class="vazio">Nenhuma vaga cadastrada ainda.</td></tr>';
     }
 
-    async function editarVaga(id) {
+    function formularioVaga(vaga) {
+      const v = vaga || {};
+      return `
+        <div class="modal-erro" id="msg-vaga"></div>
+        <div class="grid2">
+          <div><label for="codigo">Código da vaga</label><input id="codigo" value="${v.codigo || ''}"></div>
+          <div><label for="nome">Nome da vaga *</label><input id="nome" required value="${v.nome || ''}"></div>
+        </div>
+        <label for="descricao">Descrição *</label>
+        <textarea id="descricao" required>${v.descricao || ''}</textarea>
+        <div class="grid2">
+          <div>
+            <label for="salario">Salário</label>
+            <input id="salario" placeholder="Ex: A combinar, R$ 3.000 a R$ 4.000" value="${v.salario || ''}">
+          </div>
+          <div>
+            <label for="modalidade">Modalidade</label>
+            <select id="modalidade">
+              <option value="" ${!v.modalidade ? 'selected' : ''}>Selecione</option>
+              <option ${v.modalidade === 'Presencial' ? 'selected' : ''}>Presencial</option>
+              <option ${v.modalidade === 'Remoto' ? 'selected' : ''}>Remoto</option>
+              <option ${v.modalidade === 'Híbrido' ? 'selected' : ''}>Híbrido</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div>
+            <label for="nivel_experiencia">Nível de experiência *</label>
+            <input id="nivel_experiencia" placeholder="Ex: Júnior, Pleno, Sênior" required value="${v.nivel_experiencia || ''}">
+          </div>
+          <div><label for="cargo">Cargo *</label><input id="cargo" required value="${v.cargo || ''}"></div>
+        </div>
+        <label for="requisitos">Requisitos *</label>
+        <textarea id="requisitos" required>${v.requisitos || ''}</textarea>
+        <label for="competencias">Competências *</label>
+        <textarea id="competencias" required>${v.competencias || ''}</textarea>
+        ${vaga ? `
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="nova" ${v.status === 'nova' ? 'selected' : ''}>Nova</option>
+            <option value="em_andamento" ${v.status === 'em_andamento' ? 'selected' : ''}>Em andamento</option>
+            <option value="pausada" ${v.status === 'pausada' ? 'selected' : ''}>Pausada</option>
+            <option value="encerrada" ${v.status === 'encerrada' ? 'selected' : ''}>Encerrada</option>
+          </select>
+        ` : ''}
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="btn-cancelar-vaga">Cancelar</button>
+          <button type="submit" class="btn">${vaga ? 'Salvar alterações' : 'Criar vaga'}</button>
+        </div>
+      `;
+    }
+
+    function abrirModalVaga(vaga) {
+      abrirModal(
+        `<h3>${vaga ? `Editando: ${vaga.nome}` : 'Nova vaga'}</h3>`,
+        `<form id="form-vaga">${formularioVaga(vaga)}</form>`,
+        'modal-card-larga'
+      );
+
+      document.getElementById('btn-cancelar-vaga').addEventListener('click', fecharModal);
+      document.getElementById('form-vaga').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-vaga');
+        msg.textContent = '';
+        const dados = {};
+        CAMPOS.forEach((c) => { dados[c] = document.getElementById(c).value; });
+
+        try {
+          let res;
+          if (vaga) {
+            dados.status = document.getElementById('status').value;
+            res = await apiFetch(`/people/api/vagas/${vaga.id}`, { method: 'PATCH', body: JSON.stringify(dados) });
+          } else {
+            res = await apiFetch('/people/api/vagas', { method: 'POST', body: JSON.stringify(dados) });
+          }
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Falha ao salvar vaga');
+          fecharModal();
+          carregarVagas();
+        } catch (err) {
+          msg.textContent = err.message;
+        }
+      });
+    }
+
+    async function abrirModalEditar(id) {
       const res = await apiFetch(`/people/api/vagas/${id}`);
       const vaga = await res.json();
       if (!res.ok) { alert(vaga.error || 'Falha ao carregar vaga'); return; }
-      document.getElementById('vaga-id').value = vaga.id;
-      CAMPOS.forEach((c) => { document.getElementById(c).value = vaga[c] || ''; });
-      document.getElementById('status').value = vaga.status;
-      document.getElementById('campo-status').style.display = 'block';
-      document.getElementById('titulo-form').textContent = `Editando: ${vaga.nome}`;
-      document.getElementById('btn-salvar').textContent = 'Salvar alterações';
-      document.getElementById('btn-cancelar').style.display = 'inline-block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      abrirModalVaga(vaga);
     }
 
-    async function verCandidaturas(id, nome) {
-      const card = document.getElementById('card-candidaturas');
-      card.style.display = 'block';
-      document.getElementById('titulo-candidaturas').textContent = `Candidaturas — ${nome}`;
-      const lista = document.getElementById('lista-candidaturas');
-      lista.textContent = 'Carregando...';
+    async function abrirModalCandidaturas(id, nome) {
+      abrirModal(`<h3>Candidaturas — ${nome}</h3>`, '<div class="candidaturas-lista" id="lista-candidaturas">Carregando...</div>', 'modal-card-larga');
       const res = await apiFetch(`/people/api/vagas/${id}/candidaturas`);
       const candidaturas = await res.json();
-      lista.innerHTML = candidaturas.map((c) => `
+      document.getElementById('lista-candidaturas').innerHTML = candidaturas.map((c) => `
         <div class="item">
           <span>${c.nome} — ${c.whatsapp} — ${c.email}${c.linkedin ? ` — <a class="acao" href="${c.linkedin}" target="_blank">LinkedIn</a>` : ''}</span>
           <a class="acao" href="#" data-curriculo="${c.id}">Baixar currículo</a>
         </div>
-      `).join('') || '<div class="item">Nenhuma candidatura recebida ainda.</div>';
-      card.scrollIntoView({ behavior: 'smooth' });
+      `).join('') || '<div class="vazio">Nenhuma candidatura recebida ainda.</div>';
     }
 
-    document.getElementById('form-vaga').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const msg = document.getElementById('msg-form');
-      msg.textContent = '';
-      msg.className = 'msg';
-      const id = document.getElementById('vaga-id').value;
-      const dados = {};
-      CAMPOS.forEach((c) => { dados[c] = document.getElementById(c).value; });
-
-      try {
-        let res;
-        if (id) {
-          dados.status = document.getElementById('status').value;
-          res = await apiFetch(`/people/api/vagas/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
-        } else {
-          res = await apiFetch('/people/api/vagas', { method: 'POST', body: JSON.stringify(dados) });
-        }
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Falha ao salvar vaga');
-        msg.textContent = id ? 'Vaga atualizada.' : 'Vaga criada.';
-        msg.className = 'msg ok';
-        limparForm();
-        carregarVagas();
-      } catch (err) {
-        msg.textContent = err.message;
-        msg.className = 'msg erro';
-      }
-    });
-
-    document.getElementById('btn-cancelar').addEventListener('click', limparForm);
+    document.getElementById('btn-nova-vaga').addEventListener('click', () => abrirModalVaga(null));
 
     document.getElementById('tabela-vagas').addEventListener('click', (e) => {
       const editar = e.target.closest('[data-editar]');
-      if (editar) { e.preventDefault(); editarVaga(editar.dataset.editar); return; }
+      if (editar) { e.preventDefault(); abrirModalEditar(editar.dataset.editar); return; }
 
       const candidaturas = e.target.closest('[data-candidaturas]');
-      if (candidaturas) { e.preventDefault(); verCandidaturas(candidaturas.dataset.candidaturas, candidaturas.dataset.nome); return; }
+      if (candidaturas) { e.preventDefault(); abrirModalCandidaturas(candidaturas.dataset.candidaturas, candidaturas.dataset.nome); return; }
 
       const link = e.target.closest('[data-link]');
       if (link) {
@@ -251,7 +206,7 @@
       }
     });
 
-    document.getElementById('lista-candidaturas').addEventListener('click', async (e) => {
+    document.addEventListener('click', async (e) => {
       const alvo = e.target.closest('[data-curriculo]');
       if (!alvo) return;
       e.preventDefault();
