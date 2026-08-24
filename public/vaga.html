@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vaga — Kyvvo People</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:32px 24px 80px; }
+  .logo { font-size:20px; font-weight:800; letter-spacing:-.03em; margin-bottom:24px; }
+  .logo span { color:#a688ff; position:relative; }
+  .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
+  .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:28px; margin-bottom:24px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+  .pill { font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; background:#232847; color:#c7cdf5; }
+  h2 { font-size:13px; color:#a1a5c4; text-transform:uppercase; letter-spacing:.04em; margin:20px 0 8px; }
+  h2:first-of-type { margin-top:0; }
+  p.corpo { font-size:14px; line-height:1.7; color:#d8daea; white-space:pre-line; margin:0; }
+  label.campo { display:block; font-size:12px; color:#a1a5c4; margin:16px 0 6px; }
+  input[type=text], input[type=email] { width:100%; box-sizing:border-box; background:#080b14; border:1px solid #232847;
+    border-radius:8px; padding:10px 12px; color:#f2f2f7; font-size:14px; }
+  input[type=file] { width:100%; box-sizing:border-box; background:#080b14; border:1px dashed #232847;
+    border-radius:8px; padding:12px; color:#a1a5c4; font-size:13px; }
+  button { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
+    padding:12px 22px; font-size:14px; cursor:pointer; margin-top:20px; }
+  button:disabled { opacity:.5; cursor:default; }
+  .erro { color:#ff8080; font-size:13px; margin-top:12px; min-height:16px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="logo">ky<span>vv</span>o people</div>
+  <div class="card" id="conteudo">Carregando...</div>
+</main>
+
+<script>
+  const vagaId = window.location.pathname.split('/').filter(Boolean).pop();
+  const conteudo = document.getElementById('conteudo');
+
+  function telaErro(msg) {
+    conteudo.innerHTML = `<h1>Vaga não encontrada</h1><p class="corpo">${msg}</p>`;
+  }
+
+  function telaSucesso() {
+    conteudo.innerHTML = `
+      <h1>Candidatura enviada com sucesso</h1>
+      <p class="corpo">Obrigado por se candidatar! Seus dados e currículo foram recebidos e já estão disponíveis para a equipe de recrutamento.</p>`;
+  }
+
+  function telaVaga(vaga) {
+    conteudo.innerHTML = `
+      <h1>${vaga.nome}</h1>
+      <div class="meta">
+        <span class="pill">${vaga.cargo}</span>
+        <span class="pill">${vaga.nivel_experiencia}</span>
+        ${vaga.modalidade ? `<span class="pill">${vaga.modalidade}</span>` : ''}
+        ${vaga.salario ? `<span class="pill">${vaga.salario}</span>` : ''}
+      </div>
+
+      <h2>Descrição</h2>
+      <p class="corpo">${vaga.descricao}</p>
+
+      <h2>Requisitos</h2>
+      <p class="corpo">${vaga.requisitos}</p>
+
+      <h2>Competências</h2>
+      <p class="corpo">${vaga.competencias}</p>
+
+      <h2>Candidate-se</h2>
+      <form id="form-candidatura">
+        <label class="campo" for="nome">Nome completo *</label>
+        <input type="text" id="nome" required>
+
+        <label class="campo" for="whatsapp">WhatsApp *</label>
+        <input type="text" id="whatsapp" placeholder="Com DDD" required>
+
+        <label class="campo" for="email">E-mail *</label>
+        <input type="email" id="email" required>
+
+        <label class="campo" for="linkedin">LinkedIn</label>
+        <input type="text" id="linkedin" placeholder="https://linkedin.com/in/...">
+
+        <label class="campo" for="curriculo">Currículo (PDF ou DOCX) *</label>
+        <input type="file" id="curriculo" accept=".pdf,.docx" required>
+
+        <div class="erro" id="erro"></div>
+        <button type="submit" id="btn-enviar">Enviar candidatura</button>
+      </form>
+    `;
+
+    document.getElementById('form-candidatura').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const erro = document.getElementById('erro');
+      const btn = document.getElementById('btn-enviar');
+      erro.textContent = '';
+
+      const arquivo = document.getElementById('curriculo').files[0];
+      if (!arquivo) { erro.textContent = 'Anexe seu currículo.'; return; }
+
+      const form = new FormData();
+      form.append('nome', document.getElementById('nome').value);
+      form.append('whatsapp', document.getElementById('whatsapp').value);
+      form.append('email', document.getElementById('email').value);
+      form.append('linkedin', document.getElementById('linkedin').value);
+      form.append('curriculo', arquivo);
+
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/people/api/vaga-publica/${vagaId}/candidatar`, { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Não foi possível enviar sua candidatura');
+        telaSucesso();
+      } catch (err) {
+        erro.textContent = err.message;
+        btn.disabled = false;
+      }
+    });
+  }
+
+  async function iniciar() {
+    try {
+      const res = await fetch(`/people/api/vaga-publica/${vagaId}`);
+      const data = await res.json();
+      if (!res.ok) return telaErro(data.error || 'Esta vaga não está mais disponível.');
+      telaVaga(data);
+    } catch {
+      telaErro('Não foi possível carregar a vaga. Tente novamente em instantes.');
+    }
+  }
+
+  iniciar();
+</script>
+</body>
+</html>

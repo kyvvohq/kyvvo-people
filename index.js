@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const Fastify = require('fastify');
 const fastifyJwt = require('@fastify/jwt');
 const fastifyStatic = require('@fastify/static');
+const fastifyMultipart = require('@fastify/multipart');
 
 const { pool, migrar } = require('./lib/db');
 const { validarCpf, normalizar } = require('./lib/cpf');
@@ -41,7 +42,14 @@ async function build() {
     prefix: '/people/',
   });
 
-  fastify.get('/', async (request, reply) => reply.redirect('/people/login.html'));
+  fastify.register(fastifyMultipart, {
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  });
+
+  // Landing page (marketing, pública) — mesmo padrão de reply.sendFile já
+  // usado por /people/avaliacao/:token, ignora o prefixo /people/ do
+  // registro acima (sendFile resolve pelo `root`, não pela rota).
+  fastify.get('/', async (request, reply) => reply.sendFile('index.html'));
 
   // --- Auth: valida contra o serviço de login do Kyvvo principal em vez de
   // credencial fixa (qualquer usuário Kyvvo com o módulo "people" ativo pode
@@ -188,6 +196,150 @@ async function build() {
     }
 
     return { ok: true, link: `${PUBLIC_URL}/people/avaliacao/${candidato.token}` };
+  });
+
+  // --- Vagas (autenticado) ---
+  const CAMPOS_VAGA_OBRIGATORIOS = ['nome', 'descricao', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
+  const CAMPOS_VAGA_EDITAVEIS = [
+    'codigo', 'nome', 'descricao', 'salario', 'modalidade',
+    'nivel_experiencia', 'cargo', 'requisitos', 'competencias', 'status',
+  ];
+
+  fastify.post('/people/api/vagas', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = request.body || {};
+    const faltando = CAMPOS_VAGA_OBRIGATORIOS.filter((campo) => !dados[campo]);
+    if (faltando.length) {
+      return reply.code(400).send({ error: `Campos obrigatórios faltando: ${faltando.join(', ')}` });
+    }
+
+    const id = crypto.randomUUID();
+    await pool.query(
+      `insert into vagas (id, tenant_id, codigo, nome, descricao, salario, modalidade, nivel_experiencia, cargo, requisitos, competencias)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        id, request.user.tenantId, dados.codigo || null, dados.nome, dados.descricao,
+        dados.salario || null, dados.modalidade || null, dados.nivel_experiencia,
+        dados.cargo, dados.requisitos, dados.competencias,
+      ]
+    );
+    return reply.code(201).send({ id });
+  });
+
+  fastify.get('/people/api/vagas', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query(
+      'select id, codigo, nome, cargo, status, criado_em from vagas where tenant_id = $1 order by criado_em desc',
+      [request.user.tenantId]
+    );
+    return rows;
+  });
+
+  fastify.get('/people/api/vagas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query('select * from vagas where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+    return rows[0];
+  });
+
+  fastify.patch('/people/api/vagas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = request.body || {};
+    const campos = Object.keys(dados).filter((campo) => CAMPOS_VAGA_EDITAVEIS.includes(campo));
+    if (!campos.length) {
+      return reply.code(400).send({ error: 'Nenhum campo válido para atualizar' });
+    }
+    if (dados.status && !['nova', 'em_andamento', 'pausada', 'encerrada'].includes(dados.status)) {
+      return reply.code(400).send({ error: 'Status inválido' });
+    }
+
+    const sets = campos.map((campo, i) => `${campo} = $${i + 3}`).join(', ');
+    const valores = campos.map((campo) => dados[campo]);
+    const { rows } = await pool.query(
+      `update vagas set ${sets}, atualizado_em = now() where id = $1 and tenant_id = $2 returning id`,
+      [request.params.id, request.user.tenantId, ...valores]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+    return { ok: true };
+  });
+
+  fastify.get('/people/api/vagas/:id/candidaturas', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: vagaRows } = await pool.query('select id from vagas where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!vagaRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+
+    const { rows } = await pool.query(
+      'select id, nome, whatsapp, email, linkedin, curriculo_nome, criado_em from candidaturas where vaga_id = $1 order by criado_em desc',
+      [request.params.id]
+    );
+    return rows;
+  });
+
+  fastify.get('/people/api/candidaturas/:id/curriculo', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `select c.curriculo_nome, c.curriculo_tipo, c.curriculo_arquivo
+       from candidaturas c join vagas v on v.id = c.vaga_id
+       where c.id = $1 and v.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+    const candidatura = rows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Currículo não encontrado' });
+
+    reply.header('Content-Type', candidatura.curriculo_tipo);
+    reply.header('Content-Disposition', `attachment; filename="${candidatura.curriculo_nome}"`);
+    return reply.send(candidatura.curriculo_arquivo);
+  });
+
+  // --- Vaga pública (candidato, sem login) ---
+  const EXTENSOES_CURRICULO_ACEITAS = ['.pdf', '.docx'];
+
+  fastify.get('/people/vaga/:id', async (request, reply) => {
+    return reply.sendFile('vaga.html');
+  });
+
+  fastify.get('/people/api/vaga-publica/:id', async (request, reply) => {
+    const { rows } = await pool.query(
+      `select nome, descricao, salario, modalidade, nivel_experiencia, cargo, requisitos, competencias, status
+       from vagas where id = $1`,
+      [request.params.id]
+    );
+    const vaga = rows[0];
+    if (!vaga || vaga.status === 'encerrada') {
+      return reply.code(404).send({ error: 'Vaga não encontrada ou encerrada' });
+    }
+    return vaga;
+  });
+
+  fastify.post('/people/api/vaga-publica/:id/candidatar', async (request, reply) => {
+    const { rows: vagaRows } = await pool.query("select id, status from vagas where id = $1", [request.params.id]);
+    const vaga = vagaRows[0];
+    if (!vaga || vaga.status === 'encerrada') {
+      return reply.code(404).send({ error: 'Vaga não encontrada ou encerrada' });
+    }
+
+    const campos = {};
+    let arquivo = null;
+    for await (const part of request.parts()) {
+      if (part.type === 'file') {
+        const extensao = path.extname(part.filename || '').toLowerCase();
+        if (!EXTENSOES_CURRICULO_ACEITAS.includes(extensao)) {
+          return reply.code(400).send({ error: 'Currículo deve ser PDF ou DOCX' });
+        }
+        arquivo = { nome: part.filename, tipo: part.mimetype, buffer: await part.toBuffer() };
+      } else {
+        campos[part.fieldname] = part.value;
+      }
+    }
+
+    if (!campos.nome || !campos.whatsapp || !campos.email) {
+      return reply.code(400).send({ error: 'nome, whatsapp e email são obrigatórios' });
+    }
+    if (!arquivo) {
+      return reply.code(400).send({ error: 'Currículo é obrigatório' });
+    }
+
+    await pool.query(
+      `insert into candidaturas (id, vaga_id, tenant_id, nome, whatsapp, email, linkedin, curriculo_nome, curriculo_tipo, curriculo_arquivo)
+       values ($1, $2, (select tenant_id from vagas where id = $2), $3, $4, $5, $6, $7, $8, $9)`,
+      [crypto.randomUUID(), vaga.id, campos.nome, campos.whatsapp, campos.email, campos.linkedin || null, arquivo.nome, arquivo.tipo, arquivo.buffer]
+    );
+
+    return reply.code(201).send({ ok: true });
   });
 
   // --- Avaliação pública (candidato, sem login — gate por CPF) ---

@@ -12,6 +12,10 @@
   .logo span { color:#a688ff; position:relative; }
   .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
     background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
+  .cabecalho-esquerda { display:flex; align-items:center; gap:32px; }
+  nav { display:flex; gap:20px; }
+  nav a { color:#a1a5c4; text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; border-bottom:2px solid transparent; }
+  nav a.ativo { color:#f2f2f7; border-color:#a688ff; }
   main { max-width:840px; margin:0 auto; padding:32px; }
   .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:24px; margin-bottom:24px; }
   h2 { font-size:16px; margin:0 0 16px; }
@@ -36,7 +40,13 @@
 </head>
 <body>
   <header>
-    <div class="logo">ky<span>vv</span>o people</div>
+    <div class="cabecalho-esquerda">
+      <div class="logo">ky<span>vv</span>o people</div>
+      <nav>
+        <a href="/people/painel.html" class="ativo">Candidatos</a>
+        <a href="/people/vagas.html">Vagas</a>
+      </nav>
+    </div>
     <button class="secundario" id="sair">Sair</button>
   </header>
   <main>

@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Recrutamento inteligente</title>
+<meta name="description" content="Automatize a triagem de candidatos, agende entrevistas, aplique avaliações comportamentais e comunique-se automaticamente durante todo o processo seletivo.">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #080b14;
+    --bg2: #12162a;
+    --bg3: #0d1024;
+    --border: #232847;
+    --accent: #7c5cfc;
+    --accent-light: #a688ff;
+    --cyan: #00d4ff;
+    --muted: #a1a5c4;
+    --text: #f2f2f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; }
+  a { color: inherit; }
+  .wrap { max-width:1160px; margin:0 auto; padding:0 24px; }
+
+  /* Header */
+  header { position:sticky; top:0; z-index:10; background:rgba(8,11,20,.92); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border); }
+  .header-inner { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; max-width:1160px; margin:0 auto; }
+  .logo { font-size:19px; font-weight:800; letter-spacing:-.03em; }
+  .logo span { color:var(--accent-light); position:relative; }
+  .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,var(--accent),var(--cyan)); border-radius:2px; }
+  nav.principal { display:flex; gap:28px; }
+  nav.principal a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; }
+  nav.principal a:hover { color:var(--text); }
+  .header-direita { display:flex; align-items:center; gap:20px; }
+  a.entrar { color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; }
+  .btn { display:inline-flex; align-items:center; gap:6px; background:var(--accent-light); color:var(--bg); font-weight:700;
+    border:none; border-radius:10px; padding:11px 20px; font-size:13px; cursor:pointer; text-decoration:none; white-space:nowrap; }
+  .btn.secundario { background:transparent; color:var(--text); border:1px solid var(--border); }
+  .btn.pequeno { padding:8px 16px; font-size:12px; }
+
+  section { padding:70px 24px; }
+  .eyebrow { text-align:center; font-size:22px; font-weight:800; letter-spacing:-.02em; margin:0 0 40px; }
+  .destaque { background:linear-gradient(90deg,var(--accent-light),var(--cyan)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+  /* Hero */
+  .hero { padding:64px 24px 80px; }
+  .hero-inner { max-width:1160px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center; }
+  @media(max-width:900px){ .hero-inner{ grid-template-columns:1fr; } }
+  .hero h1 { font-size:clamp(30px,4vw,42px); line-height:1.15; letter-spacing:-.02em; margin:0 0 16px; }
+  .hero p.sub { color:var(--muted); font-size:15px; line-height:1.7; max-width:480px; margin:0 0 28px; }
+  .hero-beneficios { display:flex; gap:24px; margin-bottom:28px; flex-wrap:wrap; }
+  .hero-beneficio { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); max-width:140px; }
+  .hero-beneficio .icone { width:30px; height:30px; border-radius:8px; background:#1c1740; display:flex; align-items:center;
+    justify-content:center; flex-shrink:0; font-size:14px; }
+  .hero-ctas { display:flex; gap:14px; flex-wrap:wrap; }
+
+  /* Mockup dashboard */
+  .mockup { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:20px; }
+  .mockup-topo { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .mockup-logo { font-size:14px; font-weight:800; }
+  .mockup-logo span { color:var(--accent-light); }
+  .mockup-titulo { font-size:12px; color:var(--muted); font-weight:600; }
+  .mockup-body { display:grid; grid-template-columns:110px 1fr; gap:14px; }
+  .mockup-menu { display:flex; flex-direction:column; gap:4px; }
+  .mockup-menu span { font-size:10px; color:var(--muted); padding:6px 8px; border-radius:6px; }
+  .mockup-menu span.ativo { background:#1c1740; color:var(--accent-light); font-weight:700; }
+  .mockup-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
+  .mockup-stat { background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px; }
+  .mockup-stat .num { font-size:16px; font-weight:800; }
+  .mockup-stat .lbl { font-size:9px; color:var(--muted); margin-bottom:2px; }
+  .mockup-stat .delta { font-size:9px; color:#7ee7a6; }
+  .mockup-listas { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .mockup-lista-box { background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px; }
+  .mockup-lista-box h4 { font-size:10px; color:var(--muted); margin:0 0 8px; font-weight:600; }
+  .mockup-lista-item { display:flex; justify-content:space-between; font-size:9px; padding:4px 0; border-bottom:1px solid var(--border); }
+  .mockup-lista-item:last-child { border-bottom:none; }
+  .mini-badge { font-size:8px; padding:2px 6px; border-radius:999px; background:#3a3410; color:#e6c65a; font-weight:700; }
+
+  /* Desafios */
+  .grid-6 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:1160px; margin:0 auto; }
+  @media(max-width:900px){ .grid-6{ grid-template-columns:1fr 1fr; } }
+  @media(max-width:600px){ .grid-6{ grid-template-columns:1fr; } }
+  .desafio-card { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:22px; font-size:13px;
+    color:var(--muted); line-height:1.5; }
+  .desafio-card .icone { font-size:20px; margin-bottom:12px; }
+
+  /* Como funciona */
+  .passos { display:flex; justify-content:space-between; max-width:1160px; margin:0 auto 8px; position:relative; flex-wrap:wrap; gap:24px; }
+  .passo { flex:1; min-width:130px; text-align:center; }
+  .passo .num { width:44px; height:44px; border-radius:50%; border:2px solid var(--accent-light); color:var(--accent-light);
+    display:flex; align-items:center; justify-content:center; font-weight:800; margin:0 auto 12px; background:var(--bg2); }
+  .passo h4 { font-size:13px; margin:0 0 6px; }
+  .passo p { font-size:11px; color:var(--muted); line-height:1.5; margin:0; }
+
+  /* Features */
+  .grid-features { display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:1160px; margin:0 auto; }
+  @media(max-width:700px){ .grid-features{ grid-template-columns:1fr; } }
+  .feature-card { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:20px; display:flex; gap:14px; }
+  .feature-icone { width:40px; height:40px; border-radius:10px; background:#1c1740; color:var(--accent-light); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .feature-card h4 { font-size:14px; margin:0 0 6px; }
+  .feature-card p { font-size:12px; color:var(--muted); line-height:1.5; margin:0; }
+
+  /* Relatórios */
+  .relatorios-secao { display:grid; grid-template-columns:1fr 1fr; gap:40px; max-width:1160px; margin:0 auto; align-items:center; }
+  @media(max-width:900px){ .relatorios-secao{ grid-template-columns:1fr; } }
+  .relatorios-secao h2 { font-size:26px; margin:0 0 16px; text-align:left; }
+  .relatorios-secao p.sub { color:var(--muted); font-size:14px; line-height:1.7; margin:0 0 20px; }
+  .checklist { list-style:none; padding:0; margin:0 0 24px; }
+  .checklist li { font-size:13px; color:var(--muted); padding:6px 0; }
+  .checklist li::before { content:'✓ '; color:var(--accent-light); font-weight:700; }
+
+  .relatorio-exemplo { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:22px; }
+  .relatorio-topo { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .relatorio-avatar { width:44px; height:44px; border-radius:50%; border:2px solid var(--accent-light); display:flex;
+    align-items:center; justify-content:center; font-weight:800; font-size:14px; color:var(--accent-light); }
+  .relatorio-nome { font-weight:700; font-size:14px; }
+  .relatorio-tag { font-size:11px; color:var(--muted); }
+  .relatorio-score { margin-left:auto; text-align:right; }
+  .relatorio-score .num { font-size:20px; font-weight:800; color:var(--accent-light); }
+  .relatorio-score .lbl { font-size:9px; color:var(--muted); }
+  .relatorio-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+  @media(max-width:520px){ .relatorio-cols{ grid-template-columns:1fr; } }
+  .relatorio-cols h5 { font-size:11px; color:var(--muted); margin:0 0 8px; text-transform:uppercase; }
+  .relatorio-cols ul { list-style:none; padding:0; margin:0; font-size:11px; color:var(--muted); }
+  .relatorio-cols li { padding:3px 0; }
+
+  /* Pra quem é */
+  .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; max-width:1160px; margin:0 auto; }
+  @media(max-width:800px){ .grid-4{ grid-template-columns:1fr 1fr; } }
+  @media(max-width:480px){ .grid-4{ grid-template-columns:1fr; } }
+  .publico-card { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:22px; text-align:center; }
+  .publico-card .icone { width:44px; height:44px; border-radius:10px; background:#1c1740; color:var(--accent-light);
+    display:flex; align-items:center; justify-content:center; font-size:18px; margin:0 auto 12px; }
+  .publico-card h4 { font-size:13px; margin:0 0 6px; }
+  .publico-card p { font-size:11px; color:var(--muted); margin:0; }
+
+  /* Planos */
+  .grid-planos { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; max-width:1160px; margin:0 auto; align-items:stretch; }
+  @media(max-width:900px){ .grid-planos{ grid-template-columns:1fr 1fr; } }
+  @media(max-width:520px){ .grid-planos{ grid-template-columns:1fr; } }
+  .plano-card { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:22px; display:flex; flex-direction:column; position:relative; }
+  .plano-card.destaque { border-color:var(--accent-light); }
+  .plano-selo { position:absolute; top:-11px; left:50%; transform:translateX(-50%); background:var(--accent-light); color:var(--bg);
+    font-size:10px; font-weight:800; padding:4px 12px; border-radius:999px; white-space:nowrap; }
+  .plano-card h4 { font-size:14px; margin:0 0 6px; }
+  .plano-preco { font-size:24px; font-weight:800; margin-bottom:14px; }
+  .plano-preco span { font-size:12px; color:var(--muted); font-weight:400; }
+  .plano-card ul { list-style:none; padding:0; margin:0 0 20px; flex:1; }
+  .plano-card li { font-size:12px; color:var(--muted); padding:5px 0; }
+  .plano-card li::before { content:'✓ '; color:var(--accent-light); font-weight:700; }
+  .plano-card .btn { text-align:center; justify-content:center; }
+  .plano-anuidade { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:8px; }
+  .plano-anuidade .icone { font-size:22px; }
+  .plano-anuidade .selo-desconto { border:2px solid var(--accent-light); border-radius:50%; width:52px; height:52px;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; color:var(--accent-light); margin-top:8px; }
+
+  /* CTA final */
+  .cta-final { background:linear-gradient(120deg,#1c1740,#0d1024); border:1px solid var(--border); border-radius:20px;
+    max-width:1160px; margin:0 auto; padding:36px 40px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+  .cta-final-esquerda { display:flex; align-items:center; gap:16px; }
+  .cta-final .icone { width:48px; height:48px; border-radius:12px; background:var(--accent-light); color:var(--bg);
+    display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+  .cta-final h3 { font-size:18px; margin:0 0 4px; }
+  .cta-final p { font-size:12px; color:var(--muted); margin:0; }
+  .cta-final-direita { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .cta-final-direita .whats { font-size:11px; color:var(--muted); }
+
+  footer { border-top:1px solid var(--border); padding:32px 24px; }
+  .footer-inner { max-width:1160px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+  .footer-inner .muted { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">ky<span>vv</span>o people</div>
+    <nav class="principal">
+      <a href="#solucoes">Soluções</a>
+      <a href="#recursos">Recursos</a>
+      <a href="#planos">Planos</a>
+      <a href="#sobre">Sobre nós</a>
+      <a href="#contato">Contato</a>
+    </nav>
+    <div class="header-direita">
+      <a class="entrar" href="/people/login.html">Entrar</a>
+      <a class="btn pequeno" href="https://wa.me/553484285182?text=Ol%C3%A1!%20Quero%20agendar%20uma%20demonstra%C3%A7%C3%A3o%20do%20Kyvvo%20People." target="_blank" rel="noopener">Agendar demonstração →</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero" id="solucoes">
+  <div class="hero-inner">
+    <div>
+      <h1>Seu assistente virtual<br>de <span class="destaque">recrutamento</span>.</h1>
+      <p class="sub">Automatize a triagem de candidatos, agende entrevistas, aplique avaliações comportamentais e comunique-se automaticamente durante todo o processo seletivo.</p>
+      <div class="hero-beneficios">
+        <div class="hero-beneficio"><span class="icone">⏱</span> Menos tempo em tarefas operacionais</div>
+        <div class="hero-beneficio"><span class="icone">🎯</span> Mais assertividade nas decisões</div>
+        <div class="hero-beneficio"><span class="icone">🤝</span> Melhor experiência para candidatos e gestores</div>
+      </div>
+      <div class="hero-ctas">
+        <a class="btn" href="https://wa.me/553484285182?text=Ol%C3%A1!%20Quero%20solicitar%20uma%20demonstra%C3%A7%C3%A3o%20do%20Kyvvo%20People." target="_blank" rel="noopener">Solicitar demonstração →</a>
+        <a class="btn secundario" href="#recursos">Saiba mais ⌄</a>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-topo">
+        <div class="mockup-logo">ky<span>vv</span>o people</div>
+        <div class="mockup-titulo">Dashboard</div>
+      </div>
+      <div class="mockup-body">
+        <div class="mockup-menu">
+          <span class="ativo">Dashboard</span>
+          <span>Vagas</span>
+          <span>Candidatos</span>
+          <span>Avaliações</span>
+          <span>Agenda</span>
+          <span>Relatórios</span>
+          <span>Configurações</span>
+        </div>
+        <div>
+          <div class="mockup-stats">
+            <div class="mockup-stat"><div class="lbl">Vagas abertas</div><div class="num">12</div><div class="delta">+2 esta semana</div></div>
+            <div class="mockup-stat"><div class="lbl">Candidatos avaliados</div><div class="num">87</div><div class="delta">+18 esta semana</div></div>
+            <div class="mockup-stat"><div class="lbl">Entrevistas agendadas</div><div class="num">24</div><div class="delta">-7 esta semana</div></div>
+          </div>
+          <div class="mockup-listas">
+            <div class="mockup-lista-box">
+              <h4>Processos em andamento</h4>
+              <div class="mockup-lista-item"><span>Analista de RH</span><span class="mini-badge">Em andamento</span></div>
+              <div class="mockup-lista-item"><span>Assistente Administrativo</span><span class="mini-badge">Triagem</span></div>
+              <div class="mockup-lista-item"><span>Coordenador Comercial</span><span class="mini-badge">Entrevista</span></div>
+              <div class="mockup-lista-item"><span>Analista Financeiro</span><span class="mini-badge">Avaliação</span></div>
+            </div>
+            <div class="mockup-lista-box">
+              <h4>Próximas entrevistas</h4>
+              <div class="mockup-lista-item"><span>Mariana Silva</span><span>Hoje, 09:30</span></div>
+              <div class="mockup-lista-item"><span>Bruno Alves</span><span>Hoje, 14:00</span></div>
+              <div class="mockup-lista-item"><span>Carla Santos</span><span>Amanhã, 09:00</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="eyebrow">Os desafios que todo RH conhece</h2>
+  <div class="grid-6">
+    <div class="desafio-card"><div class="icone">⏳</div>Triagem manual de dezenas ou centenas de currículos</div>
+    <div class="desafio-card"><div class="icone">📅</div>Trocas intermináveis de mensagens para agendar entrevistas</div>
+    <div class="desafio-card"><div class="icone">💬</div>Candidatos cobrando retorno sobre o processo</div>
+    <div class="desafio-card"><div class="icone">📊</div>Dificuldade para comparar candidatos de forma objetiva</div>
+    <div class="desafio-card"><div class="icone">📝</div>Horas gastas elaborando pareceres para gestores</div>
+    <div class="desafio-card"><div class="icone">⌛</div>Falta de tempo para focar no que realmente importa: entrevistar e contratar</div>
+  </div>
+</section>
+
+<section id="recursos">
+  <h2 class="eyebrow">Como funciona a <span class="destaque">Kyvvo People</span></h2>
+  <div class="passos">
+    <div class="passo"><div class="num">1</div><h4>Cadastre sua vaga</h4><p>Informe requisitos, competências e perfil ideal.</p></div>
+    <div class="passo"><div class="num">2</div><h4>Adicione candidatos</h4><p>Importe currículos ou aguarde candidaturas pelo link público.</p></div>
+    <div class="passo"><div class="num">3</div><h4>Convites automáticos</h4><p>Candidatos recebem o link de avaliação comportamental por e-mail.</p></div>
+    <div class="passo"><div class="num">4</div><h4>Avaliação comportamental</h4><p>Aplicação automática do mapeamento e geração de relatórios completos.</p></div>
+    <div class="passo"><div class="num">5</div><h4>Receba os relatórios</h4><p>Visualize aderência, pontos fortes, riscos e recomendações.</p></div>
+    <div class="passo"><div class="num">6</div><h4>Compare candidatos</h4><p>Analise lado a lado quem tem maior aderência à vaga.</p></div>
+    <div class="passo"><div class="num">7</div><h4>Decida com confiança</h4><p>Exporte relatórios em PDF e compartilhe com os gestores.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2 class="eyebrow">Muito mais do que um <span class="destaque">teste comportamental</span></h2>
+  <div class="grid-features">
+    <div class="feature-card"><div class="feature-icone">🗂</div><div><h4>Gestão de vagas</h4><p>Cadastre vagas com requisitos e competências, acompanhe o status de cada processo num só lugar.</p></div></div>
+    <div class="feature-card"><div class="feature-icone">🧠</div><div><h4>Avaliação comportamental</h4><p>Mapeamento baseado em Profiler, MBTI e Big Five a partir de uma única avaliação.</p></div></div>
+    <div class="feature-card"><div class="feature-icone">📄</div><div><h4>Relatórios completos</h4><p>Análises prontas com radar comparativo, gaps e recomendações, exportáveis em PDF.</p></div></div>
+    <div class="feature-card"><div class="feature-icone">🔗</div><div><h4>Link público de candidatura</h4><p>Compartilhe a vaga e receba candidaturas com currículo direto na plataforma.</p></div></div>
+    <div class="feature-card"><div class="feature-icone">👥</div><div><h4>Banco de candidaturas</h4><p>Organize e revise as candidaturas recebidas por vaga, com currículo e contato à mão.</p></div></div>
+    <div class="feature-card"><div class="feature-icone">🔒</div><div><h4>Dados isolados por conta</h4><p>Cada empresa acessa só seus próprios dados — vagas, candidatos e relatórios totalmente isolados.</p></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="relatorios-secao">
+    <div>
+      <h2>Decisões mais <span class="destaque">assertivas</span> com relatórios <span class="destaque">completos</span></h2>
+      <p class="sub">Tenha em mãos todas as informações que você precisa para escolher os melhores talentos.</p>
+      <ul class="checklist">
+        <li>Profiler, MBTI e Big Five numa única avaliação</li>
+        <li>Análise de gaps entre autoavaliação e percepção externa</li>
+        <li>Pontos fortes e pontos de atenção por perfil</li>
+        <li>Exportação em PDF</li>
+      </ul>
+      <a class="btn" href="https://wa.me/553484285182?text=Ol%C3%A1!%20Quero%20agendar%20uma%20demonstra%C3%A7%C3%A3o%20do%20Kyvvo%20People." target="_blank" rel="noopener">Agendar demonstração →</a>
+    </div>
+
+    <div class="relatorio-exemplo">
+      <div class="relatorio-topo">
+        <div class="relatorio-avatar">BA</div>
+        <div>
+          <div class="relatorio-nome">Bruno Alves</div>
+          <div class="relatorio-tag">Executor · ISTJ · OCEAN</div>
+        </div>
+        <div class="relatorio-score"><div class="num">87%</div><div class="lbl">Índice de aderência</div></div>
+      </div>
+      <div class="relatorio-cols">
+        <div>
+          <h5>Principais aderências</h5>
+          <ul>
+            <li>✓ Forte capacidade de execução</li>
+            <li>✓ Boa organização e planejamento</li>
+            <li>✓ Comunicação compatível com a posição</li>
+          </ul>
+        </div>
+        <div>
+          <h5>Pontos de atenção</h5>
+          <ul>
+            <li>⚠ Pode apresentar impaciência em processos burocráticos</li>
+            <li>⚠ Necessita de autonomia pra atingir melhor desempenho</li>
+          </ul>
+        </div>
+      </div>
+      <a class="btn secundario pequeno" href="#planos">Exportar PDF ⭳</a>
+    </div>
+  </div>
+</section>
+
+<section id="sobre">
+  <h2 class="eyebrow">Pra quem é a <span class="destaque">Kyvvo People</span></h2>
+  <div class="grid-4">
+    <div class="publico-card"><div class="icone">💼</div><h4>Consultorias de RH</h4><p>Ganhe produtividade e atenda mais clientes com a mesma equipe.</p></div>
+    <div class="publico-card"><div class="icone">👤</div><h4>Recrutadores autônomos</h4><p>Tenha uma ferramenta profissional para elevar a qualidade das entregas.</p></div>
+    <div class="publico-card"><div class="icone">👥</div><h4>RHs internos</h4><p>Reduza tempo operacional e aumente a velocidade das contratações.</p></div>
+    <div class="publico-card"><div class="icone">⭐</div><h4>Gestores de pessoas</h4><p>Receba análises objetivas pra apoiar decisões de contratação.</p></div>
+  </div>
+</section>
+
+<section id="planos">
+  <h2 class="eyebrow">Planos que se adaptam ao <span class="destaque">seu momento</span></h2>
+  <div class="grid-planos">
+    <div class="plano-card">
+      <h4>Start</h4>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 12px">Ideal para recrutadores autônomos e pequenas empresas</p>
+      <div class="plano-preco">R$ 147<span>/mês</span></div>
+      <ul>
+        <li>Até 50 candidatos por mês</li>
+        <li>Avaliação comportamental</li>
+        <li>Relatórios em PDF</li>
+        <li>Comunicação automática</li>
+      </ul>
+      <a class="btn secundario" href="https://wa.me/553484285182?text=Ol%C3%A1!%20Quero%20come%C3%A7ar%20no%20plano%20Start%20do%20Kyvvo%20People." target="_blank" rel="noopener">Começar agora</a>
+    </div>
+    <div class="plano-card destaque">
+      <div class="plano-selo">Mais popular</div>
+      <h4>Professional</h4>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 12px">Ideal para RHs internos e consultorias</p>
+      <div class="plano-preco">R$ 397<span>/mês</span></div>
+      <ul>
+        <li>Até 300 candidatos por mês</li>
+        <li>Cadastro de vagas</li>
+        <li>Match vaga × candidato</li>
+        <li>Ranking automático</li>
+        <li>Parecer por IA</li>
+        <li>Agendamento automático</li>
+      </ul>
+      <a class="btn" href="https://wa.me/553484285182?text=Ol%C3%A1!%20Quero%20come%C3%A7ar%20no%20plano%20Professional%20do%20Kyvvo%20People." target="_blank" rel="noopener">Começar agora</a>
+    </div>
+    <div class="plano-card">
+      <h4>Business</h4>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 12px">Ideal para operações de recrutamento em escala</p>
+      <div class="plano-preco">Sob consulta</div>
+      <ul>
+        <li>Candidatos ilimitados</li>
+        <li>Múltiplos recrutadores</li>
+        <li>Dashboard gerencial</li>
+        <li>Integrações</li>
+        <li>Personalização da marca</li>
+      </ul>
+      <a class="btn secundario" href="https://wa.me/553484285182?text=Ol%C3%A1!%20Quero%20falar%20com%20um%20especialista%20sobre%20o%20plano%20Business%20do%20Kyvvo%20People." target="_blank" rel="noopener">Falar com especialista</a>
+    </div>
+    <div class="plano-card plano-anuidade">
+      <div class="icone">💡</div>
+      <h4>Economize com anuidade</h4>
+      <p style="font-size:11px;color:var(--muted);margin:0">Pague 10 meses e use 12!</p>
+      <div class="selo-desconto">%</div>
+      <p style="font-size:10px;color:var(--muted);margin:0">Desconto especial para planos pagos anualmente</p>
+    </div>
+  </div>
+</section>
+
+<section id="contato">
+  <div class="cta-final">
+    <div class="cta-final-esquerda">
+      <div class="icone">⚡</div>
+      <div>
+        <h3>Pronto para transformar seu <span class="destaque">recrutamento</span>?</h3>
+        <p>Agende uma demonstração gratuita e descubra como o Kyvvo People pode reduzir o tempo do seu processo seletivo e melhorar suas contratações.</p>
+      </div>
+    </div>
+    <div class="cta-final-direita">
+      <a class="btn" href="https://wa.me/553484285182?text=Ol%C3%A1!%20Quero%20agendar%20uma%20demonstra%C3%A7%C3%A3o%20do%20Kyvvo%20People." target="_blank" rel="noopener">Agendar demonstração →</a>
+      <span class="whats">ou fale com a gente (34) 99999-9999</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="logo">ky<span>vv</span>o people</div>
+    <span class="muted">Inteligência aplicada ao recrutamento e seleção.</span>
+    <span class="muted">people.kyvvo.com.br</span>
+  </div>
+</footer>
+
+</body>
+</html>
