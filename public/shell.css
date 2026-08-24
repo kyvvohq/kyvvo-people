@@ -1,7 +1,7 @@
 /* Shell compartilhado das telas autenticadas do portal (topbar, sidebar,
    rodapé, modal) — mesmo padrão visual/comportamental do painel principal
-   do Kyvvo (server/panel/public/style.css: .painel-shell/.painel-sidebar/
-   .user-menu*/.modal-*), replicado aqui porque os dois são repositórios
+   do Kyvvo (server/panel/public/style.css: classes painel-shell, painel-sidebar,
+   user-menu e modal), replicado aqui porque os dois são repositórios
    separados (ver [[project_kyvvo_people]] sobre isolamento). */
 :root {
   color-scheme: dark;
