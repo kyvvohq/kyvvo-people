@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Quadro</title>
+<link rel="stylesheet" href="/people/shell.css">
+<style>
+  .conteudo { max-width:none; padding:32px; }
+  .filtros { display:flex; gap:10px; }
+  .filtro { position:relative; }
+  .filtro-btn { background:#232847; color:#f2f2f7; }
+  .filtro-btn:hover { background:#2a2f52; }
+  .filtro-painel { position:absolute; top:calc(100% + 8px); left:0; min-width:220px; max-height:280px; overflow-y:auto;
+    background:var(--card); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.4);
+    padding:8px; z-index:60; }
+  .filtro-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .filtro-item:hover { background:#1a1f3a; }
+  .filtro-item input { width:auto; }
+
+  .quadro-scroll { overflow-x:auto; padding-bottom:12px; }
+  .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
+  .raia-label { position:sticky; left:0; background:var(--bg); padding:10px 8px; font-weight:700; font-size:13px;
+    display:flex; align-items:center; z-index:2; }
+  .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:10px 12px;
+    display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; }
+  .coluna-header.sem-etapa { color:var(--muted); font-weight:600; }
+  .coluna-header .nome-etapa { flex:1; cursor:text; }
+  .coluna-header input.editar-nome { width:100%; background:transparent; border:1px solid var(--accent-light); border-radius:6px; padding:2px 6px; font-size:13px; color:#f2f2f7; }
+  .coluna-header button { background:transparent; color:var(--muted); width:auto; margin:0; padding:2px 6px; font-size:12px; border-radius:6px; }
+  .coluna-header button:hover { background:rgba(124,92,252,.15); color:#f2f2f7; }
+  .coluna-add { display:flex; align-items:center; min-width:180px; }
+  .coluna-add input { font-size:13px; padding:8px 10px; }
+
+  .celula { background:#0d1024; border:1px dashed var(--border); border-radius:10px; padding:8px; min-width:220px; min-height:60px;
+    display:flex; flex-direction:column; gap:6px; }
+  .celula.arrastando-sobre { border-color:var(--accent-light); background:#141936; }
+  .cartao { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:12px; cursor:grab; }
+  .cartao:active { cursor:grabbing; }
+  .cartao .nome { font-weight:700; margin-bottom:2px; }
+  .cartao .data { color:var(--muted); font-size:11px; }
+  .celula-vazia { color:var(--muted); font-size:11px; padding:6px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="logo" href="/people/painel.html" aria-label="Ir para o início">ky<span>vv</span>o people</a>
+    <div class="user-menu" id="user-menu">
+      <button class="user-menu-toggle" id="user-menu-toggle" type="button">
+        <div class="user-menu-avatar" id="user-menu-avatar"></div>
+        <div class="user-menu-textos">
+          <div class="user-menu-nome" id="user-menu-nome"></div>
+          <div class="user-menu-empresa">Kyvvo People</div>
+        </div>
+        <span class="user-menu-chevron">▾</span>
+      </button>
+      <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
+        <button class="user-menu-sair" id="btn-sair" type="button"><span aria-hidden="true">⎋</span> Sair</button>
+      </div>
+    </div>
+  </div>
+  <div class="painel-shell">
+    <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="menu">
+        <a class="menu-item" href="/people/painel.html">Início</a>
+        <a class="menu-item" href="/people/vagas.html">Vagas</a>
+        <a class="menu-item" href="/people/candidatos.html">Candidatos</a>
+        <a class="menu-item" href="/people/quadro.html">Quadro</a>
+        <a class="menu-item" href="/people/whatsapp.html">WhatsApp</a>
+        <a class="menu-item" href="/people/configuracoes.html">Configurações</a>
+      </nav>
+    </aside>
+    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="Ocultar menu" title="Ocultar menu" type="button">&lt;</button>
+    <div class="painel-main">
+      <div class="conteudo">
+        <div class="cabecalho-pagina">
+          <h1>Quadro</h1>
+          <div class="filtros">
+            <div class="filtro">
+              <button class="btn filtro-btn" id="btn-filtro-vagas" type="button">Vagas ▾</button>
+              <div class="filtro-painel" id="painel-filtro-vagas" hidden></div>
+            </div>
+            <div class="filtro">
+              <button class="btn filtro-btn" id="btn-filtro-etapas" type="button">Etapas ▾</button>
+              <div class="filtro-painel" id="painel-filtro-etapas" hidden></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quadro-scroll">
+          <div class="quadro-grid" id="quadro-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer class="rodape-app">
+    <p class="rodape-app-copy">© 2026 <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo" class="rodape-logo-img">. Todos os direitos reservados.</p>
+  </footer>
+
+  <script src="/people/shell.js"></script>
+  <script>
+    let dados = { vagas: [], etapas: [], candidaturas: [] };
+    const filtroVagas = new Set();
+    const filtroEtapas = new Set(); // ids de etapas + a string 'sem-etapa'
+
+    async function carregar() {
+      const res = await apiFetch('/people/api/kanban');
+      dados = await res.json();
+      montarFiltros();
+      renderizarQuadro();
+    }
+
+    // --- Filtros clicáveis multi-seleção ---
+    function montarFiltroGenerico(painelId, itens, selecionados, aoMudar) {
+      const painel = document.getElementById(painelId);
+      painel.innerHTML = itens.map((item) => `
+        <label class="filtro-item">
+          <input type="checkbox" value="${item.id}" ${selecionados.has(item.id) ? 'checked' : ''}>
+          ${item.nome}
+        </label>
+      `).join('') || '<div class="filtro-item">Nada pra filtrar ainda</div>';
+
+      painel.querySelectorAll('input').forEach((input) => {
+        input.addEventListener('change', () => {
+          if (input.checked) selecionados.add(input.value);
+          else selecionados.delete(input.value);
+          aoMudar();
+        });
+      });
+    }
+
+    function montarFiltros() {
+      montarFiltroGenerico('painel-filtro-vagas', dados.vagas, filtroVagas, renderizarQuadro);
+      const itensEtapas = [{ id: 'sem-etapa', nome: 'Sem etapa' }, ...dados.etapas];
+      montarFiltroGenerico('painel-filtro-etapas', itensEtapas, filtroEtapas, renderizarQuadro);
+    }
+
+    function alternarPainel(painelId, outroPainelId) {
+      const painel = document.getElementById(painelId);
+      document.getElementById(outroPainelId).hidden = true;
+      painel.hidden = !painel.hidden;
+    }
+    document.getElementById('btn-filtro-vagas').addEventListener('click', (e) => {
+      e.stopPropagation();
+      alternarPainel('painel-filtro-vagas', 'painel-filtro-etapas');
+    });
+    document.getElementById('btn-filtro-etapas').addEventListener('click', (e) => {
+      e.stopPropagation();
+      alternarPainel('painel-filtro-etapas', 'painel-filtro-vagas');
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.filtro')) {
+        document.getElementById('painel-filtro-vagas').hidden = true;
+        document.getElementById('painel-filtro-etapas').hidden = true;
+      }
+    });
+
+    // --- Render do grid raia (vaga) × coluna (etapa) ---
+    function candidaturasDe(vagaId, etapaId) {
+      return dados.candidaturas.filter((c) => c.vaga_id === vagaId && (c.etapa_id || null) === etapaId);
+    }
+
+    function renderizarCartao(c) {
+      return `
+        <div class="cartao" draggable="true" data-candidatura="${c.id}">
+          <div class="nome">${c.nome}</div>
+          <div class="data">${new Date(c.criado_em).toLocaleDateString('pt-BR')}</div>
+        </div>
+      `;
+    }
+
+    function renderizarQuadro() {
+      const vagas = dados.vagas.filter((v) => filtroVagas.size === 0 || filtroVagas.has(v.id));
+      const colunas = [{ id: null, chave: 'sem-etapa', nome: 'Sem etapa', semEtapa: true }, ...dados.etapas.map((e) => ({ ...e, chave: e.id }))]
+        .filter((col) => filtroEtapas.size === 0 || filtroEtapas.has(col.chave));
+
+      const grid = document.getElementById('quadro-grid');
+      grid.style.gridTemplateColumns = `200px repeat(${colunas.length}, minmax(220px, 1fr)) 200px`;
+
+      let html = '<div></div>'; // canto vazio acima do rótulo das raias
+      colunas.forEach((col) => {
+        if (col.semEtapa) {
+          html += `<div class="coluna-header sem-etapa">Sem etapa</div>`;
+        } else {
+          html += `
+            <div class="coluna-header" data-etapa="${col.id}">
+              <button type="button" data-mover="${col.id}" data-direcao="esquerda" title="Mover pra esquerda">←</button>
+              <span class="nome-etapa" data-editar="${col.id}">${col.nome}</span>
+              <button type="button" data-mover="${col.id}" data-direcao="direita" title="Mover pra direita">→</button>
+              <button type="button" data-apagar="${col.id}" title="Apagar etapa">✕</button>
+            </div>
+          `;
+        }
+      });
+      html += `
+        <div class="coluna-add">
+          <input type="text" id="input-nova-etapa" placeholder="+ Nova etapa (Enter)">
+        </div>
+      `;
+
+      vagas.forEach((vaga) => {
+        html += `<div class="raia-label">${vaga.nome}</div>`;
+        colunas.forEach((col) => {
+          const cartoes = candidaturasDe(vaga.id, col.id);
+          html += `
+            <div class="celula" data-vaga="${vaga.id}" data-etapa="${col.id || ''}">
+              ${cartoes.map(renderizarCartao).join('') || '<div class="celula-vazia">—</div>'}
+            </div>
+          `;
+        });
+        html += '<div></div>'; // alinha com a coluna "+ Nova etapa"
+      });
+
+      grid.innerHTML = html || '';
+      if (!vagas.length) {
+        grid.insertAdjacentHTML('beforeend', '<div class="celula-vazia" style="grid-column:1/-1">Nenhuma vaga com candidatura pra mostrar (confira os filtros).</div>');
+      }
+
+      ligarEventosGrid();
+    }
+
+    function ligarEventosGrid() {
+      // Drag and drop dos cartões
+      document.querySelectorAll('.cartao').forEach((cartao) => {
+        cartao.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', cartao.dataset.candidatura);
+        });
+      });
+      document.querySelectorAll('.celula').forEach((celula) => {
+        celula.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          celula.classList.add('arrastando-sobre');
+        });
+        celula.addEventListener('dragleave', () => celula.classList.remove('arrastando-sobre'));
+        celula.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          celula.classList.remove('arrastando-sobre');
+          const candidaturaId = e.dataTransfer.getData('text/plain');
+          const etapaId = celula.dataset.etapa || null;
+          const candidatura = dados.candidaturas.find((c) => c.id === candidaturaId);
+          if (!candidatura || (candidatura.etapa_id || null) === etapaId) return;
+
+          candidatura.etapa_id = etapaId;
+          renderizarQuadro();
+          const res = await apiFetch(`/people/api/candidaturas/${candidaturaId}/etapa`, {
+            method: 'PATCH',
+            body: JSON.stringify({ etapa_id: etapaId }),
+          });
+          if (!res.ok) { alert('Falha ao mover candidatura'); carregar(); }
+        });
+      });
+
+      // Reordenar coluna
+      document.querySelectorAll('[data-mover]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/people/api/etapas/${btn.dataset.mover}/mover`, {
+            method: 'PATCH',
+            body: JSON.stringify({ direcao: btn.dataset.direcao }),
+          });
+          carregar();
+        });
+      });
+
+      // Apagar coluna
+      document.querySelectorAll('[data-apagar]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const confirmar = confirm('Apagar esta etapa? As candidaturas que estão nela voltam para "Sem etapa".');
+          if (!confirmar) return;
+          await apiFetch(`/people/api/etapas/${btn.dataset.apagar}`, { method: 'DELETE' });
+          carregar();
+        });
+      });
+
+      // Renomear coluna (clique no nome vira input)
+      document.querySelectorAll('[data-editar]').forEach((span) => {
+        span.addEventListener('click', () => {
+          const atual = span.textContent;
+          const input = document.createElement('input');
+          input.className = 'editar-nome';
+          input.value = atual;
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+
+          const salvar = async () => {
+            const novoNome = input.value.trim();
+            if (novoNome && novoNome !== atual) {
+              await apiFetch(`/people/api/etapas/${span.dataset.editar}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ nome: novoNome }),
+              });
+              await carregar();
+            } else {
+              input.replaceWith(span);
+            }
+          };
+          input.addEventListener('blur', salvar);
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+      });
+
+      // Nova etapa
+      const inputNova = document.getElementById('input-nova-etapa');
+      if (inputNova) {
+        inputNova.addEventListener('keydown', async (e) => {
+          if (e.key !== 'Enter') return;
+          const nome = inputNova.value.trim();
+          if (!nome) return;
+          inputNova.disabled = true;
+          await apiFetch('/people/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
+          await carregar();
+        });
+      }
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

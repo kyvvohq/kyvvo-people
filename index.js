@@ -285,6 +285,117 @@ async function build() {
     return reply.send(candidatura.curriculo_arquivo);
   });
 
+  // --- Quadro Kanban: etapas (colunas, tenant-wide) + candidaturas movendo entre elas ---
+  fastify.post('/people/api/etapas', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { nome } = request.body || {};
+    if (!nome) return reply.code(400).send({ error: 'nome é obrigatório' });
+
+    const { rows } = await pool.query(
+      'select coalesce(max(ordem), 0) + 1 as proxima from etapas where tenant_id = $1',
+      [request.user.tenantId]
+    );
+    const id = crypto.randomUUID();
+    await pool.query(
+      'insert into etapas (id, tenant_id, nome, ordem) values ($1, $2, $3, $4)',
+      [id, request.user.tenantId, nome, rows[0].proxima]
+    );
+    return reply.code(201).send({ id, nome, ordem: rows[0].proxima });
+  });
+
+  fastify.get('/people/api/etapas', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query(
+      'select id, nome, ordem from etapas where tenant_id = $1 order by ordem',
+      [request.user.tenantId]
+    );
+    return rows;
+  });
+
+  fastify.patch('/people/api/etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { nome } = request.body || {};
+    if (!nome) return reply.code(400).send({ error: 'nome é obrigatório' });
+    const { rows } = await pool.query(
+      'update etapas set nome = $1 where id = $2 and tenant_id = $3 returning id',
+      [nome, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Etapa não encontrada' });
+    return { ok: true };
+  });
+
+  // Troca a `ordem` com a etapa vizinha na direção pedida — reordenação simples
+  // via botões ←/→ no cabeçalho da coluna (drag-and-drop fica só pros cartões).
+  fastify.patch('/people/api/etapas/:id/mover', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { direcao } = request.body || {};
+    if (!['esquerda', 'direita'].includes(direcao)) {
+      return reply.code(400).send({ error: 'direcao deve ser esquerda ou direita' });
+    }
+
+    const { rows } = await pool.query(
+      'select id, ordem from etapas where tenant_id = $1 order by ordem',
+      [request.user.tenantId]
+    );
+    const indice = rows.findIndex((e) => e.id === request.params.id);
+    if (indice === -1) return reply.code(404).send({ error: 'Etapa não encontrada' });
+
+    const indiceVizinho = direcao === 'esquerda' ? indice - 1 : indice + 1;
+    if (indiceVizinho < 0 || indiceVizinho >= rows.length) return { ok: true };
+
+    const atual = rows[indice];
+    const vizinho = rows[indiceVizinho];
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      await client.query('update etapas set ordem = $1 where id = $2', [vizinho.ordem, atual.id]);
+      await client.query('update etapas set ordem = $1 where id = $2', [atual.ordem, vizinho.id]);
+      await client.query('commit');
+    } catch (err) {
+      await client.query('rollback');
+      throw err;
+    } finally {
+      client.release();
+    }
+    return { ok: true };
+  });
+
+  fastify.delete('/people/api/etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      'delete from etapas where id = $1 and tenant_id = $2 returning id',
+      [request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Etapa não encontrada' });
+    return { ok: true };
+  });
+
+  // Payload único com tudo que o quadro precisa pra montar o grid raia×coluna —
+  // filtro por vaga/etapa fica client-side (volume pequeno, evita ida e volta
+  // a cada clique no filtro).
+  fastify.get('/people/api/kanban', { preHandler: fastify.authenticate }, async (request) => {
+    const [vagas, etapas, candidaturas] = await Promise.all([
+      pool.query('select id, nome from vagas where tenant_id = $1 order by criado_em desc', [request.user.tenantId]),
+      pool.query('select id, nome, ordem from etapas where tenant_id = $1 order by ordem', [request.user.tenantId]),
+      pool.query(
+        `select c.id, c.nome, c.vaga_id, c.etapa_id, c.criado_em
+         from candidaturas c join vagas v on v.id = c.vaga_id
+         where v.tenant_id = $1
+         order by c.criado_em desc`,
+        [request.user.tenantId]
+      ),
+    ]);
+    return { vagas: vagas.rows, etapas: etapas.rows, candidaturas: candidaturas.rows };
+  });
+
+  fastify.patch('/people/api/candidaturas/:id/etapa', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { etapa_id } = request.body || {};
+    const { rows } = await pool.query(
+      `update candidaturas c set etapa_id = $1
+       from vagas v
+       where c.vaga_id = v.id and c.id = $2 and v.tenant_id = $3
+       returning c.id`,
+      [etapa_id || null, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    return { ok: true };
+  });
+
   // --- Vaga pública (candidato, sem login) ---
   const EXTENSOES_CURRICULO_ACEITAS = ['.pdf', '.docx'];
 
