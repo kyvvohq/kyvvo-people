@@ -4,6 +4,7 @@
    .user-menu*/.modal-*), replicado aqui porque os dois são repositórios
    separados (ver [[project_kyvvo_people]] sobre isolamento). */
 :root {
+  color-scheme: dark;
   --bg: #080b14;
   --card: #12162a;
   --border: #232847;
