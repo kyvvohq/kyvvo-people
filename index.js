@@ -270,6 +270,20 @@ async function build() {
     return rows;
   });
 
+  // Lista todas as candidaturas do tenant (todas as vagas juntas) — usada
+  // pela tela "Candidatos" (distinta de "Avaliações", que é sobre a tabela
+  // `candidatos` do teste comportamental).
+  fastify.get('/people/api/candidaturas', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query(
+      `select c.id, c.nome, c.email, c.whatsapp, c.criado_em, v.nome as vaga_nome
+       from candidaturas c join vagas v on v.id = c.vaga_id
+       where v.tenant_id = $1
+       order by c.criado_em desc`,
+      [request.user.tenantId]
+    );
+    return rows;
+  });
+
   fastify.get('/people/api/candidaturas/:id/curriculo', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query(
       `select c.curriculo_nome, c.curriculo_tipo, c.curriculo_arquivo

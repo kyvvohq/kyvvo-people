@@ -4,156 +4,104 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — Candidatos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/people/shell.css">
 </head>
 <body>
-  <div class="topbar">
-    <a class="logo" href="/people/painel.html" aria-label="Ir para o início">ky<span>vv</span>o people</a>
-    <div class="user-menu" id="user-menu">
-      <button class="user-menu-toggle" id="user-menu-toggle" type="button">
-        <div class="user-menu-avatar" id="user-menu-avatar"></div>
-        <div class="user-menu-textos">
-          <div class="user-menu-nome" id="user-menu-nome"></div>
-          <div class="user-menu-empresa">Kyvvo People</div>
-        </div>
-        <span class="user-menu-chevron">▾</span>
-      </button>
-      <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
-        <button class="user-menu-sair" id="btn-sair" type="button"><span aria-hidden="true">⎋</span> Sair</button>
-      </div>
-    </div>
-  </div>
-  <div class="painel-shell">
+  <div class="app-shell">
     <aside class="painel-sidebar" id="painel-sidebar">
-      <nav class="menu">
-        <a class="menu-item" href="/people/painel.html">Início</a>
-        <a class="menu-item" href="/people/vagas.html">Vagas</a>
-        <a class="menu-item" href="/people/candidatos.html">Candidatos</a>
-        <a class="menu-item" href="/people/quadro.html">Quadro</a>
-        <a class="menu-item" href="/people/whatsapp.html">WhatsApp</a>
-        <a class="menu-item" href="/people/configuracoes.html">Configurações</a>
+      <a class="marca-produto" href="/people/painel.html" aria-label="Ir para o início">
+        <div class="marca-k">k</div>
+        <div class="textos">
+          <div class="produto">Kyvvo People</div>
+          <div class="conta" id="conta-nome"></div>
+        </div>
+      </a>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Seleção</div>
+        <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
+        <a class="menu-item" href="/people/vagas.html"><span data-icon="briefcase"></span><span class="rotulo">Vagas</span></a>
+        <a class="menu-item" href="/people/candidatos.html"><span data-icon="users"></span><span class="rotulo">Candidatos</span></a>
+        <a class="menu-item" href="/people/avaliacoes.html"><span data-icon="brain"></span><span class="rotulo">Avaliações</span></a>
       </nav>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Gestão</div>
+        <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
+        <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
+      </nav>
+      <div class="sidebar-espacador"></div>
+      <div class="cartao-usuario" id="cartao-usuario">
+        <div class="avatar" id="avatar-usuario"></div>
+        <div class="textos">
+          <div class="nome" id="nome-usuario"></div>
+          <div class="papel">Recrutador(a)</div>
+        </div>
+        <button id="btn-menu-usuario" type="button" aria-label="Menu do usuário"><span data-icon="ellipsis" data-size="16"></span></button>
+        <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
+          <button class="user-menu-sair" id="btn-sair" type="button">Sair</button>
+        </div>
+      </div>
     </aside>
-    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="Ocultar menu" title="Ocultar menu" type="button">&lt;</button>
-    <div class="painel-main">
-      <div class="conteudo">
-        <div class="cabecalho-pagina">
-          <h1>Candidatos</h1>
-          <button class="btn" id="btn-novo-candidato" type="button">+ Novo candidato</button>
-        </div>
+    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
 
-        <div class="card">
-          <table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Status</th><th>Cadastrado em</th><th></th></tr></thead>
-            <tbody id="tabela-candidatos"></tbody>
-          </table>
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Candidatos</h1><span class="contagem" id="contagem-candidaturas"></span></div>
+          <p class="descricao">Todas as candidaturas recebidas pelos links públicos das vagas.</p>
         </div>
+      </div>
+
+      <div class="card" style="padding:0">
+        <table>
+          <thead><tr><th>Nome</th><th>Vaga</th><th>Contato</th><th>Candidatou-se em</th><th></th></tr></thead>
+          <tbody id="tabela-candidaturas"></tbody>
+        </table>
       </div>
     </div>
   </div>
+
   <footer class="rodape-app">
     <p class="rodape-app-copy">© 2026 <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo" class="rodape-logo-img">. Todos os direitos reservados.</p>
   </footer>
 
   <script src="/people/shell.js"></script>
   <script>
-    const STATUS_LABEL = { pendente: 'Pendente', iniciado: 'Em andamento', concluido: 'Concluído' };
-
-    async function carregarCandidatos() {
-      const res = await apiFetch('/people/api/candidatos');
-      const candidatos = await res.json();
-      const corpo = document.getElementById('tabela-candidatos');
-      corpo.innerHTML = candidatos.map((c) => `
+    async function carregarCandidaturas() {
+      const res = await apiFetch('/people/api/candidaturas');
+      const candidaturas = await res.json();
+      document.getElementById('contagem-candidaturas').textContent = candidaturas.length;
+      const corpo = document.getElementById('tabela-candidaturas');
+      corpo.innerHTML = candidaturas.map((c) => `
         <tr>
           <td>${c.nome}</td>
-          <td>${c.email}</td>
-          <td><span class="badge ${c.status}">${STATUS_LABEL[c.status]}</span></td>
+          <td>${c.vaga_nome}</td>
+          <td>${c.whatsapp} · ${c.email}</td>
           <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
-          <td>${c.status === 'concluido' ? `
-            <a class="acao" href="/people/relatorio.html?id=${c.id}">Ver relatório</a>
-            <a class="acao" href="#" data-pdf="${c.id}" data-nome="${c.nome}">Exportar PDF</a>
-            <a class="acao" href="#" data-refazer="${c.id}" data-nome="${c.nome}">Refazer avaliação</a>
-          ` : ''}</td>
+          <td><a class="acao" href="#" data-curriculo="${c.id}">Baixar currículo</a></td>
         </tr>
-      `).join('') || '<tr><td colspan="5" class="vazio">Nenhum candidato cadastrado ainda.</td></tr>';
+      `).join('') || '<tr><td colspan="5" class="vazio">Nenhuma candidatura recebida ainda.</td></tr>';
     }
 
-    function abrirModalNovoCandidato() {
-      abrirModal(
-        '<h3>Novo candidato</h3>',
-        `
-          <form id="form-candidato">
-            <div class="modal-erro" id="msg-candidato"></div>
-            <label for="nome">Nome completo</label>
-            <input id="nome" required>
-            <label for="email">E-mail</label>
-            <input id="email" type="email" required>
-            <label for="cpf">CPF (só números)</label>
-            <input id="cpf" required>
-            <div class="modal-acoes">
-              <button type="button" class="btn-secundario" id="btn-cancelar-candidato">Cancelar</button>
-              <button type="submit" class="btn">Enviar avaliação</button>
-            </div>
-          </form>
-        `
-      );
-
-      document.getElementById('btn-cancelar-candidato').addEventListener('click', fecharModal);
-      document.getElementById('form-candidato').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msg = document.getElementById('msg-candidato');
-        msg.textContent = '';
-        try {
-          const res = await apiFetch('/people/api/candidatos', {
-            method: 'POST',
-            body: JSON.stringify({
-              nome: document.getElementById('nome').value,
-              email: document.getElementById('email').value,
-              cpf: document.getElementById('cpf').value,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Falha ao cadastrar candidato');
-          fecharModal();
-          carregarCandidatos();
-        } catch (err) {
-          msg.textContent = err.message;
-        }
-      });
-    }
-
-    document.getElementById('btn-novo-candidato').addEventListener('click', abrirModalNovoCandidato);
-
-    document.getElementById('tabela-candidatos').addEventListener('click', async (e) => {
-      const pdf = e.target.closest('[data-pdf]');
-      if (pdf) {
-        e.preventDefault();
-        const res = await apiFetch(`/people/api/candidatos/${pdf.dataset.pdf}/relatorio.pdf`);
-        if (!res.ok) return;
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `relatorio-${pdf.dataset.nome.replace(/\s+/g, '-')}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
-        return;
-      }
-
-      const refazer = e.target.closest('[data-refazer]');
-      if (refazer) {
-        e.preventDefault();
-        const confirmar = confirm(`Refazer a avaliação de ${refazer.dataset.nome}? O resultado atual vai para o histórico e o mesmo link poderá ser usado de novo.`);
-        if (!confirmar) return;
-        const res = await apiFetch(`/people/api/candidatos/${refazer.dataset.refazer}/refazer`, { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Falha ao refazer avaliação'); return; }
-        alert(`Avaliação resetada. Link: ${data.link}`);
-        carregarCandidatos();
-      }
+    document.getElementById('tabela-candidaturas').addEventListener('click', async (e) => {
+      const alvo = e.target.closest('[data-curriculo]');
+      if (!alvo) return;
+      e.preventDefault();
+      const res = await apiFetch(`/people/api/candidaturas/${alvo.dataset.curriculo}/curriculo`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'curriculo';
+      a.click();
+      URL.revokeObjectURL(url);
     });
 
-    carregarCandidatos();
+    carregarCandidaturas();
   </script>
 </body>
 </html>

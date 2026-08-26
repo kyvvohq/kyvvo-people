@@ -4,46 +4,61 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — WhatsApp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/people/shell.css">
 </head>
 <body>
-  <div class="topbar">
-    <a class="logo" href="/people/painel.html" aria-label="Ir para o início">ky<span>vv</span>o people</a>
-    <div class="user-menu" id="user-menu">
-      <button class="user-menu-toggle" id="user-menu-toggle" type="button">
-        <div class="user-menu-avatar" id="user-menu-avatar"></div>
-        <div class="user-menu-textos">
-          <div class="user-menu-nome" id="user-menu-nome"></div>
-          <div class="user-menu-empresa">Kyvvo People</div>
-        </div>
-        <span class="user-menu-chevron">▾</span>
-      </button>
-      <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
-        <button class="user-menu-sair" id="btn-sair" type="button"><span aria-hidden="true">⎋</span> Sair</button>
-      </div>
-    </div>
-  </div>
-  <div class="painel-shell">
+  <div class="app-shell">
     <aside class="painel-sidebar" id="painel-sidebar">
-      <nav class="menu">
-        <a class="menu-item" href="/people/painel.html">Início</a>
-        <a class="menu-item" href="/people/vagas.html">Vagas</a>
-        <a class="menu-item" href="/people/candidatos.html">Candidatos</a>
-        <a class="menu-item" href="/people/quadro.html">Quadro</a>
-        <a class="menu-item" href="/people/whatsapp.html">WhatsApp</a>
-        <a class="menu-item" href="/people/configuracoes.html">Configurações</a>
-      </nav>
-    </aside>
-    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="Ocultar menu" title="Ocultar menu" type="button">&lt;</button>
-    <div class="painel-main">
-      <div class="conteudo">
-        <div class="cabecalho-pagina"><h1>WhatsApp</h1></div>
-        <div class="card">
-          <p class="vazio">Comunicação automática por WhatsApp chega em breve por aqui.</p>
+      <a class="marca-produto" href="/people/painel.html" aria-label="Ir para o início">
+        <div class="marca-k">k</div>
+        <div class="textos">
+          <div class="produto">Kyvvo People</div>
+          <div class="conta" id="conta-nome"></div>
         </div>
+      </a>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Seleção</div>
+        <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
+        <a class="menu-item" href="/people/vagas.html"><span data-icon="briefcase"></span><span class="rotulo">Vagas</span></a>
+        <a class="menu-item" href="/people/candidatos.html"><span data-icon="users"></span><span class="rotulo">Candidatos</span></a>
+        <a class="menu-item" href="/people/avaliacoes.html"><span data-icon="brain"></span><span class="rotulo">Avaliações</span></a>
+      </nav>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Gestão</div>
+        <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
+        <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
+      </nav>
+      <div class="sidebar-espacador"></div>
+      <div class="cartao-usuario" id="cartao-usuario">
+        <div class="avatar" id="avatar-usuario"></div>
+        <div class="textos">
+          <div class="nome" id="nome-usuario"></div>
+          <div class="papel">Recrutador(a)</div>
+        </div>
+        <button id="btn-menu-usuario" type="button" aria-label="Menu do usuário"><span data-icon="ellipsis" data-size="16"></span></button>
+        <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
+          <button class="user-menu-sair" id="btn-sair" type="button">Sair</button>
+        </div>
+      </div>
+    </aside>
+    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos"><div class="linha-titulo"><h1>WhatsApp</h1></div></div>
+      </div>
+      <div class="estado-vazio">
+        <div class="tile" data-icon="message-circle" data-size="26"></div>
+        <h3>Em breve</h3>
+        <p>Comunicação automática por WhatsApp com candidatos chega em breve por aqui.</p>
       </div>
     </div>
   </div>
+
   <footer class="rodape-app">
     <p class="rodape-app-copy">© 2026 <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo" class="rodape-logo-img">. Todos os direitos reservados.</p>
   </footer>

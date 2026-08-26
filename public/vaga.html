@@ -4,35 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vaga — Kyvvo People</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; }
-  body { margin:0; background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
+  :root { color-scheme: light; }
+  body { margin:0; background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
   main { max-width:640px; margin:0 auto; padding:32px 24px 80px; }
-  .logo { font-size:20px; font-weight:800; letter-spacing:-.03em; margin-bottom:24px; }
-  .logo span { color:#a688ff; position:relative; }
-  .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
-    background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
-  .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:28px; margin-bottom:24px; }
-  h1 { font-size:20px; margin:0 0 8px; }
+  .logo { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
+  .logo .marca-k { width:28px; height:28px; border-radius:8px; background:#0F111A; color:#fff;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .logo .nome { font-size:15px; font-weight:700; }
+  .card { background:#fff; border:1px solid #E7EAF2; border-radius:16px; padding:28px; margin-bottom:24px; }
+  h1 { font-family:'Space Grotesk',sans-serif; font-size:20px; margin:0 0 8px; }
   .meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
-  .pill { font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; background:#232847; color:#c7cdf5; }
-  h2 { font-size:13px; color:#a1a5c4; text-transform:uppercase; letter-spacing:.04em; margin:20px 0 8px; }
+  .pill { font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; background:#F1F3F8; color:#2B3040; }
+  h2 { font-size:13px; color:#6B7385; text-transform:uppercase; letter-spacing:.04em; margin:20px 0 8px; }
   h2:first-of-type { margin-top:0; }
-  p.corpo { font-size:14px; line-height:1.7; color:#d8daea; white-space:pre-line; margin:0; }
-  label.campo { display:block; font-size:12px; color:#a1a5c4; margin:16px 0 6px; }
-  input[type=text], input[type=email] { width:100%; box-sizing:border-box; background:#080b14; border:1px solid #232847;
-    border-radius:8px; padding:10px 12px; color:#f2f2f7; font-size:14px; }
-  input[type=file] { width:100%; box-sizing:border-box; background:#080b14; border:1px dashed #232847;
-    border-radius:8px; padding:12px; color:#a1a5c4; font-size:13px; }
-  button { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
-    padding:12px 22px; font-size:14px; cursor:pointer; margin-top:20px; }
+  p.corpo { font-size:14px; line-height:1.7; color:#2B3040; white-space:pre-line; margin:0; }
+  label.campo { display:block; font-size:13px; font-weight:600; color:#2B3040; margin:16px 0 7px; }
+  input[type=text], input[type=email] { width:100%; box-sizing:border-box; background:#fff; border:1px solid #D7DCE8;
+    border-radius:12px; height:44px; padding:0 14px; color:#0F111A; font-size:14px; font-family:inherit; }
+  input[type=file] { width:100%; box-sizing:border-box; background:#F8F9FC; border:1px dashed #D7DCE8;
+    border-radius:12px; padding:12px; color:#6B7385; font-size:13px; }
+  button { background:#7C5CFC; color:#fff; font-weight:600; border:none; border-radius:12px;
+    height:44px; padding:0 22px; font-size:14px; cursor:pointer; margin-top:20px; }
+  button:hover { background:#6344E8; }
   button:disabled { opacity:.5; cursor:default; }
-  .erro { color:#ff8080; font-size:13px; margin-top:12px; min-height:16px; }
+  .erro { color:#F04438; font-size:13px; margin-top:12px; min-height:16px; }
 </style>
 </head>
 <body>
 <main>
-  <div class="logo">ky<span>vv</span>o people</div>
+  <div class="logo"><div class="marca-k">k</div><div class="nome">Kyvvo People</div></div>
   <div class="card" id="conteudo">Carregando...</div>
 </main>
 

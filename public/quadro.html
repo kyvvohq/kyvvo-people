@@ -4,95 +4,107 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — Quadro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/people/shell.css">
 <style>
-  .conteudo { max-width:none; padding:32px; }
+  .painel-main { overflow-x:hidden; }
   .filtros { display:flex; gap:10px; }
   .filtro { position:relative; }
-  .filtro-btn { background:#232847; color:#f2f2f7; }
-  .filtro-btn:hover { background:#2a2f52; }
   .filtro-painel { position:absolute; top:calc(100% + 8px); left:0; min-width:220px; max-height:280px; overflow-y:auto;
-    background:var(--card); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.4);
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:0 12px 32px rgba(15,17,26,.12);
     padding:8px; z-index:60; }
   .filtro-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
-  .filtro-item:hover { background:#1a1f3a; }
+  .filtro-item:hover { background:var(--surface-muted); }
   .filtro-item input { width:auto; }
 
   .quadro-scroll { overflow-x:auto; padding-bottom:12px; }
   .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
   .raia-label { position:sticky; left:0; background:var(--bg); padding:10px 8px; font-weight:700; font-size:13px;
-    display:flex; align-items:center; z-index:2; }
-  .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:10px 12px;
-    display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; }
+    display:flex; align-items:center; z-index:2; color:var(--text); }
+  .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
+    display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; color:var(--text); }
   .coluna-header.sem-etapa { color:var(--muted); font-weight:600; }
   .coluna-header .nome-etapa { flex:1; cursor:text; }
-  .coluna-header input.editar-nome { width:100%; background:transparent; border:1px solid var(--accent-light); border-radius:6px; padding:2px 6px; font-size:13px; color:#f2f2f7; }
-  .coluna-header button { background:transparent; color:var(--muted); width:auto; margin:0; padding:2px 6px; font-size:12px; border-radius:6px; }
-  .coluna-header button:hover { background:rgba(124,92,252,.15); color:#f2f2f7; }
+  .coluna-header input.editar-nome { width:100%; background:transparent; border:1px solid var(--accent); border-radius:6px; padding:2px 6px; font-size:13px; color:var(--text); }
+  .coluna-header button { background:transparent; color:var(--muted); width:auto; height:auto; margin:0; padding:2px 6px; font-size:12px; border-radius:6px; }
+  .coluna-header button:hover { background:var(--surface-muted); color:var(--text); }
   .coluna-add { display:flex; align-items:center; min-width:180px; }
-  .coluna-add input { font-size:13px; padding:8px 10px; }
+  .coluna-add input { font-size:13px; height:38px; padding:0 10px; }
 
-  .celula { background:#0d1024; border:1px dashed var(--border); border-radius:10px; padding:8px; min-width:220px; min-height:60px;
+  .celula { background:var(--bg); border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:8px; min-width:220px; min-height:60px;
     display:flex; flex-direction:column; gap:6px; }
-  .celula.arrastando-sobre { border-color:var(--accent-light); background:#141936; }
+  .celula.arrastando-sobre { border-color:var(--accent); background:var(--accent-tint); }
   .cartao { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:12px; cursor:grab; }
   .cartao:active { cursor:grabbing; }
-  .cartao .nome { font-weight:700; margin-bottom:2px; }
+  .cartao .nome { font-weight:700; margin-bottom:2px; color:var(--text); }
   .cartao .data { color:var(--muted); font-size:11px; }
   .celula-vazia { color:var(--muted); font-size:11px; padding:6px; }
 </style>
 </head>
 <body>
-  <div class="topbar">
-    <a class="logo" href="/people/painel.html" aria-label="Ir para o início">ky<span>vv</span>o people</a>
-    <div class="user-menu" id="user-menu">
-      <button class="user-menu-toggle" id="user-menu-toggle" type="button">
-        <div class="user-menu-avatar" id="user-menu-avatar"></div>
-        <div class="user-menu-textos">
-          <div class="user-menu-nome" id="user-menu-nome"></div>
-          <div class="user-menu-empresa">Kyvvo People</div>
-        </div>
-        <span class="user-menu-chevron">▾</span>
-      </button>
-      <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
-        <button class="user-menu-sair" id="btn-sair" type="button"><span aria-hidden="true">⎋</span> Sair</button>
-      </div>
-    </div>
-  </div>
-  <div class="painel-shell">
+  <div class="app-shell">
     <aside class="painel-sidebar" id="painel-sidebar">
-      <nav class="menu">
-        <a class="menu-item" href="/people/painel.html">Início</a>
-        <a class="menu-item" href="/people/vagas.html">Vagas</a>
-        <a class="menu-item" href="/people/candidatos.html">Candidatos</a>
-        <a class="menu-item" href="/people/quadro.html">Quadro</a>
-        <a class="menu-item" href="/people/whatsapp.html">WhatsApp</a>
-        <a class="menu-item" href="/people/configuracoes.html">Configurações</a>
+      <a class="marca-produto" href="/people/painel.html" aria-label="Ir para o início">
+        <div class="marca-k">k</div>
+        <div class="textos">
+          <div class="produto">Kyvvo People</div>
+          <div class="conta" id="conta-nome"></div>
+        </div>
+      </a>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Seleção</div>
+        <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
+        <a class="menu-item" href="/people/vagas.html"><span data-icon="briefcase"></span><span class="rotulo">Vagas</span></a>
+        <a class="menu-item" href="/people/candidatos.html"><span data-icon="users"></span><span class="rotulo">Candidatos</span></a>
+        <a class="menu-item" href="/people/avaliacoes.html"><span data-icon="brain"></span><span class="rotulo">Avaliações</span></a>
       </nav>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Gestão</div>
+        <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
+        <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
+      </nav>
+      <div class="sidebar-espacador"></div>
+      <div class="cartao-usuario" id="cartao-usuario">
+        <div class="avatar" id="avatar-usuario"></div>
+        <div class="textos">
+          <div class="nome" id="nome-usuario"></div>
+          <div class="papel">Recrutador(a)</div>
+        </div>
+        <button id="btn-menu-usuario" type="button" aria-label="Menu do usuário"><span data-icon="ellipsis" data-size="16"></span></button>
+        <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
+          <button class="user-menu-sair" id="btn-sair" type="button">Sair</button>
+        </div>
+      </div>
     </aside>
-    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="Ocultar menu" title="Ocultar menu" type="button">&lt;</button>
+    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+
     <div class="painel-main">
-      <div class="conteudo">
-        <div class="cabecalho-pagina">
-          <h1>Quadro</h1>
-          <div class="filtros">
-            <div class="filtro">
-              <button class="btn filtro-btn" id="btn-filtro-vagas" type="button">Vagas ▾</button>
-              <div class="filtro-painel" id="painel-filtro-vagas" hidden></div>
-            </div>
-            <div class="filtro">
-              <button class="btn filtro-btn" id="btn-filtro-etapas" type="button">Etapas ▾</button>
-              <div class="filtro-painel" id="painel-filtro-etapas" hidden></div>
-            </div>
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Quadro</h1></div>
+          <p class="descricao">Acompanhe candidaturas por vaga e etapa.</p>
+        </div>
+        <div class="filtros">
+          <div class="filtro">
+            <button class="btn btn-secundario" id="btn-filtro-vagas" type="button">Vagas <span data-icon="chevron-down" data-size="14"></span></button>
+            <div class="filtro-painel" id="painel-filtro-vagas" hidden></div>
+          </div>
+          <div class="filtro">
+            <button class="btn btn-secundario" id="btn-filtro-etapas" type="button">Etapas <span data-icon="chevron-down" data-size="14"></span></button>
+            <div class="filtro-painel" id="painel-filtro-etapas" hidden></div>
           </div>
         </div>
+      </div>
 
-        <div class="quadro-scroll">
-          <div class="quadro-grid" id="quadro-grid"></div>
-        </div>
+      <div class="quadro-scroll">
+        <div class="quadro-grid" id="quadro-grid"></div>
       </div>
     </div>
   </div>
+
   <footer class="rodape-app">
     <p class="rodape-app-copy">© 2026 <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo" class="rodape-logo-img">. Todos os direitos reservados.</p>
   </footer>
@@ -101,7 +113,7 @@
   <script>
     let dados = { vagas: [], etapas: [], candidaturas: [] };
     const filtroVagas = new Set();
-    const filtroEtapas = new Set(); // ids de etapas + a string 'sem-etapa'
+    const filtroEtapas = new Set();
 
     async function carregar() {
       const res = await apiFetch('/people/api/kanban');
@@ -110,7 +122,6 @@
       renderizarQuadro();
     }
 
-    // --- Filtros clicáveis multi-seleção ---
     function montarFiltroGenerico(painelId, itens, selecionados, aoMudar) {
       const painel = document.getElementById(painelId);
       painel.innerHTML = itens.map((item) => `
@@ -155,7 +166,6 @@
       }
     });
 
-    // --- Render do grid raia (vaga) × coluna (etapa) ---
     function candidaturasDe(vagaId, etapaId) {
       return dados.candidaturas.filter((c) => c.vaga_id === vagaId && (c.etapa_id || null) === etapaId);
     }
@@ -177,7 +187,7 @@
       const grid = document.getElementById('quadro-grid');
       grid.style.gridTemplateColumns = `200px repeat(${colunas.length}, minmax(220px, 1fr)) 200px`;
 
-      let html = '<div></div>'; // canto vazio acima do rótulo das raias
+      let html = '<div></div>';
       colunas.forEach((col) => {
         if (col.semEtapa) {
           html += `<div class="coluna-header sem-etapa">Sem etapa</div>`;
@@ -208,7 +218,7 @@
             </div>
           `;
         });
-        html += '<div></div>'; // alinha com a coluna "+ Nova etapa"
+        html += '<div></div>';
       });
 
       grid.innerHTML = html || '';
@@ -220,7 +230,6 @@
     }
 
     function ligarEventosGrid() {
-      // Drag and drop dos cartões
       document.querySelectorAll('.cartao').forEach((cartao) => {
         cartao.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', cartao.dataset.candidatura);
@@ -250,7 +259,6 @@
         });
       });
 
-      // Reordenar coluna
       document.querySelectorAll('[data-mover]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           await apiFetch(`/people/api/etapas/${btn.dataset.mover}/mover`, {
@@ -261,7 +269,6 @@
         });
       });
 
-      // Apagar coluna
       document.querySelectorAll('[data-apagar]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const confirmar = confirm('Apagar esta etapa? As candidaturas que estão nela voltam para "Sem etapa".');
@@ -271,7 +278,6 @@
         });
       });
 
-      // Renomear coluna (clique no nome vira input)
       document.querySelectorAll('[data-editar]').forEach((span) => {
         span.addEventListener('click', () => {
           const atual = span.textContent;
@@ -299,7 +305,6 @@
         });
       });
 
-      // Nova etapa
       const inputNova = document.getElementById('input-nova-etapa');
       if (inputNova) {
         inputNova.addEventListener('keydown', async (e) => {

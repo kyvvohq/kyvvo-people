@@ -4,94 +4,92 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — Relatório</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; }
-  body { margin:0; background:#080b14; color:#f2f2f7; font-family:Arial,Helvetica,sans-serif; }
-  header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid #232847; }
-  .logo { font-size:20px; font-weight:800; letter-spacing:-.03em; }
-  .logo span { color:#a688ff; position:relative; }
-  .logo span::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:2px;
-    background:linear-gradient(90deg,#7c5cfc,#00d4ff); border-radius:2px; }
-  a.voltar { color:#a1a5c4; text-decoration:none; font-size:13px; }
+  :root { color-scheme: light; }
+  body { margin:0; background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid #E7EAF2; background:#fff; }
+  .logo { display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; }
+  .logo .marca-k { width:28px; height:28px; border-radius:8px; background:#0F111A; color:#fff;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .logo .nome { font-size:15px; font-weight:700; }
+  a.voltar { color:#6B7385; text-decoration:none; font-size:13px; }
+  a.voltar:hover { color:#0F111A; }
   main { max-width:720px; margin:0 auto; padding:32px; }
-  .card { background:#12162a; border:1px solid #232847; border-radius:16px; padding:24px; margin-bottom:24px; }
-  h2 { font-size:12px; color:#a1a5c4; margin:0 0 16px; text-transform:uppercase; letter-spacing:.06em; }
+  .card { background:#fff; border:1px solid #E7EAF2; border-radius:16px; padding:24px; margin-bottom:24px; }
+  h1 { font-family:'Space Grotesk',sans-serif; }
+  h2 { font-size:12px; color:#6B7385; margin:0 0 16px; text-transform:uppercase; letter-spacing:.06em; }
 
-  /* Cabeçalho do candidato */
   .topo { text-align:center; margin-bottom:32px; }
-  .avatar { width:64px; height:64px; border-radius:50%; border:2px solid #a688ff; display:flex;
-    align-items:center; justify-content:center; margin:0 auto 16px; font-weight:800; font-size:20px; color:#a688ff; }
+  .avatar { width:64px; height:64px; border-radius:50%; border:2px solid #7C5CFC; display:flex;
+    align-items:center; justify-content:center; margin:0 auto 16px; font-weight:800; font-size:20px; color:#7C5CFC; background:#F1EEFF; }
   .topo h1 { font-size:22px; margin:0 0 6px; text-transform:capitalize; }
-  .topo .tags { color:#a688ff; font-weight:700; font-size:13px; margin-bottom:8px; }
-  .topo .tagline { color:#a1a5c4; font-size:13px; }
+  .topo .tags { color:#7C5CFC; font-weight:700; font-size:13px; margin-bottom:8px; }
+  .topo .tagline { color:#6B7385; font-size:13px; }
 
-  /* Perfil identificado */
   .pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
   .pill { font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; }
-  .pill.perfil { background:#2a2050; color:#c9b6ff; }
-  .pill.mbti { background:#0f3630; color:#7ee7a6; }
-  .pill.traco { background:#3a3410; color:#e6c65a; }
-  .card ul.bullets { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#d8daea; }
+  .pill.perfil { background:#F1EEFF; color:#4E33C4; }
+  .pill.mbti { background:#12B76A1A; color:#12B76A; }
+  .pill.traco { background:#F790091F; color:#B54708; }
+  .card ul.bullets { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#2B3040; }
 
-  /* Radar */
-  .radar-legenda { display:flex; gap:20px; justify-content:center; font-size:12px; color:#a1a5c4; margin-top:8px; }
+  .radar-legenda { display:flex; gap:20px; justify-content:center; font-size:12px; color:#6B7385; margin-top:8px; }
   .radar-legenda span { display:inline-flex; align-items:center; gap:6px; }
   .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
-  /* Barras comparativas */
   .barra-linha { margin-bottom:16px; }
   .barra-label { display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
-  .barra-label .valores { color:#a1a5c4; font-size:12px; }
-  .barra-fundo { background:#232847; border-radius:6px; height:8px; overflow:hidden; margin-bottom:3px; }
+  .barra-label .valores { color:#6B7385; font-size:12px; }
+  .barra-fundo { background:#F1F3F8; border-radius:6px; height:8px; overflow:hidden; margin-bottom:3px; }
   .barra-preenchida { height:100%; border-radius:6px; }
   .barra-fundo.r2 { height:5px; }
 
-  /* Gaps */
   .gap-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .gap-box { border-radius:12px; padding:14px 16px; font-size:12px; }
-  .gap-box.alinhamento { background:#1c2350; color:#c7cdf5; }
-  .gap-box.atencao { background:#3a2418; color:#f5c7a8; }
+  .gap-box.alinhamento { background:#F1EEFF; color:#4E33C4; }
+  .gap-box.atencao { background:#F790091F; color:#B54708; }
   .gap-box h3 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px; opacity:.8; }
   .gap-box div.item { padding:2px 0; }
 
-  /* MBTI */
   .mbti-tipo { text-align:center; margin-bottom:20px; }
-  .mbti-tipo .letras { font-size:32px; font-weight:800; color:#a688ff; letter-spacing:.04em; }
-  .mbti-tipo .nome { font-size:14px; color:#f2f2f7; margin-top:4px; }
-  .mbti-tipo .desc { font-size:12px; color:#a1a5c4; margin-top:4px; }
+  .mbti-tipo .letras { font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; color:#7C5CFC; letter-spacing:.04em; }
+  .mbti-tipo .nome { font-size:14px; color:#0F111A; margin-top:4px; }
+  .mbti-tipo .desc { font-size:12px; color:#6B7385; margin-top:4px; }
   .dicotomia { margin-bottom:14px; }
-  .dicotomia-labels { display:flex; justify-content:space-between; font-size:12px; color:#6b7094; margin-bottom:6px; }
-  .dicotomia-labels .ativo { color:#7ee7a6; font-weight:700; }
-  .dicotomia-track { position:relative; height:6px; background:#232847; border-radius:6px; }
-  .dicotomia-preenchido { position:absolute; top:0; left:0; height:100%; background:#7ee7a6; border-radius:6px; }
-  .dicotomia-marcador { position:absolute; top:50%; width:12px; height:12px; background:#a688ff; border-radius:50%;
-    transform:translate(-50%,-50%); border:2px solid #080b14; }
+  .dicotomia-labels { display:flex; justify-content:space-between; font-size:12px; color:#98A0B0; margin-bottom:6px; }
+  .dicotomia-labels .ativo { color:#12B76A; font-weight:700; }
+  .dicotomia-track { position:relative; height:6px; background:#F1F3F8; border-radius:6px; }
+  .dicotomia-preenchido { position:absolute; top:0; left:0; height:100%; background:#12B76A; border-radius:6px; }
+  .dicotomia-marcador { position:absolute; top:50%; width:12px; height:12px; background:#7C5CFC; border-radius:50%;
+    transform:translate(-50%,-50%); border:2px solid #fff; box-shadow:0 0 0 1px #E7EAF2; }
 
-  /* OCEAN */
   .ocean-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   @media(max-width:520px) { .ocean-grid, .gap-grid { grid-template-columns:1fr; } }
-  .ocean-card { background:#0d1024; border:1px solid #232847; border-radius:12px; padding:14px; }
+  .ocean-card { background:#F8F9FC; border:1px solid #E7EAF2; border-radius:12px; padding:14px; }
   .ocean-card .nome-valor { display:flex; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:8px; }
-  .ocean-card .desc { font-size:11px; color:#a1a5c4; margin-top:8px; line-height:1.5; }
+  .ocean-card .desc { font-size:11px; color:#6B7385; margin-top:8px; line-height:1.5; }
 
-  /* Relação com o perfil */
   .rel-secao { margin-bottom:18px; }
   .rel-secao:last-child { margin-bottom:0; }
   .rel-secao h3 { font-size:12px; margin:0 0 8px; }
-  .rel-secao.fortes h3 { color:#7ee7a6; }
-  .rel-secao.atencao h3 { color:#f5a878; }
-  .rel-secao.aproveitar h3 { color:#a688ff; }
-  .rel-secao ul { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#d8daea; }
+  .rel-secao.fortes h3 { color:#12B76A; }
+  .rel-secao.atencao h3 { color:#B54708; }
+  .rel-secao.aproveitar h3 { color:#7C5CFC; }
+  .rel-secao ul { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#2B3040; }
 
-  button, .btn { background:#a688ff; color:#080b14; font-weight:700; border:none; border-radius:10px;
-    padding:10px 18px; font-size:14px; cursor:pointer; }
+  button, .btn { background:#7C5CFC; color:#fff; font-weight:600; border:none; border-radius:12px;
+    height:40px; padding:0 20px; font-size:14px; cursor:pointer; }
+  button:hover { background:#6344E8; }
   .acoes { display:flex; gap:10px; justify-content:center; margin-top:20px; }
 </style>
 </head>
 <body>
   <header>
-    <a class="logo" href="/people/painel.html" style="text-decoration:none">ky<span>vv</span>o people</a>
-    <a class="voltar" href="/people/candidatos.html">← Voltar aos candidatos</a>
+    <a class="logo" href="/people/painel.html" aria-label="Ir para o início"><div class="marca-k">k</div><div class="nome">Kyvvo People</div></a>
+    <a class="voltar" href="/people/avaliacoes.html">← Voltar às avaliações</a>
   </header>
   <main id="conteudo">Carregando...</main>
 
@@ -101,7 +99,7 @@
     const id = new URLSearchParams(window.location.search).get('id');
 
     const NOMES = { A: 'Analista', C: 'Comunicador', E: 'Executor', P: 'Planejador' };
-    const CORES_PERFIL = { A: '#a688ff', C: '#7ee7a6', E: '#f5a878', P: '#e6c65a' };
+    const CORES_PERFIL = { A: '#7C5CFC', C: '#12B76A', E: '#F79009', P: '#0BA3CC' };
 
     function svgRadar(r1, r2) {
       const cx = 165, cy = 130, raio = 65;
@@ -115,20 +113,20 @@
       const poligono = (dados) => eixos.map((e) => ponto(e.angulo, dados[e.chave] / 100)).join(' ');
 
       const grades = [0.25, 0.5, 0.75, 1].map((escala) =>
-        `<polygon points="${eixos.map((e) => ponto(e.angulo, escala)).join(' ')}" fill="none" stroke="#232847" stroke-width="1"/>`
+        `<polygon points="${eixos.map((e) => ponto(e.angulo, escala)).join(' ')}" fill="none" stroke="#E7EAF2" stroke-width="1"/>`
       ).join('');
-      const linhas = eixos.map((e) => `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(e.angulo) * raio}" y2="${cy + Math.sin(e.angulo) * raio}" stroke="#232847" stroke-width="1"/>`).join('');
+      const linhas = eixos.map((e) => `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(e.angulo) * raio}" y2="${cy + Math.sin(e.angulo) * raio}" stroke="#E7EAF2" stroke-width="1"/>`).join('');
       const labelPos = eixos.map((e) => {
         const lx = cx + Math.cos(e.angulo) * (raio + 16);
         const ly = cy + Math.sin(e.angulo) * (raio + 16);
-        return `<text x="${lx}" y="${ly}" fill="#a1a5c4" font-size="12" text-anchor="${e.ancora}" dominant-baseline="middle">${NOMES[e.chave]}</text>`;
+        return `<text x="${lx}" y="${ly}" fill="#6B7385" font-size="12" text-anchor="${e.ancora}" dominant-baseline="middle">${NOMES[e.chave]}</text>`;
       }).join('');
 
       return `
         <svg viewBox="0 0 330 260" width="100%" style="max-width:380px;display:block;margin:0 auto">
           ${grades}${linhas}
-          <polygon points="${poligono(r1)}" fill="#a688ff" fill-opacity="0.18" stroke="#a688ff" stroke-width="2"/>
-          <polygon points="${poligono(r2)}" fill="#7ee7a6" fill-opacity="0.12" stroke="#7ee7a6" stroke-width="2" stroke-dasharray="4,3"/>
+          <polygon points="${poligono(r1)}" fill="#7C5CFC" fill-opacity="0.16" stroke="#7C5CFC" stroke-width="2"/>
+          <polygon points="${poligono(r2)}" fill="#12B76A" fill-opacity="0.12" stroke="#12B76A" stroke-width="2" stroke-dasharray="4,3"/>
           ${labelPos}
         </svg>`;
     }
@@ -192,7 +190,7 @@
         return `
           <div class="ocean-card">
             <div class="nome-valor"><span>${t.nome}</span><span>${t.percentil}%</span></div>
-            <div class="barra-fundo"><div class="barra-preenchida" style="width:${t.percentil}%;background:#a688ff"></div></div>
+            <div class="barra-fundo"><div class="barra-preenchida" style="width:${t.percentil}%;background:#7C5CFC"></div></div>
             <div class="desc">${tracoDescricoes[chave]}</div>
           </div>`;
       }).join('')}</div>`;
@@ -237,8 +235,8 @@
           <h2>Profiler comportamental</h2>
           ${svgRadar(r.rodada1.profiler, r.rodada2.profiler)}
           <div class="radar-legenda">
-            <span><span class="dot" style="background:#a688ff"></span>Como me vejo</span>
-            <span><span class="dot" style="background:#7ee7a6"></span>Como os outros me veem</span>
+            <span><span class="dot" style="background:#7C5CFC"></span>Como me vejo</span>
+            <span><span class="dot" style="background:#12B76A"></span>Como os outros me veem</span>
           </div>
         </div>
 
