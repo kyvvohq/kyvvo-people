@@ -23,10 +23,13 @@
   .quadro-scroll { overflow-x:auto; padding-bottom:12px; }
   .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
   .raia-label { position:sticky; left:0; background:var(--bg); padding:10px 8px; font-weight:700; font-size:13px;
-    display:flex; align-items:center; z-index:2; color:var(--text); }
+    display:flex; align-items:center; z-index:3; color:var(--text); }
   .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
     display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; color:var(--text); }
-  .coluna-header.sem-etapa { color:var(--muted); font-weight:600; }
+  .coluna-header.arrastavel { cursor:grab; }
+  .coluna-header.arrastando-coluna { opacity:.4; }
+  .coluna-header.recebendo-coluna { border-color:var(--accent); }
+  .coluna-header.fixa { color:var(--muted); font-weight:600; position:sticky; left:200px; z-index:2; min-width:200px; background:var(--card); }
   .coluna-header .nome-etapa { flex:1; cursor:text; }
   .coluna-header input.editar-nome { width:100%; background:transparent; border:1px solid var(--accent); border-radius:6px; padding:2px 6px; font-size:13px; color:var(--text); }
   .coluna-header button { background:transparent; color:var(--muted); width:auto; height:auto; margin:0; padding:2px 6px; font-size:12px; border-radius:6px; }
@@ -37,6 +40,7 @@
   .celula { background:var(--bg); border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:8px; min-width:220px; min-height:60px;
     display:flex; flex-direction:column; gap:6px; }
   .celula.arrastando-sobre { border-color:var(--accent); background:var(--accent-tint); }
+  .celula.fixa { position:sticky; left:200px; z-index:1; min-width:200px; background:var(--bg); }
   .cartao { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:12px; cursor:grab; }
   .cartao:active { cursor:grabbing; }
   .cartao .nome { font-weight:700; margin-bottom:2px; color:var(--text); }
@@ -132,6 +136,7 @@
     let dados = { vagas: [], etapas: [], candidaturas: [] };
     const filtroVagas = new Set();
     const filtroEtapas = new Set();
+    const TIPO_ARRASTO_COLUNA = 'application/x-etapa-id';
 
     async function carregar() {
       const res = await apiFetch('/people/api/kanban');
@@ -160,8 +165,8 @@
 
     function montarFiltros() {
       montarFiltroGenerico('painel-filtro-vagas', dados.vagas, filtroVagas, renderizarQuadro);
-      const itensEtapas = [{ id: 'sem-etapa', nome: 'Sem etapa' }, ...dados.etapas];
-      montarFiltroGenerico('painel-filtro-etapas', itensEtapas, filtroEtapas, renderizarQuadro);
+      // "Nova" é fixa, não entra no filtro — só as etapas de verdade são filtráveis.
+      montarFiltroGenerico('painel-filtro-etapas', dados.etapas, filtroEtapas, renderizarQuadro);
     }
 
     function alternarPainel(painelId, outroPainelId) {
@@ -184,8 +189,10 @@
       }
     });
 
+    // Candidaturas reprovadas saem do quadro — o pipeline mostra só quem
+    // ainda está em processo.
     function candidaturasDe(vagaId, etapaId) {
-      return dados.candidaturas.filter((c) => c.vaga_id === vagaId && (c.etapa_id || null) === etapaId);
+      return dados.candidaturas.filter((c) => c.vaga_id === vagaId && (c.etapa_id || null) === etapaId && c.status !== 'reprovada');
     }
 
     function renderizarCartao(c) {
@@ -199,23 +206,21 @@
 
     function renderizarQuadro() {
       const vagas = dados.vagas.filter((v) => filtroVagas.size === 0 || filtroVagas.has(v.id));
-      const colunas = [{ id: null, chave: 'sem-etapa', nome: 'Sem etapa', semEtapa: true }, ...dados.etapas.map((e) => ({ ...e, chave: e.id }))]
-        .filter((col) => filtroEtapas.size === 0 || filtroEtapas.has(col.chave));
+      const etapas = dados.etapas.filter((e) => filtroEtapas.size === 0 || filtroEtapas.has(e.id));
+      const colunas = [{ id: null, chave: 'nova', nome: 'Nova', fixa: true }, ...etapas.map((e) => ({ ...e, chave: e.id }))];
 
       const grid = document.getElementById('quadro-grid');
-      grid.style.gridTemplateColumns = `200px repeat(${colunas.length}, minmax(220px, 1fr)) 200px`;
+      grid.style.gridTemplateColumns = `200px 200px repeat(${etapas.length}, minmax(220px, 1fr)) 200px`;
 
       let html = '<div></div>';
       colunas.forEach((col) => {
-        if (col.semEtapa) {
-          html += `<div class="coluna-header sem-etapa">Sem etapa</div>`;
+        if (col.fixa) {
+          html += `<div class="coluna-header fixa">Nova</div>`;
         } else {
           html += `
-            <div class="coluna-header" data-etapa="${col.id}">
-              <button type="button" data-mover="${col.id}" data-direcao="esquerda" title="Mover pra esquerda">←</button>
+            <div class="coluna-header arrastavel" draggable="true" data-etapa="${col.id}">
               <span class="nome-etapa" data-editar="${col.id}">${col.nome}</span>
-              <button type="button" data-mover="${col.id}" data-direcao="direita" title="Mover pra direita">→</button>
-              <button type="button" data-apagar="${col.id}" title="Apagar etapa">✕</button>
+              <button type="button" data-apagar="${col.id}" data-nome="${col.nome}" title="Apagar etapa">✕</button>
             </div>
           `;
         }
@@ -231,7 +236,7 @@
         colunas.forEach((col) => {
           const cartoes = candidaturasDe(vaga.id, col.id);
           html += `
-            <div class="celula" data-vaga="${vaga.id}" data-etapa="${col.id || ''}">
+            <div class="celula${col.fixa ? ' fixa' : ''}" data-vaga="${vaga.id}" data-etapa="${col.id || ''}">
               ${cartoes.map(renderizarCartao).join('') || '<div class="celula-vazia">—</div>'}
             </div>
           `;
@@ -247,6 +252,26 @@
       ligarEventosGrid();
     }
 
+    function confirmarApagarEtapa(id, nome) {
+      const overlay = abrirModal(
+        '<h3>Apagar etapa?</h3>',
+        `
+          <p class="modal-texto">As candidaturas em "${nome}" voltam para "Nova". Essa ação não pode ser desfeita.</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-apagar-etapa">Cancelar</button>
+            <button type="button" class="btn-perigo" id="confirmar-apagar-etapa">Apagar etapa</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-apagar-etapa').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-apagar-etapa').addEventListener('click', async () => {
+        fecharModal();
+        await apiFetch(`/people/api/etapas/${id}`, { method: 'DELETE' });
+        carregar();
+      });
+      return overlay;
+    }
+
     function ligarEventosGrid() {
       document.querySelectorAll('.cartao').forEach((cartao) => {
         cartao.addEventListener('dragstart', (e) => {
@@ -255,11 +280,13 @@
       });
       document.querySelectorAll('.celula').forEach((celula) => {
         celula.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer.types.includes('text/plain')) return;
           e.preventDefault();
           celula.classList.add('arrastando-sobre');
         });
         celula.addEventListener('dragleave', () => celula.classList.remove('arrastando-sobre'));
         celula.addEventListener('drop', async (e) => {
+          if (!e.dataTransfer.types.includes('text/plain')) return;
           e.preventDefault();
           celula.classList.remove('arrastando-sobre');
           const candidaturaId = e.dataTransfer.getData('text/plain');
@@ -277,23 +304,42 @@
         });
       });
 
-      document.querySelectorAll('[data-mover]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/people/api/etapas/${btn.dataset.mover}/mover`, {
-            method: 'PATCH',
-            body: JSON.stringify({ direcao: btn.dataset.direcao }),
-          });
+      // Arrastar e soltar o cabeçalho de uma coluna sobre outra reordena as
+      // etapas (o botão ✕ continua fixo, não participa do arrasto).
+      document.querySelectorAll('.coluna-header.arrastavel').forEach((header) => {
+        header.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData(TIPO_ARRASTO_COLUNA, header.dataset.etapa);
+          header.classList.add('arrastando-coluna');
+        });
+        header.addEventListener('dragend', () => header.classList.remove('arrastando-coluna'));
+        header.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
+          e.preventDefault();
+          header.classList.add('recebendo-coluna');
+        });
+        header.addEventListener('dragleave', () => header.classList.remove('recebendo-coluna'));
+        header.addEventListener('drop', async (e) => {
+          if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
+          e.preventDefault();
+          header.classList.remove('recebendo-coluna');
+          const idArrastado = e.dataTransfer.getData(TIPO_ARRASTO_COLUNA);
+          const idAlvo = header.dataset.etapa;
+          if (!idArrastado || idArrastado === idAlvo) return;
+
+          const ids = dados.etapas.map((et) => et.id);
+          const doIndice = ids.indexOf(idArrastado);
+          const paraIndice = ids.indexOf(idAlvo);
+          if (doIndice === -1 || paraIndice === -1) return;
+          ids.splice(doIndice, 1);
+          ids.splice(paraIndice, 0, idArrastado);
+
+          await apiFetch('/people/api/etapas/reordenar', { method: 'PATCH', body: JSON.stringify({ ids }) });
           carregar();
         });
       });
 
       document.querySelectorAll('[data-apagar]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const confirmar = confirm('Apagar esta etapa? As candidaturas que estão nela voltam para "Sem etapa".');
-          if (!confirmar) return;
-          await apiFetch(`/people/api/etapas/${btn.dataset.apagar}`, { method: 'DELETE' });
-          carregar();
-        });
+        btn.addEventListener('click', () => confirmarApagarEtapa(btn.dataset.apagar, btn.dataset.nome));
       });
 
       document.querySelectorAll('[data-editar]').forEach((span) => {

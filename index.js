@@ -13,6 +13,7 @@ const { calcularResultado, CARACTERISTICAS } = require('./lib/inferencia');
 const { montarResumo } = require('./lib/conteudo');
 const { enviarLinkAvaliacao } = require('./lib/email');
 const { gerarRelatorioPdf } = require('./lib/pdf');
+const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
@@ -275,13 +276,25 @@ async function build() {
   // `candidatos` do teste comportamental).
   fastify.get('/people/api/candidaturas', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      `select c.id, c.nome, c.email, c.whatsapp, c.criado_em, v.nome as vaga_nome
+      `select c.id, c.nome, c.email, c.whatsapp, c.status, c.criado_em, v.nome as vaga_nome
        from candidaturas c join vagas v on v.id = c.vaga_id
        where v.tenant_id = $1
        order by c.criado_em desc`,
       [request.user.tenantId]
     );
     return rows;
+  });
+
+  fastify.get('/people/api/candidaturas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `select c.id, c.nome, c.email, c.whatsapp, c.linkedin, c.status, c.etapa_id, c.vaga_id,
+              c.curriculo_nome, c.curriculo_tipo, c.criado_em, v.nome as vaga_nome
+       from candidaturas c join vagas v on v.id = c.vaga_id
+       where c.id = $1 and v.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    return rows[0];
   });
 
   fastify.get('/people/api/candidaturas/:id/curriculo', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -297,6 +310,126 @@ async function build() {
     reply.header('Content-Type', candidatura.curriculo_tipo);
     reply.header('Content-Disposition', `attachment; filename="${candidatura.curriculo_nome}"`);
     return reply.send(candidatura.curriculo_arquivo);
+  });
+
+  // Mesmo arquivo do endpoint acima, mas com Content-Disposition: inline —
+  // usado pelo <iframe> do painel de detalhe do candidato (só funciona
+  // embutido pra PDF; DOCX não tem visualização nativa no navegador).
+  fastify.get('/people/api/candidaturas/:id/curriculo/visualizar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `select c.curriculo_nome, c.curriculo_tipo, c.curriculo_arquivo
+       from candidaturas c join vagas v on v.id = c.vaga_id
+       where c.id = $1 and v.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+    const candidatura = rows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Currículo não encontrado' });
+
+    reply.header('Content-Type', candidatura.curriculo_tipo);
+    reply.header('Content-Disposition', `inline; filename="${candidatura.curriculo_nome}"`);
+    return reply.send(candidatura.curriculo_arquivo);
+  });
+
+  fastify.patch('/people/api/candidaturas/:id/reprovar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `update candidaturas c set status = 'reprovada'
+       from vagas v
+       where c.vaga_id = v.id and c.id = $1 and v.tenant_id = $2
+       returning c.id`,
+      [request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    return { ok: true };
+  });
+
+  // Avança a candidatura pra próxima etapa (por `ordem`) a partir da etapa
+  // atual — se ela não estiver em nenhuma, a próxima é a primeira etapa
+  // cadastrada. Se não houver uma próxima etapa configurada, devolve
+  // `semProximaEtapa: true` (não é erro) pro front oferecer cadastrar uma.
+  fastify.patch('/people/api/candidaturas/:id/avancar-etapa', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: candidaturaRows } = await pool.query(
+      `select c.id, c.etapa_id
+       from candidaturas c join vagas v on v.id = c.vaga_id
+       where c.id = $1 and v.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+    const candidatura = candidaturaRows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+
+    const { rows: etapas } = await pool.query(
+      'select id, nome from etapas where tenant_id = $1 order by ordem',
+      [request.user.tenantId]
+    );
+    if (!etapas.length) return { ok: true, semProximaEtapa: true };
+
+    const indiceAtual = candidatura.etapa_id ? etapas.findIndex((e) => e.id === candidatura.etapa_id) : -1;
+    const proxima = etapas[indiceAtual + 1];
+    if (!proxima) return { ok: true, semProximaEtapa: true };
+
+    await pool.query('update candidaturas set etapa_id = $1 where id = $2', [proxima.id, candidatura.id]);
+    return { ok: true, etapa: proxima };
+  });
+
+  // Cadastro manual de candidato (sem passar pelo link público da vaga) —
+  // currículo é opcional aqui; o botão "Importar currículo" da tela usa o
+  // mesmo endpoint depois de pré-preencher os campos via /extrair-curriculo.
+  fastify.post('/people/api/candidaturas', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const campos = {};
+    let arquivo = null;
+    for await (const part of request.parts()) {
+      if (part.type === 'file') {
+        const extensao = path.extname(part.filename || '').toLowerCase();
+        if (!EXTENSOES_CURRICULO_ACEITAS.includes(extensao)) {
+          return reply.code(400).send({ error: 'Currículo deve ser PDF ou DOCX' });
+        }
+        arquivo = { nome: part.filename, tipo: part.mimetype, buffer: await part.toBuffer() };
+      } else {
+        campos[part.fieldname] = part.value;
+      }
+    }
+
+    if (!campos.vaga_id || !campos.nome || !campos.whatsapp || !campos.email) {
+      return reply.code(400).send({ error: 'vaga_id, nome, whatsapp e email são obrigatórios' });
+    }
+    const { rows: vagaRows } = await pool.query('select id from vagas where id = $1 and tenant_id = $2', [campos.vaga_id, request.user.tenantId]);
+    if (!vagaRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+
+    const id = crypto.randomUUID();
+    await pool.query(
+      `insert into candidaturas (id, vaga_id, tenant_id, nome, whatsapp, email, linkedin, curriculo_nome, curriculo_tipo, curriculo_arquivo)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        id, campos.vaga_id, request.user.tenantId, campos.nome, campos.whatsapp, campos.email, campos.linkedin || null,
+        arquivo ? arquivo.nome : 'sem-arquivo', arquivo ? arquivo.tipo : 'application/octet-stream', arquivo ? arquivo.buffer : Buffer.alloc(0),
+      ]
+    );
+    return reply.code(201).send({ id });
+  });
+
+  // Lê um currículo enviado e devolve nome/e-mail/whatsapp encontrados no
+  // texto por regex/heurística (não é IA) — só sugere valores pro
+  // formulário de "Importar currículo", nada é salvo aqui.
+  fastify.post('/people/api/candidaturas/extrair-curriculo', { preHandler: fastify.authenticate }, async (request, reply) => {
+    let arquivo = null;
+    for await (const part of request.parts()) {
+      if (part.type === 'file') {
+        const extensao = path.extname(part.filename || '').toLowerCase();
+        if (!EXTENSOES_CURRICULO_ACEITAS.includes(extensao)) {
+          return reply.code(400).send({ error: 'Currículo deve ser PDF ou DOCX' });
+        }
+        arquivo = { nome: part.filename, tipo: part.mimetype, buffer: await part.toBuffer() };
+      }
+    }
+    if (!arquivo) return reply.code(400).send({ error: 'Envie um arquivo' });
+
+    try {
+      const texto = await extrairTexto(arquivo.buffer, arquivo.tipo, arquivo.nome);
+      const campos = extrairCamposDoTexto(texto);
+      return { ...campos, arquivoBase64: arquivo.buffer.toString('base64'), curriculoNome: arquivo.nome, curriculoTipo: arquivo.tipo };
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(422).send({ error: 'Não foi possível ler esse arquivo. Preencha os campos manualmente.' });
+    }
   });
 
   // --- Quadro Kanban: etapas (colunas, tenant-wide) + candidaturas movendo entre elas ---
@@ -335,31 +468,27 @@ async function build() {
     return { ok: true };
   });
 
-  // Troca a `ordem` com a etapa vizinha na direção pedida — reordenação simples
-  // via botões ←/→ no cabeçalho da coluna (drag-and-drop fica só pros cartões).
-  fastify.patch('/people/api/etapas/:id/mover', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { direcao } = request.body || {};
-    if (!['esquerda', 'direita'].includes(direcao)) {
-      return reply.code(400).send({ error: 'direcao deve ser esquerda ou direita' });
+  // Reordena as etapas de acordo com a lista de ids recebida (arrastar e
+  // soltar o cabeçalho da coluna no quadro) — reescreve a `ordem` de todas
+  // de uma vez, mais simples e robusto que mover uma por uma.
+  fastify.patch('/people/api/etapas/reordenar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { ids } = request.body || {};
+    if (!Array.isArray(ids) || !ids.length) {
+      return reply.code(400).send({ error: 'ids deve ser uma lista não vazia' });
     }
 
-    const { rows } = await pool.query(
-      'select id, ordem from etapas where tenant_id = $1 order by ordem',
-      [request.user.tenantId]
-    );
-    const indice = rows.findIndex((e) => e.id === request.params.id);
-    if (indice === -1) return reply.code(404).send({ error: 'Etapa não encontrada' });
+    const { rows } = await pool.query('select id from etapas where tenant_id = $1', [request.user.tenantId]);
+    const idsValidos = new Set(rows.map((r) => r.id));
+    if (ids.length !== idsValidos.size || !ids.every((id) => idsValidos.has(id))) {
+      return reply.code(400).send({ error: 'A lista deve conter exatamente as etapas do tenant' });
+    }
 
-    const indiceVizinho = direcao === 'esquerda' ? indice - 1 : indice + 1;
-    if (indiceVizinho < 0 || indiceVizinho >= rows.length) return { ok: true };
-
-    const atual = rows[indice];
-    const vizinho = rows[indiceVizinho];
     const client = await pool.connect();
     try {
       await client.query('begin');
-      await client.query('update etapas set ordem = $1 where id = $2', [vizinho.ordem, atual.id]);
-      await client.query('update etapas set ordem = $1 where id = $2', [atual.ordem, vizinho.id]);
+      for (let i = 0; i < ids.length; i++) {
+        await client.query('update etapas set ordem = $1 where id = $2 and tenant_id = $3', [i + 1, ids[i], request.user.tenantId]);
+      }
       await client.query('commit');
     } catch (err) {
       await client.query('rollback');
@@ -387,7 +516,7 @@ async function build() {
       pool.query('select id, nome from vagas where tenant_id = $1 order by criado_em desc', [request.user.tenantId]),
       pool.query('select id, nome, ordem from etapas where tenant_id = $1 order by ordem', [request.user.tenantId]),
       pool.query(
-        `select c.id, c.nome, c.vaga_id, c.etapa_id, c.criado_em
+        `select c.id, c.nome, c.vaga_id, c.etapa_id, c.status, c.criado_em
          from candidaturas c join vagas v on v.id = c.vaga_id
          where v.tenant_id = $1
          order by c.criado_em desc`,
