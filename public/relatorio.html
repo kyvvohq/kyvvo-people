@@ -71,6 +71,24 @@
   .ocean-card { background:#F8F9FC; border:1px solid #E7EAF2; border-radius:12px; padding:14px; }
   .ocean-card .nome-valor { display:flex; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:8px; }
   .ocean-card .desc { font-size:11px; color:#6B7385; margin-top:8px; line-height:1.5; }
+  .ocean-card .impacto { font-size:12px; color:#2B3040; margin-top:8px; line-height:1.6; padding-top:8px; border-top:1px solid #E7EAF2; }
+
+  .subsecao { margin-top:18px; }
+  .subsecao h3 { font-size:12px; color:#6B7385; text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px; }
+  .ambiente-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:520px) { .ambiente-grid { grid-template-columns:1fr; } }
+  .ambiente-box { border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.6; }
+  .ambiente-box.ideal { background:#12B76A1A; color:#0C7A47; }
+  .ambiente-box.risco { background:#F790091F; color:#B54708; }
+  .ambiente-box h4 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 6px; opacity:.85; }
+  .lideranca-box { margin-top:12px; background:#F1EEFF; color:#4E33C4; border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.6; }
+  .lideranca-box h4 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 6px; opacity:.85; }
+
+  .mbti-dimensoes { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+  @media(max-width:520px) { .mbti-dimensoes { grid-template-columns:1fr; } }
+  .mbti-dimensao { background:#F8F9FC; border:1px solid #E7EAF2; border-radius:12px; padding:12px 14px; }
+  .mbti-dimensao h4 { font-size:11px; color:#7C5CFC; text-transform:uppercase; letter-spacing:.04em; margin:0 0 6px; }
+  .mbti-dimensao p { font-size:12.5px; color:#2B3040; line-height:1.55; margin:0; }
 
   .rel-secao { margin-bottom:18px; }
   .rel-secao:last-child { margin-bottom:0; }
@@ -184,7 +202,7 @@
       }).join('');
     }
 
-    function oceanCards(bigFive, tracoDescricoes) {
+    function oceanCards(bigFive, tracoDescricoes, tracoImpactos) {
       return `<div class="ocean-grid">${Object.keys(bigFive).map((chave) => {
         const t = bigFive[chave];
         return `
@@ -192,6 +210,7 @@
             <div class="nome-valor"><span>${t.nome}</span><span>${t.percentil}%</span></div>
             <div class="barra-fundo"><div class="barra-preenchida" style="width:${t.percentil}%;background:#7C5CFC"></div></div>
             <div class="desc">${tracoDescricoes[chave]}</div>
+            <div class="impacto">${tracoImpactos[chave]}</div>
           </div>`;
       }).join('')}</div>`;
     }
@@ -232,11 +251,23 @@
         </div>
 
         <div class="card">
+          <h2>Big Five — OCEAN</h2>
+          ${oceanCards(r.bigFive, resumo.tracoDescricoes, resumo.tracoImpactos)}
+        </div>
+
+        <div class="card">
           <h2>Profiler comportamental</h2>
           ${svgRadar(r.rodada1.profiler, r.rodada2.profiler)}
           <div class="radar-legenda">
             <span><span class="dot" style="background:#7C5CFC"></span>Como me vejo</span>
             <span><span class="dot" style="background:#12B76A"></span>Como os outros me veem</span>
+          </div>
+          <div class="subsecao">
+            <div class="ambiente-grid">
+              <div class="ambiente-box ideal"><h4>Ambiente ideal</h4>${resumo.ambienteIdeal}</div>
+              <div class="ambiente-box risco"><h4>Ambiente de risco</h4>${resumo.ambienteRisco}</div>
+            </div>
+            <div class="lideranca-box"><h4>Estilo de liderança esperado</h4>${resumo.estiloLideranca}</div>
           </div>
         </div>
 
@@ -257,11 +288,13 @@
             <div class="desc">${resumo.mbtiDescricao}</div>
           </div>
           ${mbtiDicotomias(r.mbti)}
-        </div>
-
-        <div class="card">
-          <h2>Big Five — OCEAN</h2>
-          ${oceanCards(r.bigFive, resumo.tracoDescricoes)}
+          <div class="mbti-dimensoes">
+            <div class="mbti-dimensao"><h4>Como se comunica</h4><p>${resumo.mbtiDimensoes.comoComunica}</p></div>
+            <div class="mbti-dimensao"><h4>Como toma decisões</h4><p>${resumo.mbtiDimensoes.comoDecide}</p></div>
+            <div class="mbti-dimensao"><h4>Como reage sob pressão</h4><p>${resumo.mbtiDimensoes.comoReagePressao}</p></div>
+            <div class="mbti-dimensao"><h4>Como lidera</h4><p>${resumo.mbtiDimensoes.comoLidera}</p></div>
+            <div class="mbti-dimensao"><h4>Como aprende</h4><p>${resumo.mbtiDimensoes.comoAprende}</p></div>
+          </div>
         </div>
 
         <div class="card">
