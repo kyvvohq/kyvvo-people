@@ -9,6 +9,37 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>document.documentElement.setAttribute('data-tema', localStorage.getItem('people_tema') || 'claro');</script>
 <link rel="stylesheet" href="/people/shell.css">
+<style>
+  .candidatos-layout { display:flex; gap:var(--space-4); align-items:flex-start; }
+  .candidatos-lista-col { flex:1; min-width:0; }
+  .candidatos-layout.selecionado .candidatos-lista-col { flex:0 0 300px; }
+  .candidatos-detalhe-col { flex:1; min-width:0; }
+
+  .lista-candidaturas { display:flex; flex-direction:column; }
+  .item-candidatura { display:flex; flex-direction:column; gap:4px; padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .item-candidatura:last-child { border-bottom:none; }
+  .item-candidatura:hover { background:var(--surface-muted); }
+  .item-candidatura.ativo { background:var(--accent-tint); }
+  .item-candidatura .nome { font-weight:700; font-size:13.5px; color:var(--text); }
+  .item-candidatura .vaga { font-size:12px; color:var(--muted); }
+
+  .detalhe-cabecalho { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:20px; border-bottom:1px solid var(--border); }
+  .detalhe-cabecalho h2 { font-size:18px; margin:0 0 6px; color:var(--text); font-family:var(--font-display); }
+  .detalhe-cabecalho .info { font-size:13px; color:var(--muted); line-height:1.7; }
+  .detalhe-cabecalho .info a { color:var(--accent); text-decoration:none; }
+  .detalhe-fechar { background:transparent; color:var(--muted); width:32px; height:32px; margin:0; padding:0; border-radius:50%; flex-shrink:0; }
+  .detalhe-fechar:hover { background:var(--surface-muted); color:var(--text); }
+
+  .detalhe-visualizador { min-height:400px; background:var(--bg); display:flex; align-items:center; justify-content:center; }
+  .detalhe-visualizador iframe { width:100%; height:66vh; border:none; display:block; }
+  .detalhe-sem-preview { padding:60px 20px; text-align:center; color:var(--muted); font-size:13.5px; }
+  .detalhe-acoes { display:flex; gap:10px; justify-content:flex-end; padding:16px 20px; border-top:1px solid var(--border); flex-wrap:wrap; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+  @media(max-width:520px) { .grid2, .candidatos-layout { grid-template-columns:1fr; flex-direction:column; } }
+  .campo-arquivo { display:flex; align-items:center; gap:10px; }
+  .campo-arquivo input[type=file] { font-size:12.5px; }
+</style>
 </head>
 <body>
   <header class="topo-app">
@@ -70,13 +101,17 @@
         <div class="textos">
           <div class="linha-titulo"><h1>Candidatos</h1></div>
         </div>
+        <div class="acoes">
+          <button class="btn btn-secundario" id="btn-importar-curriculo" type="button"><span data-icon="file-text" data-size="16"></span>Importar currículo</button>
+          <button class="btn" id="btn-adicionar-candidato" type="button"><span data-icon="plus" data-size="16"></span>Adicionar candidato</button>
+        </div>
       </div>
 
-      <div class="card" style="padding:0">
-        <table>
-          <thead><tr><th>Nome</th><th>Vaga</th><th>Contato</th><th>Candidatou-se em</th><th></th></tr></thead>
-          <tbody id="tabela-candidaturas"></tbody>
-        </table>
+      <div class="candidatos-layout" id="candidatos-layout">
+        <div class="candidatos-lista-col">
+          <div class="card" style="padding:0" id="lista-container"></div>
+        </div>
+        <div class="candidatos-detalhe-col card" style="padding:0" id="detalhe-container" hidden></div>
       </div>
     </div>
   </div>
@@ -88,37 +123,395 @@
 
   <script src="/people/shell.js"></script>
   <script>
-    async function carregarCandidaturas() {
-      const res = await apiFetch('/people/api/candidaturas');
-      const candidaturas = await res.json();
-      const corpo = document.getElementById('tabela-candidaturas');
-      corpo.innerHTML = candidaturas.map((c) => `
-        <tr>
-          <td>${c.nome}</td>
-          <td>${c.vaga_nome}</td>
-          <td>${c.whatsapp} · ${c.email}</td>
-          <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
-          <td><a class="acao" href="#" data-curriculo="${c.id}">Baixar currículo</a></td>
-        </tr>
-      `).join('') || '<tr><td colspan="5" class="vazio">Nenhuma candidatura recebida ainda.</td></tr>';
+    const STATUS_CLASSE = { nova: 'destaque', reprovada: 'perigo', aprovada: 'sucesso' };
+    const STATUS_LABEL = { nova: 'Nova', reprovada: 'Reprovada', aprovada: 'Aprovada' };
+
+    let candidaturas = [];
+    let vagas = [];
+    let etapas = [];
+    let idSelecionado = new URLSearchParams(window.location.search).get('id') || null;
+    let urlPreview = null;
+
+    async function carregarListas() {
+      const [resCand, resVagas, resEtapas] = await Promise.all([
+        apiFetch('/people/api/candidaturas'),
+        apiFetch('/people/api/vagas'),
+        apiFetch('/people/api/etapas'),
+      ]);
+      candidaturas = await resCand.json();
+      vagas = await resVagas.json();
+      etapas = await resEtapas.json();
     }
 
-    document.getElementById('tabela-candidaturas').addEventListener('click', async (e) => {
-      const alvo = e.target.closest('[data-curriculo]');
-      if (!alvo) return;
-      e.preventDefault();
-      const res = await apiFetch(`/people/api/candidaturas/${alvo.dataset.curriculo}/curriculo`);
+    function nomeEtapa(etapaId) {
+      if (!etapaId) return 'Nova';
+      const etapa = etapas.find((e) => e.id === etapaId);
+      return etapa ? etapa.nome : 'Nova';
+    }
+
+    function renderizarLista() {
+      const container = document.getElementById('lista-container');
+      const layout = document.getElementById('candidatos-layout');
+      layout.classList.toggle('selecionado', Boolean(idSelecionado));
+
+      if (!idSelecionado) {
+        container.innerHTML = `
+          <table>
+            <thead><tr><th>Nome</th><th>Vaga</th><th>Contato</th><th>Etapa</th><th>Candidatou-se em</th></tr></thead>
+            <tbody>
+              ${candidaturas.map((c) => `
+                <tr class="linha-candidatura" data-id="${c.id}" style="cursor:pointer">
+                  <td>${c.nome}</td>
+                  <td>${c.vaga_nome}</td>
+                  <td>${c.whatsapp} · ${c.email}</td>
+                  <td><span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span></td>
+                  <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
+                </tr>
+              `).join('') || ''}
+            </tbody>
+          </table>
+          ${!candidaturas.length ? '<div class="vazio" style="padding:16px">Nenhuma candidatura recebida ainda.</div>' : ''}
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="lista-candidaturas">
+            ${candidaturas.map((c) => `
+              <div class="item-candidatura linha-candidatura${c.id === idSelecionado ? ' ativo' : ''}" data-id="${c.id}">
+                <span class="nome">${c.nome}</span>
+                <span class="vaga">${c.vaga_nome}</span>
+                <span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      container.querySelectorAll('.linha-candidatura').forEach((el) => {
+        el.addEventListener('click', () => selecionar(el.dataset.id));
+      });
+    }
+
+    function selecionar(id) {
+      idSelecionado = id;
+      aplicarSidebarOculta(true);
+      localStorage.setItem('people_sidebar_oculta', '1');
+      const url = new URL(window.location.href);
+      url.searchParams.set('id', id);
+      history.pushState({}, '', url);
+      renderizarLista();
+      renderizarDetalhe();
+    }
+
+    function fecharDetalhe() {
+      idSelecionado = null;
+      if (urlPreview) { URL.revokeObjectURL(urlPreview); urlPreview = null; }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('id');
+      history.pushState({}, '', url);
+      document.getElementById('detalhe-container').hidden = true;
+      renderizarLista();
+    }
+
+    async function renderizarDetalhe() {
+      const detalheEl = document.getElementById('detalhe-container');
+      detalheEl.hidden = false;
+      detalheEl.innerHTML = '<div class="vazio" style="padding:20px">Carregando...</div>';
+
+      const res = await apiFetch(`/people/api/candidaturas/${idSelecionado}`);
+      if (!res.ok) { detalheEl.innerHTML = '<div class="vazio" style="padding:20px">Candidatura não encontrada.</div>'; return; }
+      const c = await res.json();
+
+      detalheEl.innerHTML = `
+        <div class="detalhe-cabecalho">
+          <div>
+            <h2>${c.nome}</h2>
+            <div class="info">
+              ${c.vaga_nome} · <span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span> · Etapa: ${nomeEtapa(c.etapa_id)}<br>
+              ${c.whatsapp} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}
+            </div>
+          </div>
+          <button class="detalhe-fechar" id="btn-fechar-detalhe" type="button" aria-label="Fechar">${icon('x', 16)}</button>
+        </div>
+        <div class="detalhe-visualizador" id="detalhe-visualizador">
+          <div class="detalhe-sem-preview">Carregando currículo...</div>
+        </div>
+        <div class="detalhe-acoes">
+          ${c.curriculo_nome !== 'sem-arquivo' ? '<button class="btn-secundario" id="btn-download-curriculo" type="button">Baixar currículo</button>' : ''}
+          <button class="btn-perigo" id="btn-reprovar" type="button"${c.status === 'reprovada' ? ' disabled' : ''}>Reprovar</button>
+          <button class="btn" id="btn-proxima-etapa" type="button">Próxima etapa</button>
+        </div>
+      `;
+
+      document.getElementById('btn-fechar-detalhe').addEventListener('click', fecharDetalhe);
+      const btnDownload = document.getElementById('btn-download-curriculo');
+      if (btnDownload) btnDownload.addEventListener('click', () => baixarCurriculo(c.id, c.curriculo_nome));
+      document.getElementById('btn-reprovar').addEventListener('click', () => confirmarReprovar(c));
+      document.getElementById('btn-proxima-etapa').addEventListener('click', () => avancarEtapa(c));
+
+      carregarPreview(c);
+    }
+
+    async function carregarPreview(c) {
+      const visualizador = document.getElementById('detalhe-visualizador');
+      if (urlPreview) { URL.revokeObjectURL(urlPreview); urlPreview = null; }
+
+      if (c.curriculo_nome === 'sem-arquivo') {
+        visualizador.innerHTML = '<div class="detalhe-sem-preview">Nenhum currículo anexado a este candidato.</div>';
+        return;
+      }
+      if (c.curriculo_tipo !== 'application/pdf') {
+        visualizador.innerHTML = '<div class="detalhe-sem-preview">Pré-visualização disponível só para currículos em PDF.<br>Use "Baixar currículo" para abrir este arquivo.</div>';
+        return;
+      }
+      try {
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/curriculo/visualizar`);
+        if (!res.ok) throw new Error();
+        const blob = await res.blob();
+        urlPreview = URL.createObjectURL(blob);
+        // Só atualiza se o candidato selecionado ainda for este (evita
+        // sobrescrever a prévia se o usuário já clicou em outro nome).
+        if (idSelecionado === c.id) {
+          visualizador.innerHTML = `<iframe src="${urlPreview}" title="Currículo de ${c.nome}"></iframe>`;
+        }
+      } catch {
+        visualizador.innerHTML = '<div class="detalhe-sem-preview">Não foi possível carregar a prévia do currículo.</div>';
+      }
+    }
+
+    async function baixarCurriculo(id, nomeArquivo) {
+      const res = await apiFetch(`/people/api/candidaturas/${id}/curriculo`);
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'curriculo';
+      a.download = nomeArquivo || 'curriculo';
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    function confirmarReprovar(c) {
+      abrirModal(
+        '<h3>Reprovar candidato?</h3>',
+        `
+          <p class="modal-texto">"${c.nome}" sai do quadro Kanban. Essa ação não pode ser desfeita.</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-reprovar">Cancelar</button>
+            <button type="button" class="btn-perigo" id="confirmar-reprovar">Reprovar</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-reprovar').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-reprovar').addEventListener('click', async () => {
+        fecharModal();
+        await apiFetch(`/people/api/candidaturas/${c.id}/reprovar`, { method: 'PATCH' });
+        await carregarListas();
+        renderizarLista();
+        renderizarDetalhe();
+      });
+    }
+
+    async function avancarEtapa(c) {
+      const res = await apiFetch(`/people/api/candidaturas/${c.id}/avancar-etapa`, { method: 'PATCH' });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Falha ao avançar etapa'); return; }
+
+      if (data.semProximaEtapa) {
+        perguntarNovaEtapa(c);
+        return;
+      }
+      await carregarListas();
+      renderizarLista();
+      renderizarDetalhe();
+    }
+
+    function perguntarNovaEtapa(c) {
+      abrirModal(
+        '<h3>Não possui próxima etapa</h3>',
+        `
+          <p class="modal-texto">Não há uma próxima etapa cadastrada depois de "${nomeEtapa(c.etapa_id)}". Deseja cadastrar uma nova etapa e mover "${c.nome}" pra ela?</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="nao-nova-etapa">Não</button>
+            <button type="button" class="btn" id="sim-nova-etapa">Sim</button>
+          </div>
+        `
+      );
+      document.getElementById('nao-nova-etapa').addEventListener('click', fecharModal);
+      document.getElementById('sim-nova-etapa').addEventListener('click', () => formularioNovaEtapa(c));
+    }
+
+    function formularioNovaEtapa(c) {
+      abrirModal(
+        '<h3>Nova etapa</h3>',
+        `
+          <form id="form-nova-etapa-rapida">
+            <div class="modal-erro" id="msg-nova-etapa"></div>
+            <label for="nome-etapa-rapida">Nome da etapa</label>
+            <input id="nome-etapa-rapida" required autofocus>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-nova-etapa">Cancelar</button>
+              <button type="submit" class="btn">Criar e mover</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-nova-etapa').addEventListener('click', fecharModal);
+      document.getElementById('form-nova-etapa-rapida').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nome = document.getElementById('nome-etapa-rapida').value.trim();
+        if (!nome) return;
+        const resEtapa = await apiFetch('/people/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
+        const etapa = await resEtapa.json();
+        if (!resEtapa.ok) { document.getElementById('msg-nova-etapa').textContent = etapa.error || 'Falha ao criar etapa'; return; }
+
+        await apiFetch(`/people/api/candidaturas/${c.id}/etapa`, { method: 'PATCH', body: JSON.stringify({ etapa_id: etapa.id }) });
+        fecharModal();
+        await carregarListas();
+        renderizarLista();
+        renderizarDetalhe();
+      });
+    }
+
+    // --- Adicionar candidato / Importar currículo ---
+    function opcoesVagas(selecionadoId) {
+      return vagas.map((v) => `<option value="${v.id}" ${v.id === selecionadoId ? 'selected' : ''}>${v.nome}</option>`).join('');
+    }
+
+    function formularioCandidato({ titulo, valores, aoSalvar }) {
+      const v = valores || {};
+      const jaTemArquivo = Boolean(v.arquivoBase64);
+      abrirModal(
+        `<h3>${titulo}</h3>`,
+        `
+          <form id="form-candidato-manual">
+            <div class="modal-erro" id="msg-candidato-manual"></div>
+            <label for="cm-vaga">Vaga *</label>
+            <select id="cm-vaga" required><option value="">Selecione</option>${opcoesVagas(v.vaga_id)}</select>
+            <div class="grid2">
+              <div><label for="cm-nome">Nome completo *</label><input id="cm-nome" required value="${v.nome || ''}"></div>
+              <div><label for="cm-whatsapp">WhatsApp *</label><input id="cm-whatsapp" required value="${v.whatsapp || ''}"></div>
+            </div>
+            <div class="grid2">
+              <div><label for="cm-email">E-mail *</label><input id="cm-email" type="email" required value="${v.email || ''}"></div>
+              <div><label for="cm-linkedin">LinkedIn</label><input id="cm-linkedin" value="${v.linkedin || ''}"></div>
+            </div>
+            <label for="cm-curriculo">Currículo (PDF ou DOCX)</label>
+            ${jaTemArquivo ? `<p class="campo-ajuda">Já anexado: ${v.curriculoNome}. Escolha outro arquivo abaixo só se quiser substituir.</p>` : ''}
+            <div class="campo-arquivo"><input id="cm-curriculo" type="file" accept=".pdf,.docx"></div>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-candidato-manual">Cancelar</button>
+              <button type="submit" class="btn">Salvar candidato</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-candidato-manual').addEventListener('click', fecharModal);
+      document.getElementById('form-candidato-manual').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-candidato-manual');
+        msg.textContent = '';
+        const form = new FormData();
+        form.append('vaga_id', document.getElementById('cm-vaga').value);
+        form.append('nome', document.getElementById('cm-nome').value);
+        form.append('whatsapp', document.getElementById('cm-whatsapp').value);
+        form.append('email', document.getElementById('cm-email').value);
+        form.append('linkedin', document.getElementById('cm-linkedin').value);
+        const arquivo = document.getElementById('cm-curriculo').files[0];
+        if (arquivo) form.append('curriculo', arquivo);
+        else if (jaTemArquivo) form.append('curriculo', base64ParaBlob(v.arquivoBase64, v.curriculoTipo), v.curriculoNome);
+
+        try {
+          await aoSalvar(form, msg);
+        } catch (err) {
+          msg.textContent = err.message;
+        }
+      });
+    }
+
+    function base64ParaBlob(base64, tipo) {
+      const bin = atob(base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: tipo });
+    }
+
+    async function salvarCandidatoManual(form, msg) {
+      const res = await fetch('/people/api/candidaturas', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) { msg.textContent = data.error || 'Falha ao salvar candidato'; return; }
+      fecharModal();
+      await carregarListas();
+      renderizarLista();
+    }
+
+    document.getElementById('btn-adicionar-candidato').addEventListener('click', () => {
+      formularioCandidato({ titulo: 'Adicionar candidato', valores: {}, aoSalvar: salvarCandidatoManual });
     });
 
-    carregarCandidaturas();
+    document.getElementById('btn-importar-curriculo').addEventListener('click', () => {
+      abrirModal(
+        '<h3>Importar currículo</h3>',
+        `
+          <form id="form-importar-curriculo">
+            <div class="modal-erro" id="msg-importar"></div>
+            <label for="arquivo-importar">Currículo (PDF ou DOCX) *</label>
+            <div class="campo-arquivo"><input id="arquivo-importar" type="file" accept=".pdf,.docx" required></div>
+            <p class="campo-ajuda">O sistema lê o arquivo e tenta preencher nome, e-mail e WhatsApp automaticamente — você confere e ajusta antes de salvar.</p>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-importar">Cancelar</button>
+              <button type="submit" class="btn">Analisar currículo</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-importar').addEventListener('click', fecharModal);
+      document.getElementById('form-importar-curriculo').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-importar');
+        const arquivo = document.getElementById('arquivo-importar').files[0];
+        if (!arquivo) return;
+        msg.textContent = 'Analisando...';
+
+        const form = new FormData();
+        form.append('curriculo', arquivo);
+        const res = await fetch('/people/api/candidaturas/extrair-curriculo', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        const dados = await res.json();
+        if (!res.ok) { msg.textContent = dados.error || 'Falha ao ler o currículo'; return; }
+
+        formularioCandidato({
+          titulo: 'Confira os dados extraídos',
+          valores: dados,
+          aoSalvar: salvarCandidatoManual,
+        });
+      });
+    });
+
+    window.addEventListener('popstate', () => {
+      idSelecionado = new URLSearchParams(window.location.search).get('id') || null;
+      renderizarLista();
+      if (idSelecionado) renderizarDetalhe();
+      else document.getElementById('detalhe-container').hidden = true;
+    });
+
+    async function iniciar() {
+      await carregarListas();
+      renderizarLista();
+      if (idSelecionado) {
+        aplicarSidebarOculta(true);
+        localStorage.setItem('people_sidebar_oculta', '1');
+        renderizarDetalhe();
+      }
+    }
+
+    iniciar();
   </script>
 </body>
 </html>
