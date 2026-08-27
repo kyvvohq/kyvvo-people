@@ -1,8 +1,11 @@
-// Shell compartilhado das telas autenticadas — auth guard, sidebar (Kyvvo
-// Design System), menu de usuário e helpers de modal. Espera que a página já
-// tenha no DOM: #painel-sidebar, #btn-toggle-sidebar, #cartao-usuario,
-// #btn-menu-usuario, #user-menu-dropdown, #avatar-usuario, #nome-usuario,
-// #btn-sair. Incluir via <script src="/people/shell.js"> no fim do <body>.
+// Shell compartilhado das telas autenticadas — auth guard, cabeçalho (logo +
+// menu de perfil + tema), sidebar de navegação e helpers de modal. Espera que
+// a página já tenha no DOM: #painel-sidebar, #btn-toggle-sidebar,
+// #topo-perfil, #topo-perfil-gatilho, #menu-perfil, elementos com classe
+// .js-avatar-usuario/.js-nome-usuario/.js-email-usuario/.btn-sair/.toggle-tema.
+// Incluir via <script src="/people/shell.js"> no fim do <body>, depois de um
+// snippet inline no <head> que já tenha aplicado data-tema no <html> (evita
+// flash do tema errado).
 
 const token = localStorage.getItem('people_token');
 if (!token) window.location.href = '/people/login.html';
@@ -37,6 +40,9 @@ const ICON_PATHS = {
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   kanban: '<path d="M5 3v14"/><path d="M12 3v8"/><path d="M19 3v18"/>',
   'message-circle': '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>',
+  'sun-moon': '<path d="M12 2v2"/><path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715"/><path d="M16 12a4 4 0 0 0-4-4"/><path d="m19 5-1.256 1.256"/><path d="M20 12h2"/>',
+  'log-out': '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
 };
 
 function icon(name, size = 18) {
@@ -73,22 +79,58 @@ document.querySelectorAll('.menu-item[href]').forEach((item) => {
   if (item.getAttribute('href') === window.location.pathname) item.classList.add('active');
 });
 
-// --- Cartão de usuário (avatar + dropdown "Sair", no rodapé da sidebar) ---
-const btnMenuUsuario = document.getElementById('btn-menu-usuario');
-const userMenuDropdown = document.getElementById('user-menu-dropdown');
-
-function fecharUserMenu() {
-  userMenuDropdown.hidden = true;
+// --- Tema claro/escuro ---
+// Aplicado o mais cedo possível por um snippet inline no <head> de cada
+// página (evita flash do tema errado); aqui só sincronizamos os controles
+// visuais (toggle, texto, logos) com o que já foi aplicado no <html>.
+function temaAtual() {
+  return document.documentElement.getAttribute('data-tema') === 'escuro' ? 'escuro' : 'claro';
 }
-btnMenuUsuario.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const vaiAbrir = userMenuDropdown.hidden;
-  fecharUserMenu();
-  if (vaiAbrir) userMenuDropdown.hidden = false;
+function aplicarLogos() {
+  const escuro = temaAtual() === 'escuro';
+  document.querySelectorAll('.topo-logo-img').forEach((img) => {
+    img.src = escuro ? '/people/images/logo-kyvvo-escuro.svg' : '/people/images/logo-kyvvo.svg';
+  });
+}
+function sincronizarToggleTema() {
+  const escuro = temaAtual() === 'escuro';
+  document.querySelectorAll('.toggle-tema').forEach((btn) => {
+    btn.classList.toggle('ligado', escuro);
+    btn.setAttribute('aria-checked', String(escuro));
+  });
+  document.querySelectorAll('.toggle-tema-estado').forEach((el) => {
+    el.textContent = escuro ? 'Escuro' : 'Claro';
+  });
+  aplicarLogos();
+}
+function definirTema(tema) {
+  document.documentElement.setAttribute('data-tema', tema);
+  localStorage.setItem('people_tema', tema);
+  sincronizarToggleTema();
+}
+document.querySelectorAll('.toggle-tema').forEach((btn) => {
+  btn.addEventListener('click', () => definirTema(temaAtual() === 'escuro' ? 'claro' : 'escuro'));
 });
-document.addEventListener('click', (e) => {
-  if (!document.getElementById('cartao-usuario').contains(e.target)) fecharUserMenu();
-});
+sincronizarToggleTema();
+
+// --- Menu de perfil (cabeçalho, canto superior direito) ---
+const topoPerfilGatilho = document.getElementById('topo-perfil-gatilho');
+const menuPerfil = document.getElementById('menu-perfil');
+
+function fecharMenuPerfil() {
+  if (menuPerfil) menuPerfil.hidden = true;
+}
+if (topoPerfilGatilho && menuPerfil) {
+  topoPerfilGatilho.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const vaiAbrir = menuPerfil.hidden;
+    fecharMenuPerfil();
+    if (vaiAbrir) menuPerfil.hidden = false;
+  });
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('topo-perfil').contains(e.target)) fecharMenuPerfil();
+  });
+}
 
 function iniciaisNome(nomeCompleto) {
   const partes = (nomeCompleto || '').trim().split(/\s+/).filter(Boolean);
@@ -97,25 +139,25 @@ function iniciaisNome(nomeCompleto) {
 }
 
 const nomeUsuario = localStorage.getItem('people_nome') || '';
-document.getElementById('avatar-usuario').textContent = iniciaisNome(nomeUsuario);
-document.getElementById('nome-usuario').textContent = nomeUsuario;
+document.querySelectorAll('.js-avatar-usuario').forEach((el) => { el.textContent = iniciaisNome(nomeUsuario); });
+document.querySelectorAll('.js-nome-usuario').forEach((el) => { el.textContent = nomeUsuario; });
 
-// E-mail só pra exibição no cabeçalho da sidebar — decodifica o payload do
-// JWT sem verificar (o próprio dono do token já enxerga esse conteúdo).
-const contaNomeEl = document.getElementById('conta-nome');
-if (contaNomeEl) {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    contaNomeEl.textContent = payload.email || '';
-  } catch {
-    contaNomeEl.textContent = '';
-  }
+// E-mail só pra exibição no menu de perfil — decodifica o payload do JWT
+// sem verificar (o próprio dono do token já enxerga esse conteúdo).
+let emailUsuario = '';
+try {
+  emailUsuario = JSON.parse(atob(token.split('.')[1])).email || '';
+} catch {
+  emailUsuario = '';
 }
+document.querySelectorAll('.js-email-usuario').forEach((el) => { el.textContent = emailUsuario; });
 
-document.getElementById('btn-sair').addEventListener('click', () => {
-  localStorage.removeItem('people_token');
-  localStorage.removeItem('people_nome');
-  window.location.href = '/people/login.html';
+document.querySelectorAll('.btn-sair').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    localStorage.removeItem('people_token');
+    localStorage.removeItem('people_nome');
+    window.location.href = '/people/login.html';
+  });
 });
 
 // --- Modal genérico (mesmo padrão do painel principal: abrirModal/fecharModal) ---

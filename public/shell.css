@@ -35,26 +35,84 @@
   --font-ui: 'Inter', Arial, sans-serif;
 }
 
+/* Tema escuro — escala "night"/"text" do Kyvvo DS. Esses tokens não são
+   pareados automaticamente no arquivo pen.dev (cada variante de componente
+   escolhe a cor certa manualmente) — os valores abaixo foram derivados a
+   partir das variantes "Dark" existentes no DS (cabeçalho, menu de perfil). */
+html[data-tema="escuro"] {
+  color-scheme: dark;
+  --bg: #0B0D13;
+  --card: #11131B;
+  --surface-muted: #171A24;
+  --border: #212533;
+  --border-strong: #2E3444;
+  --text: #F5F6FA;
+  --text-secondary: #C7CBD9;
+  --muted: #7C8497;
+  --muted-strong: #A2A9BA;
+  --accent: #7C5CFC;
+  --accent-dark: #9578FF;
+  --accent-strong: #C9BCFF;
+  --accent-tint: #7C5CFC29;
+}
+
 * { box-sizing: border-box; }
 html, body { margin:0; min-height:100vh; }
 body { background:var(--bg); color:var(--text); font-family:var(--font-ui); display:flex; flex-direction:column; }
 a { color: inherit; }
 h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 
+/* Cabeçalho — "logo sempre no canto superior esquerdo, menu de perfil
+   sempre no canto superior direito" (Kyvvo DS). Fixo no topo, acima da
+   sidebar e do conteúdo. */
+.topo-app { position:sticky; top:0; z-index:40; height:64px; flex-shrink:0; display:flex; align-items:center;
+  justify-content:space-between; padding:0 var(--space-5); background:var(--card); border-bottom:1px solid var(--border); }
+.topo-logo { display:flex; align-items:center; gap:10px; text-decoration:none; }
+.topo-logo-img { height:20px; width:auto; display:block; }
+.topo-produto-tag { font-family:var(--font-ui); font-size:12px; font-weight:700; color:var(--muted-strong);
+  background:var(--surface-muted); border-radius:var(--radius-full); padding:3px 9px; }
+
+.topo-perfil { position:relative; }
+.topo-perfil-gatilho { display:flex; align-items:center; gap:8px; background:var(--surface-muted); border:none;
+  border-radius:var(--radius-full); height:40px; padding:4px 10px 4px 4px; cursor:pointer; font-family:var(--font-ui); }
+.topo-perfil-gatilho .avatar { width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff;
+  font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.topo-perfil-gatilho .nome { font-size:13px; font-weight:600; color:var(--text); max-width:140px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.topo-perfil-gatilho svg { color:var(--muted); flex-shrink:0; }
+
+.menu-perfil { position:absolute; top:calc(100% + 8px); right:0; width:280px; background:var(--card);
+  border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 12px 32px rgba(15,17,26,.18);
+  overflow:hidden; z-index:50; }
+.menu-perfil-usuario { display:flex; align-items:center; gap:12px; padding:16px; }
+.menu-perfil-usuario .avatar { width:44px; height:44px; border-radius:50%; background:var(--accent); color:#fff;
+  font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.menu-perfil-usuario .textos { min-width:0; }
+.menu-perfil-usuario .nome { font-size:15px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.menu-perfil-usuario .email { font-size:12px; color:var(--muted-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.menu-perfil-divisor { height:1px; background:var(--border); }
+.menu-perfil-item { display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; background:transparent;
+  border:none; color:var(--text); font-size:14px; font-family:var(--font-ui); cursor:pointer; text-align:left; text-decoration:none; }
+.menu-perfil-item:hover { background:var(--surface-muted); }
+.menu-perfil-item svg { color:var(--muted-strong); flex-shrink:0; }
+.menu-perfil-item .rotulo { flex:1; }
+.menu-perfil-item.perigo, .menu-perfil-item.perigo svg { color:var(--danger); }
+.menu-perfil-item.perigo:hover { background:#F044381A; }
+
+.menu-perfil-tema { justify-content:space-between; cursor:default; }
+.toggle-tema { position:relative; width:44px; height:24px; border-radius:var(--radius-full); border:none;
+  background:var(--border-strong); flex-shrink:0; cursor:pointer; padding:0; }
+.toggle-tema .bolinha { position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(15,17,26,.25); transition:transform .15s ease; }
+.toggle-tema.ligado { background:#3E4557; }
+.toggle-tema.ligado .bolinha { transform:translateX(20px); background:var(--accent); }
+
 .app-shell { display:flex; flex:1; gap:var(--space-5); padding:var(--space-5); align-items:flex-start; }
 
-/* Sidebar — "Lateral / People" */
+/* Sidebar — navegação (logo e perfil agora vivem no cabeçalho) */
 .painel-sidebar { width:264px; flex-shrink:0; background:var(--card); border:1px solid var(--border);
   border-radius:var(--radius-lg); padding:18px 14px; display:flex; flex-direction:column; gap:22px; }
 .painel-sidebar.sidebar-oculta { display:none; }
-
-.marca-produto { display:flex; align-items:center; gap:10px; background:var(--surface-muted); border-radius:var(--radius-md);
-  height:52px; padding:0 10px; text-decoration:none; color:inherit; }
-.marca-produto .marca-k { width:32px; height:32px; border-radius:9px; background:#0F111A; color:#fff;
-  font-family:var(--font-display); font-weight:700; font-size:19px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.marca-produto .textos { display:flex; flex-direction:column; gap:1px; min-width:0; }
-.marca-produto .produto { font-size:14px; font-weight:600; color:var(--text); }
-.marca-produto .conta { font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .grupo-menu { display:flex; flex-direction:column; gap:3px; }
 .grupo-titulo { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px;
@@ -68,31 +126,16 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .menu-item .contador { height:20px; padding:0 7px; border-radius:var(--radius-full); background:var(--border);
   color:var(--muted-strong); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
 
-.sidebar-espacador { flex:1; }
-
-.cartao-usuario { display:flex; align-items:center; gap:10px; background:var(--surface-muted); border-radius:var(--radius-md);
-  height:56px; padding:0 10px; position:relative; }
-.cartao-usuario .avatar { width:34px; height:34px; border-radius:var(--radius-full); background:var(--accent); color:#fff;
-  font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.cartao-usuario .textos { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
-.cartao-usuario .nome { font-size:13px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cartao-usuario .papel { font-size:11px; color:var(--muted); }
-.cartao-usuario button { background:none; border:none; padding:0; margin:0; width:auto; color:var(--muted); cursor:pointer; display:flex; }
-
-.user-menu-dropdown { position:absolute; bottom:calc(100% + 8px); left:0; right:0; background:var(--card);
-  border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:0 12px 32px rgba(15,17,26,.12); padding:6px; z-index:50; }
-.user-menu-sair { display:flex; align-items:center; gap:8px; width:100%; padding:9px 10px; background:transparent;
-  border:none; border-radius:8px; color:var(--danger); font-weight:600; font-size:13px; cursor:pointer; text-align:left; }
-.user-menu-sair:hover { background:#F044381A; }
-
-.btn-toggle-sidebar { position:sticky; top:38px; width:22px; height:22px; flex-shrink:0; margin-top:18px;
-  display:flex; align-items:center; justify-content:center; background:var(--card); border:1px solid var(--border-strong);
-  border-radius:var(--radius-full); color:var(--muted); font-size:12px; cursor:pointer; }
+.btn-toggle-sidebar { position:sticky; top:calc(64px + var(--space-5) + 14px); width:22px; height:22px; flex-shrink:0;
+  margin-top:18px; display:flex; align-items:center; justify-content:center; background:var(--card);
+  border:1px solid var(--border-strong); border-radius:var(--radius-full); color:var(--muted); font-size:12px; cursor:pointer; }
 .btn-toggle-sidebar:hover { background:var(--surface-muted); color:var(--text); }
 
 .painel-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--space-5); }
 
 @media(max-width:860px) {
+  .topo-app { padding:0 var(--space-3); }
+  .topo-perfil-gatilho .nome { display:none; }
   .app-shell { flex-direction:column; padding:var(--space-3); }
   .painel-sidebar { width:100%; }
   .btn-toggle-sidebar { display:none; }
@@ -116,14 +159,14 @@ button, .btn { background:var(--accent); color:#fff; font-weight:600; border:non
   height:40px; padding:0 20px; font-size:14px; cursor:pointer; text-decoration:none; display:inline-flex;
   align-items:center; justify-content:center; gap:8px; font-family:var(--font-ui); }
 button:hover, .btn:hover { background:var(--accent-dark); }
-.btn-secundario { background:#fff; color:var(--text-secondary); border:1px solid var(--border-strong); }
+.btn-secundario { background:var(--card); color:var(--text-secondary); border:1px solid var(--border-strong); }
 .btn-secundario:hover { background:var(--surface-muted); }
 .btn-perigo { background:var(--danger); color:#fff; }
 .btn-perigo:hover { background:#d33c2e; }
 
 /* Campos */
 label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin:14px 0 7px; }
-input, textarea, select { width:100%; box-sizing:border-box; background:#fff; border:1px solid var(--border-strong);
+input, textarea, select { width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--border-strong);
   border-radius:var(--radius-md); height:44px; padding:0 14px; color:var(--text); font-size:14px; font-family:var(--font-ui); }
 textarea { height:auto; min-height:80px; padding:12px 14px; resize:vertical; }
 input::placeholder, textarea::placeholder { color:var(--muted); }
@@ -179,8 +222,28 @@ a.acao:hover { color:var(--accent-dark); }
 .msg.ok { color:var(--success); }
 .vazio { color:var(--muted); font-size:13px; padding:12px 0; }
 
-/* Rodapé — linha separadora + wordmark como imagem */
-footer.rodape-app { padding:32px 24px; border-top:1px solid var(--border); display:flex; align-items:center;
-  justify-content:center; text-align:center; }
-.rodape-app-copy { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
-.rodape-logo-img { height:14px; width:auto; vertical-align:middle; }
+/* Rodapé — "Rodapé" do Kyvvo DS, adaptado ao tema claro/escuro do app
+   (o componente original do DS é uma seção fixa escura de site institucional;
+   aqui os tokens de tema fazem o rodapé acompanhar a escolha do usuário). */
+.rodape-completo { max-width:1160px; margin:0 auto var(--space-5); width:calc(100% - var(--space-5) * 2);
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius-xl);
+  padding:38px; display:flex; flex-direction:column; gap:32px; }
+.rodape-topo { display:flex; flex-wrap:wrap; gap:40px; }
+.rodape-marca { display:flex; flex-direction:column; gap:16px; width:260px; flex-shrink:0; }
+.rodape-marca .topo-logo-img { height:18px; }
+.rodape-marca p { font-size:13px; color:var(--muted); line-height:1.6; margin:0; }
+.rodape-redes { display:flex; gap:8px; }
+.rodape-redes span { width:32px; height:32px; border-radius:50%; background:var(--surface-muted);
+  border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--muted); }
+.rodape-coluna { display:flex; flex-direction:column; gap:12px; flex:1; min-width:140px; }
+.rodape-coluna h3 { font-size:12px; font-weight:700; letter-spacing:.3px; color:var(--text); margin:0; }
+.rodape-coluna a, .rodape-coluna .rodape-link-indisponivel { font-size:13.5px; color:var(--muted); text-decoration:none; }
+.rodape-coluna a:hover { color:var(--text); }
+.rodape-coluna .rodape-link-indisponivel { cursor:default; opacity:.6; }
+.rodape-divisor { height:1px; background:var(--border); }
+.rodape-base { display:flex; flex-wrap:wrap; gap:16px 24px; align-items:center; justify-content:space-between; }
+.rodape-base .copy { font-size:12.5px; color:var(--muted); }
+.rodape-selo { display:inline-flex; align-items:center; gap:7px; height:28px; padding:0 12px; border-radius:var(--radius-full);
+  background:var(--surface-muted); color:var(--muted-strong); font-size:12px; font-weight:500; }
+.rodape-selo svg { color:var(--success); }
+.rodape-local { font-size:12.5px; color:var(--muted); }

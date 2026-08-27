@@ -7,18 +7,46 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>document.documentElement.setAttribute('data-tema', localStorage.getItem('people_tema') || 'claro');</script>
 <link rel="stylesheet" href="/people/shell.css">
 </head>
 <body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/people/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img" src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">People</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <a class="menu-perfil-item" href="/people/configuracoes.html">
+          <span data-icon="settings" data-size="16"></span><span class="rotulo">Configurações</span>
+        </a>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
   <div class="app-shell">
     <aside class="painel-sidebar" id="painel-sidebar">
-      <a class="marca-produto" href="/people/painel.html" aria-label="Ir para o início">
-        <div class="marca-k">k</div>
-        <div class="textos">
-          <div class="produto">Kyvvo People</div>
-          <div class="conta" id="conta-nome"></div>
-        </div>
-      </a>
       <nav class="grupo-menu">
         <div class="grupo-titulo">Seleção</div>
         <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
@@ -32,18 +60,6 @@
         <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
         <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
       </nav>
-      <div class="sidebar-espacador"></div>
-      <div class="cartao-usuario" id="cartao-usuario">
-        <div class="avatar" id="avatar-usuario"></div>
-        <div class="textos">
-          <div class="nome" id="nome-usuario"></div>
-          <div class="papel">Recrutador(a)</div>
-        </div>
-        <button id="btn-menu-usuario" type="button" aria-label="Menu do usuário"><span data-icon="ellipsis" data-size="16"></span></button>
-        <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
-          <button class="user-menu-sair" id="btn-sair" type="button">Sair</button>
-        </div>
-      </div>
     </aside>
     <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
 
@@ -67,8 +83,37 @@
     </div>
   </div>
 
-  <footer class="rodape-app">
-    <p class="rodape-app-copy">© 2026 <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo" class="rodape-logo-img">. Todos os direitos reservados.</p>
+  <footer class="rodape-completo">
+    <div class="rodape-topo">
+      <div class="rodape-marca">
+        <img class="topo-logo-img" src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
+        <p>A plataforma de avaliação comportamental que ajuda você a contratar com mais clareza.</p>
+      </div>
+      <div class="rodape-coluna">
+        <h3>Plataforma</h3>
+        <a href="/people/painel.html">Visão geral</a>
+        <a href="/people/vagas.html">Vagas</a>
+        <a href="/people/candidatos.html">Candidatos</a>
+        <a href="/people/avaliacoes.html">Avaliações</a>
+      </div>
+      <div class="rodape-coluna">
+        <h3>Produtos Kyvvo</h3>
+        <a href="https://studio.kyvvo.com.br" target="_blank" rel="noopener">Kyvvo Studio</a>
+        <span class="rodape-link-indisponivel">Kyvvo People</span>
+        <a href="https://kyvvo.com.br" target="_blank" rel="noopener">Site institucional</a>
+      </div>
+      <div class="rodape-coluna">
+        <h3>Legal</h3>
+        <a href="https://studio.kyvvo.com.br/privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
+        <a href="https://studio.kyvvo.com.br/termos.html" target="_blank" rel="noopener">Termos de Uso</a>
+        <span class="rodape-link-indisponivel">Central de ajuda</span>
+      </div>
+    </div>
+    <div class="rodape-divisor"></div>
+    <div class="rodape-base">
+      <span class="copy">© 2026 Kyvvo Tecnologia. Todos os direitos reservados.</span>
+      <span class="rodape-local">Feito em Uberlândia, MG</span>
+    </div>
   </footer>
 
   <script src="/people/shell.js"></script>
