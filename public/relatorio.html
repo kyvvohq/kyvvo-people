@@ -32,7 +32,7 @@
   .pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
   .pill { font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; }
   .pill.perfil { background:#F1EEFF; color:#4E33C4; }
-  .pill.mbti { background:#12B76A1A; color:#12B76A; }
+  .pill.tipo { background:#12B76A1A; color:#12B76A; }
   .pill.traco { background:#F790091F; color:#B54708; }
   .card ul.bullets { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#2B3040; }
 
@@ -54,10 +54,10 @@
   .gap-box h3 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px; opacity:.8; }
   .gap-box div.item { padding:2px 0; }
 
-  .mbti-tipo { text-align:center; margin-bottom:20px; }
-  .mbti-tipo .letras { font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; color:#7C5CFC; letter-spacing:.04em; }
-  .mbti-tipo .nome { font-size:14px; color:#0F111A; margin-top:4px; }
-  .mbti-tipo .desc { font-size:12px; color:#6B7385; margin-top:4px; }
+  .tipo-psicologico { text-align:center; margin-bottom:20px; }
+  .tipo-psicologico .letras { font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; color:#7C5CFC; letter-spacing:.04em; }
+  .tipo-psicologico .nome { font-size:14px; color:#0F111A; margin-top:4px; }
+  .tipo-psicologico .desc { font-size:12px; color:#6B7385; margin-top:4px; }
   .dicotomia { margin-bottom:14px; }
   .dicotomia-labels { display:flex; justify-content:space-between; font-size:12px; color:#98A0B0; margin-bottom:6px; }
   .dicotomia-labels .ativo { color:#12B76A; font-weight:700; }
@@ -84,11 +84,11 @@
   .lideranca-box { margin-top:12px; background:#F1EEFF; color:#4E33C4; border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.6; }
   .lideranca-box h4 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 6px; opacity:.85; }
 
-  .mbti-dimensoes { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
-  @media(max-width:520px) { .mbti-dimensoes { grid-template-columns:1fr; } }
-  .mbti-dimensao { background:#F8F9FC; border:1px solid #E7EAF2; border-radius:12px; padding:12px 14px; }
-  .mbti-dimensao h4 { font-size:11px; color:#7C5CFC; text-transform:uppercase; letter-spacing:.04em; margin:0 0 6px; }
-  .mbti-dimensao p { font-size:12.5px; color:#2B3040; line-height:1.55; margin:0; }
+  .tipo-dimensoes { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+  @media(max-width:520px) { .tipo-dimensoes { grid-template-columns:1fr; } }
+  .tipo-dimensao { background:#F8F9FC; border:1px solid #E7EAF2; border-radius:12px; padding:12px 14px; }
+  .tipo-dimensao h4 { font-size:11px; color:#7C5CFC; text-transform:uppercase; letter-spacing:.04em; margin:0 0 6px; }
+  .tipo-dimensao p { font-size:12.5px; color:#2B3040; line-height:1.55; margin:0; }
 
   .rel-secao { margin-bottom:18px; }
   .rel-secao:last-child { margin-bottom:0; }
@@ -183,7 +183,7 @@
       { chave: 'jp', neg: 'Percepção', pos: 'Julgamento' },
     ];
 
-    function mbtiDicotomias(mbti) {
+    function tipoDicotomias(mbti) {
       return DICOTOMIAS.map((d) => {
         const info = mbti.dicotomias[d.chave];
         const posicao = ((info.normalizado + 100) / 200) * 100;
@@ -244,7 +244,7 @@
           <h2>Perfil identificado</h2>
           <div class="pills">
             <span class="pill perfil">${NOMES[r.perfilDominante.perfil]}</span>
-            <span class="pill mbti">${r.mbti.tipo} — ${resumo.mbtiNome}</span>
+            <span class="pill tipo">${r.mbti.tipo} — ${resumo.tipoNome}</span>
             ${resumo.tracosMarcantes.map((t) => `<span class="pill traco">${t.nome} elevado</span>`).join('')}
           </div>
           <ul class="bullets">${listaItens(resumo.bulletsResumo)}</ul>
@@ -281,19 +281,19 @@
         </div>
 
         <div class="card">
-          <h2>Tipo MBTI detalhado</h2>
-          <div class="mbti-tipo">
+          <h2>Tipo Psicológico detalhado</h2>
+          <div class="tipo-psicologico">
             <div class="letras">${r.mbti.tipo}</div>
-            <div class="nome">${resumo.mbtiNome}</div>
-            <div class="desc">${resumo.mbtiDescricao}</div>
+            <div class="nome">${resumo.tipoNome}</div>
+            <div class="desc">${resumo.tipoDescricao}</div>
           </div>
-          ${mbtiDicotomias(r.mbti)}
-          <div class="mbti-dimensoes">
-            <div class="mbti-dimensao"><h4>Como se comunica</h4><p>${resumo.mbtiDimensoes.comoComunica}</p></div>
-            <div class="mbti-dimensao"><h4>Como toma decisões</h4><p>${resumo.mbtiDimensoes.comoDecide}</p></div>
-            <div class="mbti-dimensao"><h4>Como reage sob pressão</h4><p>${resumo.mbtiDimensoes.comoReagePressao}</p></div>
-            <div class="mbti-dimensao"><h4>Como lidera</h4><p>${resumo.mbtiDimensoes.comoLidera}</p></div>
-            <div class="mbti-dimensao"><h4>Como aprende</h4><p>${resumo.mbtiDimensoes.comoAprende}</p></div>
+          ${tipoDicotomias(r.mbti)}
+          <div class="tipo-dimensoes">
+            <div class="tipo-dimensao"><h4>Como se comunica</h4><p>${resumo.tipoDimensoes.comoComunica}</p></div>
+            <div class="tipo-dimensao"><h4>Como toma decisões</h4><p>${resumo.tipoDimensoes.comoDecide}</p></div>
+            <div class="tipo-dimensao"><h4>Como reage sob pressão</h4><p>${resumo.tipoDimensoes.comoReagePressao}</p></div>
+            <div class="tipo-dimensao"><h4>Como lidera</h4><p>${resumo.tipoDimensoes.comoLidera}</p></div>
+            <div class="tipo-dimensao"><h4>Como aprende</h4><p>${resumo.tipoDimensoes.comoAprende}</p></div>
           </div>
         </div>
 

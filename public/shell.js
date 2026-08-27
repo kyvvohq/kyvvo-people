@@ -11,10 +11,12 @@ const token = localStorage.getItem('people_token');
 if (!token) window.location.href = '/people/login.html';
 
 async function apiFetch(url, opts = {}) {
-  const res = await fetch(url, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
-  });
+  const headers = { Authorization: `Bearer ${token}`, ...(opts.headers || {}) };
+  // Content-Type só entra quando há corpo — mandar esse header com corpo
+  // vazio (ex: DELETE sem body) faz o Fastify rejeitar com
+  // FST_ERR_CTP_EMPTY_JSON_BODY antes mesmo de rodar o handler.
+  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+  const res = await fetch(url, { ...opts, headers });
   if (res.status === 401) {
     localStorage.removeItem('people_token');
     localStorage.removeItem('people_nome');

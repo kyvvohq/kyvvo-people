@@ -80,7 +80,8 @@
     </div>
   </header>
   <div class="app-shell">
-    <aside class="painel-sidebar" id="painel-sidebar">
+    <div class="sidebar-wrap">
+      <aside class="painel-sidebar" id="painel-sidebar">
       <nav class="grupo-menu">
         <div class="grupo-titulo">Seleção</div>
         <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
@@ -94,14 +95,14 @@
         <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
         <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
       </nav>
-    </aside>
-    <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+      </aside>
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+    </div>
 
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
           <div class="linha-titulo"><h1>Quadro</h1></div>
-          <p class="descricao">Acompanhe candidaturas por vaga e etapa.</p>
         </div>
         <div class="filtros">
           <div class="filtro">
@@ -121,37 +122,9 @@
     </div>
   </div>
 
-  <footer class="rodape-completo">
-    <div class="rodape-topo">
-      <div class="rodape-marca">
-        <img class="topo-logo-img" src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
-        <p>A plataforma de avaliação comportamental que ajuda você a contratar com mais clareza.</p>
-      </div>
-      <div class="rodape-coluna">
-        <h3>Plataforma</h3>
-        <a href="/people/painel.html">Visão geral</a>
-        <a href="/people/vagas.html">Vagas</a>
-        <a href="/people/candidatos.html">Candidatos</a>
-        <a href="/people/avaliacoes.html">Avaliações</a>
-      </div>
-      <div class="rodape-coluna">
-        <h3>Produtos Kyvvo</h3>
-        <a href="https://studio.kyvvo.com.br" target="_blank" rel="noopener">Kyvvo Studio</a>
-        <span class="rodape-link-indisponivel">Kyvvo People</span>
-        <a href="https://kyvvo.com.br" target="_blank" rel="noopener">Site institucional</a>
-      </div>
-      <div class="rodape-coluna">
-        <h3>Legal</h3>
-        <a href="https://studio.kyvvo.com.br/privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
-        <a href="https://studio.kyvvo.com.br/termos.html" target="_blank" rel="noopener">Termos de Uso</a>
-        <span class="rodape-link-indisponivel">Central de ajuda</span>
-      </div>
-    </div>
-    <div class="rodape-divisor"></div>
-    <div class="rodape-base">
-      <span class="copy">© 2026 Kyvvo Tecnologia. Todos os direitos reservados.</span>
-      <span class="rodape-local">Feito em Uberlândia, MG</span>
-    </div>
+  <footer class="rodape-logado">
+    <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
+    <span>© 2026 Kyvvo Tecnologia. Todos os direitos reservados.</span>
   </footer>
 
   <script src="/people/shell.js"></script>

@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
 const KYVVO_APP_URL = process.env.KYVVO_APP_URL || 'https://studio.kyvvo.com.br';
 
-// Lista pública das características (sem os pesos MBTI/OCEAN — só o que o
+// Lista pública das características (sem os pesos de tipo psicológico/OCEAN — só o que o
 // candidato precisa ver na tela de avaliação).
 const CARACTERISTICAS_PUBLICAS = CARACTERISTICAS.map((c) => ({ id: c.id, texto: c.caracteristica }));
 
