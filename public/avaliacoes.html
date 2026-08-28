@@ -9,6 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>document.documentElement.setAttribute('data-tema', localStorage.getItem('people_tema') || 'claro');</script>
 <link rel="stylesheet" href="/people/shell.css">
+<style>
+  .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+  .filtros select, .filtros input { height:36px; }
+  .filtros input { flex:1; min-width:180px; }
+  th.ordenavel { cursor:pointer; user-select:none; white-space:nowrap; }
+  th.ordenavel .seta { opacity:.35; font-size:11px; margin-left:3px; }
+  th.ordenavel.ativa .seta { opacity:1; }
+</style>
 </head>
 <body>
   <header class="topo-app">
@@ -70,14 +78,31 @@
         <div class="textos">
           <div class="linha-titulo"><h1>Avaliações</h1></div>
         </div>
-        <div class="acoes">
-          <button class="btn" id="btn-novo-candidato" type="button"><span data-icon="plus" data-size="16"></span>Novo candidato</button>
-        </div>
       </div>
 
       <div class="card" style="padding:0">
+        <div class="filtros">
+          <select id="filtro-vaga"><option value="">Todas as vagas</option></select>
+          <select id="filtro-status">
+            <option value="">Todos os status</option>
+            <option value="sem_envio">Sem avaliação enviada</option>
+            <option value="pendente">Pendente</option>
+            <option value="iniciado">Em andamento</option>
+            <option value="concluido">Concluído</option>
+          </select>
+          <input id="filtro-busca" placeholder="Buscar por nome ou e-mail">
+        </div>
         <table>
-          <thead><tr><th>Nome</th><th>E-mail</th><th>Status</th><th>Cadastrado em</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th class="ordenavel" data-col="nome">Nome<span class="seta">▲</span></th>
+              <th class="ordenavel" data-col="email">E-mail<span class="seta">▲</span></th>
+              <th class="ordenavel" data-col="vaga">Vaga<span class="seta">▲</span></th>
+              <th class="ordenavel" data-col="status">Status<span class="seta">▲</span></th>
+              <th class="ordenavel" data-col="criado_em">Cadastrado em<span class="seta">▲</span></th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody id="tabela-candidatos"></tbody>
         </table>
       </div>
@@ -93,76 +118,175 @@
   <script>
     const STATUS_CLASSE = { pendente: 'neutro', iniciado: 'aviso', concluido: 'sucesso' };
     const STATUS_LABEL = { pendente: 'Pendente', iniciado: 'Em andamento', concluido: 'Concluído' };
+    const SEM_ENVIO_LABEL = 'Sem avaliação enviada';
 
-    async function carregarCandidatos() {
-      const res = await apiFetch('/people/api/avaliacoes');
-      const candidatos = await res.json();
+    let candidatos = [];
+    let vagasPorCandidato = new Map();
+    let ordenacao = { coluna: 'criado_em', direcao: 'desc' };
+
+    async function carregarListas() {
+      const [resCand, resVagas, resCandidaturas] = await Promise.all([
+        apiFetch('/people/api/avaliacoes'),
+        apiFetch('/people/api/vagas'),
+        apiFetch('/people/api/candidaturas'),
+      ]);
+      candidatos = await resCand.json();
+      const vagas = await resVagas.json();
+      const candidaturas = await resCandidaturas.json();
+
+      vagasPorCandidato = new Map();
+      candidaturas.forEach((c) => {
+        if (!vagasPorCandidato.has(c.candidato_id)) vagasPorCandidato.set(c.candidato_id, new Set());
+        vagasPorCandidato.get(c.candidato_id).add(c.vaga_nome);
+      });
+
+      const selectVaga = document.getElementById('filtro-vaga');
+      const vagaAtual = selectVaga.value;
+      selectVaga.innerHTML = '<option value="">Todas as vagas</option>' + vagas.map((v) => `<option value="${v.nome}">${v.nome}</option>`).join('');
+      selectVaga.value = vagaAtual;
+    }
+
+    function vagasDoCandidato(c) {
+      const set = vagasPorCandidato.get(c.candidato_id);
+      return set ? Array.from(set) : [];
+    }
+
+    function aplicarFiltrosEOrdenacao() {
+      const vagaFiltro = document.getElementById('filtro-vaga').value;
+      const statusFiltro = document.getElementById('filtro-status').value;
+      const busca = document.getElementById('filtro-busca').value.trim().toLowerCase();
+
+      let lista = candidatos.filter((c) => {
+        const statusChave = c.status || 'sem_envio';
+        if (statusFiltro && statusChave !== statusFiltro) return false;
+        if (vagaFiltro && !vagasDoCandidato(c).includes(vagaFiltro)) return false;
+        if (busca && !(`${c.nome} ${c.email || ''}`.toLowerCase().includes(busca))) return false;
+        return true;
+      });
+
+      const { coluna, direcao } = ordenacao;
+      const chave = (c) => {
+        if (coluna === 'status') return c.status ? STATUS_LABEL[c.status] : SEM_ENVIO_LABEL;
+        if (coluna === 'vaga') return vagasDoCandidato(c).join(', ');
+        if (coluna === 'criado_em') return new Date(c.criado_em).getTime();
+        return (c[coluna] || '').toString().toLowerCase();
+      };
+      lista.sort((a, b) => {
+        const va = chave(a);
+        const vb = chave(b);
+        const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+        return direcao === 'asc' ? cmp : -cmp;
+      });
+
+      return lista;
+    }
+
+    function renderizarCabecalhoOrdenacao() {
+      document.querySelectorAll('th.ordenavel').forEach((th) => {
+        const ativa = th.dataset.col === ordenacao.coluna;
+        th.classList.toggle('ativa', ativa);
+        th.querySelector('.seta').textContent = ativa && ordenacao.direcao === 'desc' ? '▼' : '▲';
+      });
+    }
+
+    function renderizarTabela() {
+      renderizarCabecalhoOrdenacao();
+      const lista = aplicarFiltrosEOrdenacao();
       const corpo = document.getElementById('tabela-candidatos');
-      corpo.innerHTML = candidatos.map((c) => `
-        <tr>
-          <td>${c.nome}</td>
-          <td>${c.email}</td>
-          <td><span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span></td>
-          <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
-          <td>${c.status === 'concluido' ? `
+      corpo.innerHTML = lista.map((c) => {
+        const statusChave = c.status || 'sem_envio';
+        const statusLabel = c.status ? STATUS_LABEL[c.status] : SEM_ENVIO_LABEL;
+        const statusClasse = c.status ? STATUS_CLASSE[c.status] : 'neutro';
+        const vagas = vagasDoCandidato(c).join(', ') || '—';
+        let acoes = '';
+        if (c.status === 'concluido') {
+          acoes = `
             <a class="acao" href="/people/relatorio.html?id=${c.id}">Ver relatório</a>
             <a class="acao" href="#" data-pdf="${c.id}" data-nome="${c.nome}">Exportar PDF</a>
             <a class="acao" href="#" data-refazer="${c.id}" data-nome="${c.nome}">Refazer avaliação</a>
-          ` : ''}</td>
-        </tr>
-      `).join('') || '<tr><td colspan="5" class="vazio">Nenhum candidato cadastrado ainda.</td></tr>';
+          `;
+        } else if (statusChave === 'sem_envio') {
+          acoes = `<a class="acao" href="#" data-encaminhar="${c.candidato_id}" data-nome="${c.nome}">Enviar avaliação</a>`;
+        } else {
+          acoes = `<a class="acao" href="#" data-encaminhar="${c.candidato_id}" data-nome="${c.nome}">Reenviar avaliação</a>`;
+        }
+        return `
+          <tr>
+            <td>${c.nome}</td>
+            <td>${c.email || '—'}</td>
+            <td>${vagas}</td>
+            <td><span class="badge ${statusClasse}">${statusLabel}</span></td>
+            <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
+            <td>${acoes}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="6" class="vazio">Nenhum candidato cadastrado ainda.</td></tr>';
     }
 
-    function abrirModalNovoCandidato() {
+    document.querySelectorAll('th.ordenavel').forEach((th) => {
+      th.addEventListener('click', () => {
+        if (ordenacao.coluna === th.dataset.col) {
+          ordenacao.direcao = ordenacao.direcao === 'asc' ? 'desc' : 'asc';
+        } else {
+          ordenacao = { coluna: th.dataset.col, direcao: 'asc' };
+        }
+        renderizarTabela();
+      });
+    });
+
+    ['filtro-vaga', 'filtro-status'].forEach((id) => document.getElementById(id).addEventListener('change', renderizarTabela));
+    document.getElementById('filtro-busca').addEventListener('input', renderizarTabela);
+
+    function encaminharAvaliacao(candidatoId, nome, cpf) {
+      const opts = { method: 'POST' };
+      if (cpf) opts.body = JSON.stringify({ cpf });
+      return apiFetch(`/people/api/candidatos/${candidatoId}/enviar-avaliacao`, opts);
+    }
+
+    async function acionarEnvio(candidatoId, nome) {
+      const res = await encaminharAvaliacao(candidatoId, nome);
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === 'cpf_necessario') { abrirModalCpf(candidatoId, nome); return; }
+        avisar('Erro', data.error || 'Falha ao encaminhar avaliação');
+        return;
+      }
+      if (data.reenviada) avisar('Avaliação reenviada', `Link reenviado por e-mail para ${nome}.`);
+      else if (data.reaproveitada) avisar('Avaliação reaproveitada', 'Essa pessoa já tinha uma avaliação concluída recente — reaproveitada, nenhum link novo foi enviado.');
+      else avisar('Avaliação enviada', `Convite enviado por e-mail para ${nome}.`);
+      await carregarListas();
+      renderizarTabela();
+    }
+
+    function abrirModalCpf(candidatoId, nome) {
       abrirModal(
-        '<h3>Novo candidato</h3>',
+        '<h3>Enviar avaliação</h3>',
         `
-          <form id="form-candidato">
-            <div class="modal-erro" id="msg-candidato"></div>
-            <label for="nome">Nome completo</label>
-            <input id="nome" required>
-            <div class="grid2">
-              <div><label for="whatsapp">WhatsApp</label><input id="whatsapp"></div>
-              <div><label for="email">E-mail</label><input id="email" type="email" required></div>
-            </div>
-            <label for="cpf">CPF (só números)</label>
-            <input id="cpf" required>
-            <p class="campo-ajuda">Se essa pessoa já tiver uma avaliação concluída há menos de 6 meses (mesmo telefone ou e-mail), o sistema reaproveita em vez de mandar um novo link.</p>
+          <form id="form-cpf-avaliacao">
+            <div class="modal-erro" id="msg-cpf-avaliacao"></div>
+            <p class="campo-ajuda">Primeira avaliação de "${nome}" — o CPF é o mecanismo de acesso ao link (o candidato digita o mesmo CPF pra destravar).</p>
+            <label for="cpf-avaliacao">CPF (só números)</label>
+            <input id="cpf-avaliacao" required>
             <div class="modal-acoes">
-              <button type="button" class="btn-secundario" id="btn-cancelar-candidato">Cancelar</button>
-              <button type="submit" class="btn">Enviar avaliação</button>
+              <button type="button" class="btn-secundario" id="cancelar-cpf-avaliacao">Cancelar</button>
+              <button type="submit" class="btn">Enviar</button>
             </div>
           </form>
         `
       );
-
-      document.getElementById('btn-cancelar-candidato').addEventListener('click', fecharModal);
-      document.getElementById('form-candidato').addEventListener('submit', async (e) => {
+      document.getElementById('cancelar-cpf-avaliacao').addEventListener('click', fecharModal);
+      document.getElementById('form-cpf-avaliacao').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const msg = document.getElementById('msg-candidato');
-        msg.textContent = '';
-        try {
-          const res = await apiFetch('/people/api/avaliacoes', {
-            method: 'POST',
-            body: JSON.stringify({
-              nome: document.getElementById('nome').value,
-              email: document.getElementById('email').value,
-              whatsapp: document.getElementById('whatsapp').value,
-              cpf: document.getElementById('cpf').value,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Falha ao cadastrar candidato');
-          fecharModal();
-          if (data.reaproveitada) avisar('Avaliação reaproveitada', 'Essa pessoa já tinha uma avaliação concluída recente — reaproveitada, nenhum link novo foi enviado.');
-          carregarCandidatos();
-        } catch (err) {
-          msg.textContent = err.message;
-        }
+        const msg = document.getElementById('msg-cpf-avaliacao');
+        const res = await encaminharAvaliacao(candidatoId, nome, document.getElementById('cpf-avaliacao').value);
+        const data = await res.json();
+        if (!res.ok) { msg.textContent = data.error || 'Falha ao enviar avaliação'; return; }
+        fecharModal();
+        avisar('Avaliação enviada', `Convite enviado por e-mail para ${nome}.`);
+        await carregarListas();
+        renderizarTabela();
       });
     }
-
-    document.getElementById('btn-novo-candidato').addEventListener('click', abrirModalNovoCandidato);
 
     function confirmarRefazer(id, nome) {
       abrirModal(
@@ -182,7 +306,8 @@
         const data = await res.json();
         if (!res.ok) { avisar('Erro', data.error || 'Falha ao refazer avaliação'); return; }
         avisar('Avaliação resetada', `Link: ${data.link}`);
-        carregarCandidatos();
+        await carregarListas();
+        renderizarTabela();
       });
     }
 
@@ -206,10 +331,21 @@
       if (refazer) {
         e.preventDefault();
         confirmarRefazer(refazer.dataset.refazer, refazer.dataset.nome);
+        return;
+      }
+
+      const encaminhar = e.target.closest('[data-encaminhar]');
+      if (encaminhar) {
+        e.preventDefault();
+        acionarEnvio(encaminhar.dataset.encaminhar, encaminhar.dataset.nome);
       }
     });
 
-    carregarCandidatos();
+    async function iniciar() {
+      await carregarListas();
+      renderizarTabela();
+    }
+    iniciar();
   </script>
 </body>
 </html>

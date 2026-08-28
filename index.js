@@ -136,14 +136,71 @@ async function build() {
     return reply.code(201).send({ id, token, link, reaproveitada: false });
   });
 
+  // Lista TODOS os candidatos (pessoa) da conta, não só quem já tem
+  // avaliação — cada linha traz a avaliação mais recente (se houver) via
+  // LEFT JOIN LATERAL, pra tela de Avaliações poder encaminhar o convite
+  // pra quem ainda não tem uma. `status`/`id` continuam no formato que
+  // painel.html e avaliacoes.html já esperavam (id = avaliação, quando
+  // existir) — id do candidato vai à parte em `candidato_id`.
   fastify.get('/people/api/avaliacoes', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      `select a.id, p.nome, p.email, a.status, a.criado_em, a.concluido_em
-       from avaliacoes a join candidatos p on p.id = a.candidato_id
-       where a.tenant_id = $1 order by a.criado_em desc`,
+      `select p.id as candidato_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.criado_em,
+              av.id, av.status, av.concluido_em
+       from candidatos p
+       left join lateral (
+         select * from avaliacoes a2 where a2.candidato_id = p.id order by a2.criado_em desc limit 1
+       ) av on true
+       where p.tenant_id = $1 and p.anonimizado_em is null
+       order by p.criado_em desc`,
       [request.user.tenantId]
     );
     return rows;
+  });
+
+  // Encaminha (ou reenvia) o convite de avaliação pra um candidato já
+  // cadastrado — não pede nome/e-mail/telefone de novo (já se tem pelo
+  // candidato_id). CPF só é exigido quando de fato precisa criar uma
+  // avaliação nova (primeira vez, ou a anterior já passou da validade de
+  // reaproveitamento); se já existe uma pendente/em andamento, reenvia o
+  // mesmo link por e-mail sem pedir CPF de novo.
+  fastify.post('/people/api/candidatos/:id/enviar-avaliacao', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: pessoaRows } = await pool.query(
+      'select id, nome, email, anonimizado_em from candidatos where id = $1 and tenant_id = $2',
+      [request.params.id, request.user.tenantId]
+    );
+    const pessoa = pessoaRows[0];
+    if (!pessoa) return reply.code(404).send({ error: 'Candidato não encontrado' });
+    if (pessoa.anonimizado_em) return reply.code(409).send({ error: 'Candidato está mascarado — reverta antes de enviar avaliação' });
+    if (!pessoa.email) return reply.code(409).send({ error: 'Candidato não tem e-mail cadastrado' });
+
+    const { rows: abertasRows } = await pool.query(
+      "select id, token from avaliacoes where candidato_id = $1 and status in ('pendente', 'iniciado') order by criado_em desc limit 1",
+      [pessoa.id]
+    );
+    if (abertasRows[0]) {
+      const link = `${PUBLIC_URL}/people/avaliacao/${abertasRows[0].token}`;
+      await enviarLinkAvaliacao({ email: pessoa.email, nome: pessoa.nome, link });
+      return reply.code(200).send({ id: abertasRows[0].id, link, reenviada: true });
+    }
+
+    const reaproveitavel = await avaliacaoReaproveitavel(pool, pessoa.id);
+    if (reaproveitavel) {
+      return reply.code(200).send({ id: reaproveitavel.id, reaproveitada: true, concluido_em: reaproveitavel.concluido_em });
+    }
+
+    const { cpf } = request.body || {};
+    if (!cpf) return reply.code(409).send({ error: 'cpf_necessario' });
+    if (!validarCpf(cpf)) return reply.code(400).send({ error: 'CPF inválido' });
+
+    const id = crypto.randomUUID();
+    const token = crypto.randomUUID();
+    await pool.query(
+      'insert into avaliacoes (id, tenant_id, candidato_id, cpf, token) values ($1, $2, $3, $4, $5)',
+      [id, request.user.tenantId, pessoa.id, normalizar(cpf), token]
+    );
+    const link = `${PUBLIC_URL}/people/avaliacao/${token}`;
+    await enviarLinkAvaliacao({ email: pessoa.email, nome: pessoa.nome, link });
+    return reply.code(201).send({ id, link, reaproveitada: false });
   });
 
   fastify.get('/people/api/avaliacoes/:id/relatorio', { preHandler: fastify.authenticate }, async (request, reply) => {
