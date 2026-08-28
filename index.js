@@ -14,6 +14,7 @@ const { montarResumo } = require('./lib/conteudo');
 const { enviarLinkAvaliacao } = require('./lib/email');
 const { gerarRelatorioPdf } = require('./lib/pdf');
 const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
+const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
@@ -100,8 +101,13 @@ async function build() {
   });
 
   // --- Portal da psicóloga (autenticado) ---
-  fastify.post('/people/api/candidatos', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { nome, email, cpf } = request.body || {};
+  // Avaliação comportamental pertence à PESSOA, não à vaga (ver nota de
+  // arquitetura 2026-08-28) — passa por dedup de pessoa (telefone/e-mail)
+  // antes de criar o convite. Continua exigindo CPF na criação porque é o
+  // mecanismo de acesso ao link (candidato precisa digitar o mesmo CPF pra
+  // destravar) — diferente de dedup de pessoa, que usa telefone/e-mail.
+  fastify.post('/people/api/avaliacoes', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { nome, email, whatsapp, cpf } = request.body || {};
     if (!nome || !email || !cpf) {
       return reply.code(400).send({ error: 'nome, email e cpf são obrigatórios' });
     }
@@ -109,60 +115,77 @@ async function build() {
       return reply.code(400).send({ error: 'CPF inválido' });
     }
 
+    const pessoa = await encontrarOuCriarPessoa(pool, request.user.tenantId, { nome, email, telefone: whatsapp });
+
+    const reaproveitavel = await avaliacaoReaproveitavel(pool, pessoa.id);
+    if (reaproveitavel) {
+      return reply.code(200).send({ id: reaproveitavel.id, reaproveitada: true, concluido_em: reaproveitavel.concluido_em });
+    }
+
     const id = crypto.randomUUID();
     const token = crypto.randomUUID();
     await pool.query(
-      'insert into candidatos (id, nome, email, cpf, token, tenant_id) values ($1, $2, $3, $4, $5, $6)',
-      [id, nome, email, normalizar(cpf), token, request.user.tenantId]
+      'insert into avaliacoes (id, tenant_id, candidato_id, cpf, token) values ($1, $2, $3, $4, $5)',
+      [id, request.user.tenantId, pessoa.id, normalizar(cpf), token]
     );
 
     const link = `${PUBLIC_URL}/people/avaliacao/${token}`;
     await enviarLinkAvaliacao({ email, nome, link });
 
-    return reply.code(201).send({ id, token, link });
+    return reply.code(201).send({ id, token, link, reaproveitada: false });
   });
 
-  fastify.get('/people/api/candidatos', { preHandler: fastify.authenticate }, async (request) => {
+  fastify.get('/people/api/avaliacoes', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      'select id, nome, email, status, criado_em, concluido_em from candidatos where tenant_id = $1 order by criado_em desc',
+      `select a.id, p.nome, p.email, a.status, a.criado_em, a.concluido_em
+       from avaliacoes a join candidatos p on p.id = a.candidato_id
+       where a.tenant_id = $1 order by a.criado_em desc`,
       [request.user.tenantId]
     );
     return rows;
   });
 
-  fastify.get('/people/api/candidatos/:id/relatorio', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { rows } = await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
-    const candidato = rows[0];
-    if (!candidato) return reply.code(404).send({ error: 'Candidato não encontrado' });
-    if (candidato.status !== 'concluido') {
+  fastify.get('/people/api/avaliacoes/:id/relatorio', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `select a.*, p.nome from avaliacoes a join candidatos p on p.id = a.candidato_id
+       where a.id = $1 and a.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+    const avaliacao = rows[0];
+    if (!avaliacao) return reply.code(404).send({ error: 'Avaliação não encontrada' });
+    if (avaliacao.status !== 'concluido') {
       return reply.code(409).send({ error: 'Avaliação ainda não foi concluída' });
     }
-    return { ...candidato, resumo: montarResumo(candidato.resultado, candidato.nome) };
+    return { ...avaliacao, resumo: montarResumo(avaliacao.resultado, avaliacao.nome) };
   });
 
-  fastify.get('/people/api/candidatos/:id/relatorio.pdf', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { rows } = await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
-    const candidato = rows[0];
-    if (!candidato) return reply.code(404).send({ error: 'Candidato não encontrado' });
-    if (candidato.status !== 'concluido') {
+  fastify.get('/people/api/avaliacoes/:id/relatorio.pdf', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `select a.*, p.nome from avaliacoes a join candidatos p on p.id = a.candidato_id
+       where a.id = $1 and a.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+    const avaliacao = rows[0];
+    if (!avaliacao) return reply.code(404).send({ error: 'Avaliação não encontrada' });
+    if (avaliacao.status !== 'concluido') {
       return reply.code(409).send({ error: 'Avaliação ainda não foi concluída' });
     }
 
     reply.header('Content-Type', 'application/pdf');
-    reply.header('Content-Disposition', `attachment; filename="relatorio-${candidato.nome.replace(/\s+/g, '-')}.pdf"`);
-    const resumo = montarResumo(candidato.resultado, candidato.nome);
-    const doc = gerarRelatorioPdf(candidato, resumo);
+    reply.header('Content-Disposition', `attachment; filename="relatorio-${avaliacao.nome.replace(/\s+/g, '-')}.pdf"`);
+    const resumo = montarResumo(avaliacao.resultado, avaliacao.nome);
+    const doc = gerarRelatorioPdf(avaliacao, resumo);
     return reply.send(doc);
   });
 
-  // Arquiva a tentativa atual em `candidatos_historico` e reseta o candidato
+  // Arquiva a tentativa atual em `avaliacoes_historico` e reseta a avaliação
   // pra 'pendente', mantendo o mesmo token/link — decisão da psicóloga, o
   // candidato não pode se autodestravar depois de concluído.
-  fastify.post('/people/api/candidatos/:id/refazer', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { rows } = await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
-    const candidato = rows[0];
-    if (!candidato) return reply.code(404).send({ error: 'Candidato não encontrado' });
-    if (candidato.status !== 'concluido') {
+  fastify.post('/people/api/avaliacoes/:id/refazer', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query('select * from avaliacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    const avaliacao = rows[0];
+    if (!avaliacao) return reply.code(404).send({ error: 'Avaliação não encontrada' });
+    if (avaliacao.status !== 'concluido') {
       return reply.code(409).send({ error: 'Só é possível refazer uma avaliação já concluída' });
     }
 
@@ -170,23 +193,23 @@ async function build() {
     try {
       await client.query('begin');
       await client.query(
-        `insert into candidatos_historico (id, candidato_id, respostas_rodada1, respostas_rodada2, resultado, concluido_em)
+        `insert into avaliacoes_historico (id, avaliacao_id, respostas_rodada1, respostas_rodada2, resultado, concluido_em)
          values ($1, $2, $3, $4, $5, $6)`,
         [
           crypto.randomUUID(),
-          candidato.id,
-          JSON.stringify(candidato.respostas_rodada1),
-          JSON.stringify(candidato.respostas_rodada2),
-          JSON.stringify(candidato.resultado),
-          candidato.concluido_em,
+          avaliacao.id,
+          JSON.stringify(avaliacao.respostas_rodada1),
+          JSON.stringify(avaliacao.respostas_rodada2),
+          JSON.stringify(avaliacao.resultado),
+          avaliacao.concluido_em,
         ]
       );
       await client.query(
-        `update candidatos
+        `update avaliacoes
          set status = 'pendente', respostas_rodada1 = null, respostas_rodada2 = null,
              resultado = null, iniciado_em = null, concluido_em = null
          where id = $1`,
-        [candidato.id]
+        [avaliacao.id]
       );
       await client.query('commit');
     } catch (err) {
@@ -196,15 +219,16 @@ async function build() {
       client.release();
     }
 
-    return { ok: true, link: `${PUBLIC_URL}/people/avaliacao/${candidato.token}` };
+    return { ok: true, link: `${PUBLIC_URL}/people/avaliacao/${avaliacao.token}` };
   });
 
   // --- Vagas (autenticado) ---
   const CAMPOS_VAGA_OBRIGATORIOS = ['nome', 'descricao', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
   const CAMPOS_VAGA_EDITAVEIS = [
     'codigo', 'nome', 'descricao', 'salario', 'modalidade',
-    'nivel_experiencia', 'cargo', 'requisitos', 'competencias', 'status',
+    'nivel_experiencia', 'cargo', 'requisitos', 'competencias', 'status', 'pesos',
   ];
+  const CAMPOS_VAGA_JSONB = ['pesos'];
 
   fastify.post('/people/api/vagas', { preHandler: fastify.authenticate }, async (request, reply) => {
     const dados = request.body || {};
@@ -251,7 +275,7 @@ async function build() {
     }
 
     const sets = campos.map((campo, i) => `${campo} = $${i + 3}`).join(', ');
-    const valores = campos.map((campo) => dados[campo]);
+    const valores = campos.map((campo) => (CAMPOS_VAGA_JSONB.includes(campo) ? JSON.stringify(dados[campo]) : dados[campo]));
     const { rows } = await pool.query(
       `update vagas set ${sets}, atualizado_em = now() where id = $1 and tenant_id = $2 returning id`,
       [request.params.id, request.user.tenantId, ...valores]
@@ -265,19 +289,24 @@ async function build() {
     if (!vagaRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
 
     const { rows } = await pool.query(
-      'select id, nome, whatsapp, email, linkedin, curriculo_nome, criado_em from candidaturas where vaga_id = $1 order by criado_em desc',
+      `select c.id, p.nome, p.telefone_e164 as whatsapp, p.email, p.linkedin, c.curriculo_nome, c.criado_em
+       from candidaturas c join candidatos p on p.id = c.candidato_id
+       where c.vaga_id = $1 order by c.criado_em desc`,
       [request.params.id]
     );
     return rows;
   });
 
   // Lista todas as candidaturas do tenant (todas as vagas juntas) — usada
-  // pela tela "Candidatos" (distinta de "Avaliações", que é sobre a tabela
-  // `candidatos` do teste comportamental).
+  // pela tela "Candidatos" (distinta de "Avaliações", que é sobre a
+  // avaliação comportamental). Nome/e-mail/whatsapp vêm da PESSOA agora —
+  // a candidatura em si não guarda mais identidade (ver nota 2026-08-28).
   fastify.get('/people/api/candidaturas', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      `select c.id, c.nome, c.email, c.whatsapp, c.status, c.criado_em, v.nome as vaga_nome
-       from candidaturas c join vagas v on v.id = c.vaga_id
+      `select c.id, p.nome, p.email, p.telefone_e164 as whatsapp, c.status, c.criado_em, v.nome as vaga_nome
+       from candidaturas c
+       join candidatos p on p.id = c.candidato_id
+       join vagas v on v.id = c.vaga_id
        where v.tenant_id = $1
        order by c.criado_em desc`,
       [request.user.tenantId]
@@ -287,9 +316,12 @@ async function build() {
 
   fastify.get('/people/api/candidaturas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query(
-      `select c.id, c.nome, c.email, c.whatsapp, c.linkedin, c.status, c.etapa_id, c.vaga_id,
-              c.curriculo_nome, c.curriculo_tipo, c.criado_em, v.nome as vaga_nome
-       from candidaturas c join vagas v on v.id = c.vaga_id
+      `select c.id, c.candidato_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.linkedin,
+              c.status, c.etapa_id, c.vaga_id, c.avaliacao_id, c.score, c.pesos_snapshot,
+              c.motivo_reprovacao, c.origem, c.curriculo_nome, c.curriculo_tipo, c.criado_em, v.nome as vaga_nome
+       from candidaturas c
+       join candidatos p on p.id = c.candidato_id
+       join vagas v on v.id = c.vaga_id
        where c.id = $1 and v.tenant_id = $2`,
       [request.params.id, request.user.tenantId]
     );
@@ -330,15 +362,22 @@ async function build() {
     return reply.send(candidatura.curriculo_arquivo);
   });
 
+  // Reprovar exige ação humana registrada (Art. 20 LGPD) — não existe
+  // caminho automático pra esse status em nenhuma rota deste arquivo.
   fastify.patch('/people/api/candidaturas/:id/reprovar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { motivo } = request.body || {};
     const { rows } = await pool.query(
-      `update candidaturas c set status = 'reprovada'
+      `update candidaturas c set status = 'reprovada', motivo_reprovacao = $3
        from vagas v
        where c.vaga_id = v.id and c.id = $1 and v.tenant_id = $2
-       returning c.id`,
-      [request.params.id, request.user.tenantId]
+       returning c.id, c.tenant_id, c.status as status_anterior`,
+      [request.params.id, request.user.tenantId, motivo || null]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    await registrarEvento(pool, {
+      tenantId: request.user.tenantId, candidaturaId: rows[0].id, tipo: 'candidatura_reprovada',
+      de: rows[0].status_anterior, para: 'reprovada', atorEmail: request.user.email, payload: motivo ? { motivo } : null,
+    });
     return { ok: true };
   });
 
@@ -367,8 +406,115 @@ async function build() {
     if (!proxima) return { ok: true, semProximaEtapa: true };
 
     await pool.query('update candidaturas set etapa_id = $1 where id = $2', [proxima.id, candidatura.id]);
+    const etapaAnteriorNome = indiceAtual >= 0 ? etapas[indiceAtual].nome : 'Nova';
+    await registrarEvento(pool, {
+      tenantId: request.user.tenantId, candidaturaId: candidatura.id, tipo: 'etapa_alterada',
+      de: etapaAnteriorNome, para: proxima.nome, atorEmail: request.user.email,
+    });
     return { ok: true, etapa: proxima };
   });
+
+  // Score de aderência: componentes lançados à mão (0-100), combinados pelos
+  // pesos congelados no momento em que a candidatura foi criada
+  // (`pesos_snapshot`) — não muda se o recrutador reajustar os pesos da
+  // vaga depois, pra não tornar os scores já calculados incomparáveis.
+  fastify.patch('/people/api/candidaturas/:id/score', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `select c.id, c.tenant_id, c.pesos_snapshot from candidaturas c join vagas v on v.id = c.vaga_id
+       where c.id = $1 and v.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+    const candidatura = rows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    if (!candidatura.pesos_snapshot) return reply.code(409).send({ error: 'Essa candidatura não tem pesos definidos (foi criada antes do recurso de score)' });
+
+    const componentes = request.body || {};
+    const score = calcularScore(candidatura.pesos_snapshot, componentes);
+    if (!score) return reply.code(400).send({ error: 'Informe ao menos um componente de score' });
+
+    await pool.query('update candidaturas set score = $1 where id = $2', [JSON.stringify(score), candidatura.id]);
+    await registrarEvento(pool, {
+      tenantId: request.user.tenantId, candidaturaId: candidatura.id, tipo: 'score_calculado', atorEmail: request.user.email, payload: score,
+    });
+    return { ok: true, score };
+  });
+
+  // Pessoa entra numa vaga nova reaproveitando o histórico já existente
+  // ("banco de talentos") — mesma regra de dedup por candidato_id+vaga_id.
+  fastify.post('/people/api/candidaturas/banco-de-talentos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { candidato_id, vaga_id } = request.body || {};
+    if (!candidato_id || !vaga_id) return reply.code(400).send({ error: 'candidato_id e vaga_id são obrigatórios' });
+
+    const { rows: pessoaRows } = await pool.query('select id from candidatos where id = $1 and tenant_id = $2', [candidato_id, request.user.tenantId]);
+    if (!pessoaRows[0]) return reply.code(404).send({ error: 'Candidato não encontrado' });
+    const { rows: vagaRows } = await pool.query('select id from vagas where id = $1 and tenant_id = $2', [vaga_id, request.user.tenantId]);
+    if (!vagaRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+
+    const resultado = await criarOuReutilizarCandidatura({
+      vagaId: vaga_id, tenantId: request.user.tenantId, candidatoId: candidato_id, origem: 'banco_de_talentos', atorEmail: request.user.email,
+    });
+    return reply.code(201).send({ id: resultado.candidatura.id, reaproveitada: resultado.reaproveitada });
+  });
+
+  // LGPD: anonimiza a pessoa (nome/e-mail/telefone/linkedin removidos),
+  // preserva candidaturas e avaliações como agregados — não é uma exclusão
+  // física, é o que sustenta o direito de exclusão sem apagar histórico
+  // que a conta ainda precisa (relatórios, funil, auditoria).
+  fastify.post('/people/api/candidatos/:id/anonimizar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `update candidatos set nome = '[removido]', email = null, telefone_e164 = null, linkedin = null, anonimizado_em = now()
+       where id = $1 and tenant_id = $2 returning id`,
+      [request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Candidato não encontrado' });
+    return { ok: true };
+  });
+
+  // Cria (ou devolve, se já existir) a candidatura de uma pessoa numa vaga —
+  // usado pelo formulário público, cadastro manual, importação de currículo
+  // e banco de talentos. Sempre passa por dedup de pessoa (telefone
+  // primeiro, e-mail depois) e reaproveita a última avaliação concluída
+  // válida, se houver — ver nota de arquitetura 2026-08-28. UNIQUE
+  // (candidato_id, vaga_id) no banco garante que "clicar duas vezes no
+  // link" nunca duplica: a segunda chamada só devolve a candidatura já
+  // criada na primeira.
+  async function criarOuReutilizarCandidatura({ vagaId, tenantId, candidatoId, nome, email, telefone, linkedin, origem, curriculo, atorEmail }) {
+    const pessoa = candidatoId
+      ? (await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [candidatoId, tenantId])).rows[0]
+      : await encontrarOuCriarPessoa(pool, tenantId, { nome, email, telefone, linkedin });
+    if (!pessoa) throw new Error('Pessoa não encontrada');
+
+    const { rows: existentes } = await pool.query(
+      'select * from candidaturas where candidato_id = $1 and vaga_id = $2',
+      [pessoa.id, vagaId]
+    );
+    if (existentes[0]) return { candidatura: existentes[0], pessoa, reaproveitada: true };
+
+    const { rows: vagaRows } = await pool.query('select pesos from vagas where id = $1', [vagaId]);
+    const pesosSnapshot = vagaRows[0] ? vagaRows[0].pesos : null;
+    const avaliacaoExistente = await avaliacaoReaproveitavel(pool, pessoa.id);
+
+    const id = crypto.randomUUID();
+    const { rows } = await pool.query(
+      `insert into candidaturas
+         (id, vaga_id, tenant_id, candidato_id, avaliacao_id, origem, pesos_snapshot,
+          curriculo_nome, curriculo_tipo, curriculo_arquivo)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       returning *`,
+      [
+        id, vagaId, tenantId, pessoa.id, avaliacaoExistente ? avaliacaoExistente.id : null, origem,
+        pesosSnapshot ? JSON.stringify(pesosSnapshot) : null,
+        curriculo ? curriculo.nome : 'sem-arquivo', curriculo ? curriculo.tipo : 'application/octet-stream',
+        curriculo ? curriculo.buffer : Buffer.alloc(0),
+      ]
+    );
+    const candidatura = rows[0];
+    await registrarEvento(pool, { tenantId, candidaturaId: candidatura.id, tipo: 'candidatura_criada', para: 'nova', atorEmail, payload: { origem } });
+    if (avaliacaoExistente) {
+      await registrarEvento(pool, { tenantId, candidaturaId: candidatura.id, tipo: 'avaliacao_reaproveitada', payload: { avaliacao_id: avaliacaoExistente.id } });
+    }
+    return { candidatura, pessoa, reaproveitada: false };
+  }
 
   // Cadastro manual de candidato (sem passar pelo link público da vaga) —
   // currículo é opcional aqui; o botão "Importar currículo" da tela usa o
@@ -394,16 +540,11 @@ async function build() {
     const { rows: vagaRows } = await pool.query('select id from vagas where id = $1 and tenant_id = $2', [campos.vaga_id, request.user.tenantId]);
     if (!vagaRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
 
-    const id = crypto.randomUUID();
-    await pool.query(
-      `insert into candidaturas (id, vaga_id, tenant_id, nome, whatsapp, email, linkedin, curriculo_nome, curriculo_tipo, curriculo_arquivo)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [
-        id, campos.vaga_id, request.user.tenantId, campos.nome, campos.whatsapp, campos.email, campos.linkedin || null,
-        arquivo ? arquivo.nome : 'sem-arquivo', arquivo ? arquivo.tipo : 'application/octet-stream', arquivo ? arquivo.buffer : Buffer.alloc(0),
-      ]
-    );
-    return reply.code(201).send({ id });
+    const resultado = await criarOuReutilizarCandidatura({
+      vagaId: campos.vaga_id, tenantId: request.user.tenantId, nome: campos.nome, email: campos.email,
+      telefone: campos.whatsapp, linkedin: campos.linkedin || null, origem: 'manual', curriculo: arquivo, atorEmail: request.user.email,
+    });
+    return reply.code(201).send({ id: resultado.candidatura.id, reaproveitada: resultado.reaproveitada });
   });
 
   // Lê um currículo enviado e devolve nome/e-mail/whatsapp encontrados no
@@ -516,8 +657,10 @@ async function build() {
       pool.query('select id, nome from vagas where tenant_id = $1 order by criado_em desc', [request.user.tenantId]),
       pool.query('select id, nome, ordem from etapas where tenant_id = $1 order by ordem', [request.user.tenantId]),
       pool.query(
-        `select c.id, c.nome, c.vaga_id, c.etapa_id, c.status, c.criado_em
-         from candidaturas c join vagas v on v.id = c.vaga_id
+        `select c.id, p.nome, c.vaga_id, c.etapa_id, c.status, c.criado_em
+         from candidaturas c
+         join candidatos p on p.id = c.candidato_id
+         join vagas v on v.id = c.vaga_id
          where v.tenant_id = $1
          order by c.criado_em desc`,
         [request.user.tenantId]
@@ -532,10 +675,13 @@ async function build() {
       `update candidaturas c set etapa_id = $1
        from vagas v
        where c.vaga_id = v.id and c.id = $2 and v.tenant_id = $3
-       returning c.id`,
+       returning c.id, c.tenant_id`,
       [etapa_id || null, request.params.id, request.user.tenantId]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    await registrarEvento(pool, {
+      tenantId: request.user.tenantId, candidaturaId: rows[0].id, tipo: 'etapa_alterada', para: etapa_id || 'Nova', atorEmail: request.user.email,
+    });
     return { ok: true };
   });
 
@@ -560,7 +706,7 @@ async function build() {
   });
 
   fastify.post('/people/api/vaga-publica/:id/candidatar', async (request, reply) => {
-    const { rows: vagaRows } = await pool.query("select id, status from vagas where id = $1", [request.params.id]);
+    const { rows: vagaRows } = await pool.query("select id, tenant_id, status from vagas where id = $1", [request.params.id]);
     const vaga = vagaRows[0];
     if (!vaga || vaga.status === 'encerrada') {
       return reply.code(404).send({ error: 'Vaga não encontrada ou encerrada' });
@@ -587,11 +733,13 @@ async function build() {
       return reply.code(400).send({ error: 'Currículo é obrigatório' });
     }
 
-    await pool.query(
-      `insert into candidaturas (id, vaga_id, tenant_id, nome, whatsapp, email, linkedin, curriculo_nome, curriculo_tipo, curriculo_arquivo)
-       values ($1, $2, (select tenant_id from vagas where id = $2), $3, $4, $5, $6, $7, $8, $9)`,
-      [crypto.randomUUID(), vaga.id, campos.nome, campos.whatsapp, campos.email, campos.linkedin || null, arquivo.nome, arquivo.tipo, arquivo.buffer]
-    );
+    // Mesma pessoa clicando duas vezes no link não duplica: dedup por
+    // telefone/e-mail + UNIQUE(candidato_id, vaga_id) devolvem a candidatura
+    // já existente em vez de criar outra.
+    await criarOuReutilizarCandidatura({
+      vagaId: vaga.id, tenantId: vaga.tenant_id, nome: campos.nome, email: campos.email,
+      telefone: campos.whatsapp, linkedin: campos.linkedin || null, origem: 'link', curriculo: arquivo,
+    });
 
     return reply.code(201).send({ ok: true });
   });
@@ -602,26 +750,29 @@ async function build() {
   });
 
   fastify.get('/people/api/avaliacao/:token', async (request, reply) => {
-    const { rows } = await pool.query('select status, nome from candidatos where token = $1', [request.params.token]);
-    const candidato = rows[0];
-    if (!candidato) return reply.code(404).send({ error: 'Link inválido' });
-    return { status: candidato.status, nome: candidato.nome };
+    const { rows } = await pool.query(
+      `select a.status, p.nome from avaliacoes a join candidatos p on p.id = a.candidato_id where a.token = $1`,
+      [request.params.token]
+    );
+    const avaliacao = rows[0];
+    if (!avaliacao) return reply.code(404).send({ error: 'Link inválido' });
+    return { status: avaliacao.status, nome: avaliacao.nome };
   });
 
   fastify.post('/people/api/avaliacao/:token/validar-cpf', async (request, reply) => {
     const { cpf } = request.body || {};
-    const { rows } = await pool.query('select id, cpf, status from candidatos where token = $1', [request.params.token]);
-    const candidato = rows[0];
-    if (!candidato) return reply.code(404).send({ error: 'Link inválido' });
-    if (candidato.status === 'concluido') {
+    const { rows } = await pool.query('select id, cpf, status from avaliacoes where token = $1', [request.params.token]);
+    const avaliacao = rows[0];
+    if (!avaliacao) return reply.code(404).send({ error: 'Link inválido' });
+    if (avaliacao.status === 'concluido') {
       return reply.code(403).send({ error: 'Esta avaliação já foi concluída e não pode ser refeita' });
     }
-    if (normalizar(cpf) !== candidato.cpf) {
+    if (normalizar(cpf) !== avaliacao.cpf) {
       return reply.code(401).send({ error: 'CPF não confere' });
     }
 
-    if (candidato.status === 'pendente') {
-      await pool.query("update candidatos set status = 'iniciado', iniciado_em = now() where id = $1", [candidato.id]);
+    if (avaliacao.status === 'pendente') {
+      await pool.query("update avaliacoes set status = 'iniciado', iniciado_em = now() where id = $1", [avaliacao.id]);
     }
 
     return { ok: true, caracteristicas: CARACTERISTICAS_PUBLICAS };
@@ -629,57 +780,66 @@ async function build() {
 
   fastify.post('/people/api/avaliacao/:token/rodada1', async (request, reply) => {
     const { selecionadas } = request.body || {};
-    const candidato = await buscarPorTokenEmAndamento(request.params.token, reply);
-    if (!candidato) return;
+    const avaliacao = await buscarPorTokenEmAndamento(request.params.token, reply);
+    if (!avaliacao) return;
     if (!Array.isArray(selecionadas) || !selecionadas.length) {
       return reply.code(400).send({ error: 'selecionadas deve ser uma lista de ids não vazia' });
     }
 
-    await pool.query('update candidatos set respostas_rodada1 = $1 where id = $2', [JSON.stringify(selecionadas), candidato.id]);
+    await pool.query('update avaliacoes set respostas_rodada1 = $1 where id = $2', [JSON.stringify(selecionadas), avaliacao.id]);
     return { ok: true };
   });
 
   fastify.post('/people/api/avaliacao/:token/rodada2', async (request, reply) => {
     const { selecionadas } = request.body || {};
-    const candidato = await buscarPorTokenEmAndamento(request.params.token, reply);
-    if (!candidato) return;
+    const avaliacao = await buscarPorTokenEmAndamento(request.params.token, reply);
+    if (!avaliacao) return;
     if (!Array.isArray(selecionadas) || !selecionadas.length) {
       return reply.code(400).send({ error: 'selecionadas deve ser uma lista de ids não vazia' });
     }
-    if (!candidato.respostas_rodada1) {
+    if (!avaliacao.respostas_rodada1) {
       return reply.code(409).send({ error: 'Rodada 1 ainda não foi respondida' });
     }
 
-    const resultado = calcularResultado(candidato.respostas_rodada1, selecionadas);
+    const resultado = calcularResultado(avaliacao.respostas_rodada1, selecionadas);
     await pool.query(
-      `update candidatos
+      `update avaliacoes
        set respostas_rodada2 = $1, resultado = $2, status = 'concluido', concluido_em = now()
        where id = $3`,
-      [JSON.stringify(selecionadas), JSON.stringify(resultado), candidato.id]
+      [JSON.stringify(selecionadas), JSON.stringify(resultado), avaliacao.id]
     );
+
+    // Se alguma candidatura estava esperando essa avaliação, registra o
+    // evento na jornada dela (best-effort: uma avaliação pode ter sido
+    // reaproveitada por mais de uma candidatura).
+    const { rows: candidaturasLigadas } = await pool.query('select id, tenant_id from candidaturas where avaliacao_id = $1', [avaliacao.id]);
+    for (const c of candidaturasLigadas) {
+      await registrarEvento(pool, { tenantId: c.tenant_id, candidaturaId: c.id, tipo: 'avaliacao_concluida' });
+    }
+
     return { ok: true };
   });
 
-  // Busca um candidato pelo token garantindo que a avaliação está em andamento
-  // (CPF já validado, ainda não concluída) — usado pelas rotas de rodada 1/2
-  // pra impedir salvar respostas fora do fluxo (token errado, já concluído,
-  // ou nunca iniciado).
+  // Busca uma avaliação pelo token garantindo que está em andamento (CPF já
+  // validado, ainda não concluída) — usado pelas rotas de rodada 1/2 pra
+  // impedir salvar respostas fora do fluxo (token errado, já concluído, ou
+  // nunca iniciado).
   async function buscarPorTokenEmAndamento(token, reply) {
-    const { rows } = await pool.query('select * from candidatos where token = $1', [token]);
-    const candidato = rows[0];
-    if (!candidato) {
+    const { rows } = await pool.query('select * from avaliacoes where token = $1', [token]);
+    const avaliacao = rows[0];
+    if (!avaliacao) {
       reply.code(404).send({ error: 'Link inválido' });
       return null;
     }
-    if (candidato.status === 'concluido') {
+    if (avaliacao.status === 'concluido') {
       reply.code(403).send({ error: 'Esta avaliação já foi concluída e não pode ser refeita' });
       return null;
     }
-    if (candidato.status === 'pendente') {
+    if (avaliacao.status === 'pendente') {
       reply.code(403).send({ error: 'Valide seu CPF antes de responder' });
       return null;
     }
-    return candidato;
+    return avaliacao;
   }
 
   return fastify;

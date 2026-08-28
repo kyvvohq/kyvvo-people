@@ -107,7 +107,7 @@
     async function carregarStats() {
       const [vagasRes, candidatosRes] = await Promise.all([
         apiFetch('/people/api/vagas'),
-        apiFetch('/people/api/candidatos'),
+        apiFetch('/people/api/avaliacoes'),
       ]);
       const vagas = await vagasRes.json();
       const candidatos = await candidatosRes.json();

@@ -189,3 +189,15 @@ function abrirModal(tituloHtml, conteudoHtml, classeExtra) {
   document.addEventListener('keydown', escFecharModal);
   return overlay;
 }
+function avisar(titulo, mensagem) {
+  abrirModal(
+    `<h3>${titulo}</h3>`,
+    `
+      <p class="modal-texto">${mensagem}</p>
+      <div class="modal-acoes">
+        <button type="button" class="btn" id="btn-ok-aviso">OK</button>
+      </div>
+    `
+  );
+  document.getElementById('btn-ok-aviso').addEventListener('click', fecharModal);
+}

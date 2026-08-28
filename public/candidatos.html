@@ -226,8 +226,12 @@
           <div>
             <h2>${c.nome}</h2>
             <div class="info">
-              ${c.vaga_nome} · <span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span> · Etapa: ${nomeEtapa(c.etapa_id)}<br>
-              ${c.whatsapp} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}
+              ${c.vaga_nome} · <span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span> · Etapa: ${nomeEtapa(c.etapa_id)}
+              ${c.score ? ` · Score: <strong>${c.score.geral}</strong>` : ''}
+              <a class="acao" href="#" id="btn-editar-score" style="margin-left:6px">${c.score ? 'Editar score' : 'Lançar score'}</a><br>
+              ${c.whatsapp} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}<br>
+              <a class="acao" href="#" id="btn-banco-talentos">Adicionar a outra vaga</a>
+              <a class="acao" href="#" id="btn-anonimizar" style="color:var(--danger)">Anonimizar (LGPD)</a>
             </div>
           </div>
           <button class="detalhe-fechar" id="btn-fechar-detalhe" type="button" aria-label="Fechar">${icon('x', 16)}</button>
@@ -247,8 +251,102 @@
       if (btnDownload) btnDownload.addEventListener('click', () => baixarCurriculo(c.id, c.curriculo_nome));
       document.getElementById('btn-reprovar').addEventListener('click', () => confirmarReprovar(c));
       document.getElementById('btn-proxima-etapa').addEventListener('click', () => avancarEtapa(c));
+      document.getElementById('btn-editar-score').addEventListener('click', (e) => { e.preventDefault(); formularioScore(c); });
+      document.getElementById('btn-banco-talentos').addEventListener('click', (e) => { e.preventDefault(); formularioBancoDeTalentos(c); });
+      document.getElementById('btn-anonimizar').addEventListener('click', (e) => { e.preventDefault(); confirmarAnonimizar(c); });
 
       carregarPreview(c);
+    }
+
+    function formularioScore(c) {
+      const s = c.score || {};
+      abrirModal(
+        '<h3>Score de aderência</h3>',
+        `
+          <form id="form-score">
+            <div class="modal-erro" id="msg-score"></div>
+            <p class="campo-ajuda">Nota de 0 a 100 em cada componente — o "geral" é calculado pela média ponderada pelos pesos da vaga.</p>
+            <div class="grid2" style="grid-template-columns:1fr 1fr 1fr">
+              <div><label for="score-tecnica">Técnica</label><input id="score-tecnica" type="number" min="0" max="100" value="${s.tecnica ?? ''}"></div>
+              <div><label for="score-experiencia">Experiência</label><input id="score-experiencia" type="number" min="0" max="100" value="${s.experiencia ?? ''}"></div>
+              <div><label for="score-entrevista">Entrevista</label><input id="score-entrevista" type="number" min="0" max="100" value="${s.entrevista ?? ''}"></div>
+            </div>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-score">Cancelar</button>
+              <button type="submit" class="btn">Salvar score</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-score').addEventListener('click', fecharModal);
+      document.getElementById('form-score').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-score');
+        const componentes = {};
+        ['tecnica', 'experiencia', 'entrevista'].forEach((k) => {
+          const v = document.getElementById(`score-${k}`).value;
+          if (v !== '') componentes[k] = Number(v);
+        });
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/score`, { method: 'PATCH', body: JSON.stringify(componentes) });
+        const data = await res.json();
+        if (!res.ok) { msg.textContent = data.error || 'Falha ao salvar score'; return; }
+        fecharModal();
+        renderizarDetalhe();
+      });
+    }
+
+    function formularioBancoDeTalentos(c) {
+      abrirModal(
+        '<h3>Adicionar a outra vaga</h3>',
+        `
+          <form id="form-banco-talentos">
+            <div class="modal-erro" id="msg-banco-talentos"></div>
+            <label for="bt-vaga">Vaga</label>
+            <select id="bt-vaga" required><option value="">Selecione</option>${opcoesVagas(null)}</select>
+            <p class="campo-ajuda">"${c.nome}" entra na vaga escolhida reaproveitando a última avaliação concluída válida, sem precisar preencher o formulário de novo.</p>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-banco-talentos">Cancelar</button>
+              <button type="submit" class="btn">Adicionar</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-banco-talentos').addEventListener('click', fecharModal);
+      document.getElementById('form-banco-talentos').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-banco-talentos');
+        const vagaId = document.getElementById('bt-vaga').value;
+        const res = await apiFetch('/people/api/candidaturas/banco-de-talentos', {
+          method: 'POST',
+          body: JSON.stringify({ candidato_id: c.candidato_id, vaga_id: vagaId }),
+        });
+        const data = await res.json();
+        if (!res.ok) { msg.textContent = data.error || 'Falha ao adicionar candidato à vaga'; return; }
+        fecharModal();
+        await carregarListas();
+        selecionar(data.id);
+      });
+    }
+
+    function confirmarAnonimizar(c) {
+      abrirModal(
+        '<h3>Anonimizar candidato?</h3>',
+        `
+          <p class="modal-texto">Remove nome, e-mail, telefone e LinkedIn de "${c.nome}" (LGPD). As candidaturas e avaliações continuam existindo como histórico/agregado, sem identificar a pessoa. Essa ação não pode ser desfeita.</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-anonimizar">Cancelar</button>
+            <button type="button" class="btn-perigo" id="confirmar-anonimizar">Anonimizar</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-anonimizar').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-anonimizar').addEventListener('click', async () => {
+        fecharModal();
+        await apiFetch(`/people/api/candidatos/${c.candidato_id}/anonimizar`, { method: 'POST' });
+        fecharDetalhe();
+        await carregarListas();
+        renderizarLista();
+      });
     }
 
     async function carregarPreview(c) {

@@ -95,7 +95,7 @@
     const STATUS_LABEL = { pendente: 'Pendente', iniciado: 'Em andamento', concluido: 'Concluído' };
 
     async function carregarCandidatos() {
-      const res = await apiFetch('/people/api/candidatos');
+      const res = await apiFetch('/people/api/avaliacoes');
       const candidatos = await res.json();
       const corpo = document.getElementById('tabela-candidatos');
       corpo.innerHTML = candidatos.map((c) => `
@@ -121,10 +121,13 @@
             <div class="modal-erro" id="msg-candidato"></div>
             <label for="nome">Nome completo</label>
             <input id="nome" required>
-            <label for="email">E-mail</label>
-            <input id="email" type="email" required>
+            <div class="grid2">
+              <div><label for="whatsapp">WhatsApp</label><input id="whatsapp"></div>
+              <div><label for="email">E-mail</label><input id="email" type="email" required></div>
+            </div>
             <label for="cpf">CPF (só números)</label>
             <input id="cpf" required>
+            <p class="campo-ajuda">Se essa pessoa já tiver uma avaliação concluída há menos de 6 meses (mesmo telefone ou e-mail), o sistema reaproveita em vez de mandar um novo link.</p>
             <div class="modal-acoes">
               <button type="button" class="btn-secundario" id="btn-cancelar-candidato">Cancelar</button>
               <button type="submit" class="btn">Enviar avaliação</button>
@@ -139,17 +142,19 @@
         const msg = document.getElementById('msg-candidato');
         msg.textContent = '';
         try {
-          const res = await apiFetch('/people/api/candidatos', {
+          const res = await apiFetch('/people/api/avaliacoes', {
             method: 'POST',
             body: JSON.stringify({
               nome: document.getElementById('nome').value,
               email: document.getElementById('email').value,
+              whatsapp: document.getElementById('whatsapp').value,
               cpf: document.getElementById('cpf').value,
             }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Falha ao cadastrar candidato');
           fecharModal();
+          if (data.reaproveitada) avisar('Avaliação reaproveitada', 'Essa pessoa já tinha uma avaliação concluída recente — reaproveitada, nenhum link novo foi enviado.');
           carregarCandidatos();
         } catch (err) {
           msg.textContent = err.message;
@@ -159,11 +164,33 @@
 
     document.getElementById('btn-novo-candidato').addEventListener('click', abrirModalNovoCandidato);
 
+    function confirmarRefazer(id, nome) {
+      abrirModal(
+        '<h3>Refazer avaliação?</h3>',
+        `
+          <p class="modal-texto">O resultado atual de "${nome}" vai para o histórico e o mesmo link poderá ser usado de novo.</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-refazer">Cancelar</button>
+            <button type="button" class="btn" id="confirmar-refazer">Refazer</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-refazer').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-refazer').addEventListener('click', async () => {
+        fecharModal();
+        const res = await apiFetch(`/people/api/avaliacoes/${id}/refazer`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { avisar('Erro', data.error || 'Falha ao refazer avaliação'); return; }
+        avisar('Avaliação resetada', `Link: ${data.link}`);
+        carregarCandidatos();
+      });
+    }
+
     document.getElementById('tabela-candidatos').addEventListener('click', async (e) => {
       const pdf = e.target.closest('[data-pdf]');
       if (pdf) {
         e.preventDefault();
-        const res = await apiFetch(`/people/api/candidatos/${pdf.dataset.pdf}/relatorio.pdf`);
+        const res = await apiFetch(`/people/api/avaliacoes/${pdf.dataset.pdf}/relatorio.pdf`);
         if (!res.ok) return;
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -178,13 +205,7 @@
       const refazer = e.target.closest('[data-refazer]');
       if (refazer) {
         e.preventDefault();
-        const confirmar = confirm(`Refazer a avaliação de ${refazer.dataset.nome}? O resultado atual vai para o histórico e o mesmo link poderá ser usado de novo.`);
-        if (!confirmar) return;
-        const res = await apiFetch(`/people/api/candidatos/${refazer.dataset.refazer}/refazer`, { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Falha ao refazer avaliação'); return; }
-        alert(`Avaliação resetada. Link: ${data.link}`);
-        carregarCandidatos();
+        confirmarRefazer(refazer.dataset.refazer, refazer.dataset.nome);
       }
     });
 

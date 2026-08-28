@@ -220,7 +220,7 @@
     }
 
     async function carregar() {
-      const res = await fetch(`/people/api/candidatos/${id}/relatorio`, {
+      const res = await fetch(`/people/api/avaliacoes/${id}/relatorio`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status === 401) { window.location.href = '/people/login.html'; return; }
@@ -310,7 +310,7 @@
       `;
 
       document.getElementById('btn-pdf').addEventListener('click', async () => {
-        const res = await fetch(`/people/api/candidatos/${id}/relatorio.pdf`, {
+        const res = await fetch(`/people/api/avaliacoes/${id}/relatorio.pdf`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
