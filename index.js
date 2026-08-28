@@ -15,6 +15,7 @@ const { enviarLinkAvaliacao } = require('./lib/email');
 const { gerarRelatorioPdf } = require('./lib/pdf');
 const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
+const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
@@ -227,26 +228,88 @@ async function build() {
   const CAMPOS_VAGA_EDITAVEIS = [
     'codigo', 'nome', 'descricao', 'salario', 'modalidade',
     'nivel_experiencia', 'cargo', 'requisitos', 'competencias', 'status', 'pesos',
+    'requisitos_estruturados', 'limites', 'campos_excluidos_score',
   ];
-  const CAMPOS_VAGA_JSONB = ['pesos'];
+  const CAMPOS_VAGA_JSONB = ['pesos', 'requisitos_estruturados', 'limites', 'campos_excluidos_score'];
+  const STATUS_VAGA_VALIDOS = ['rascunho', 'nova', 'em_andamento', 'pausada', 'encerrada'];
+
+  // Lista fixa do que o motor de match nunca deve considerar — o
+  // recrutador só pode ADICIONAR itens, nunca remover os defaults
+  // (seção 3.1/9.3 da especificação, evita viés indireto no score).
+  const CAMPOS_EXCLUIDOS_SCORE_DEFAULT = [
+    'idade', 'ano_formatura', 'genero', 'estado_civil', 'nome', 'foto',
+    'endereco_completo', 'gaps_temporais_nao_justificados',
+  ];
+
+  // Valida e normaliza os campos estruturados de match antes de gravar
+  // (mutando `dados` in place) — regras obrigatórias da seção 3.1 da
+  // especificação (2026-08-28): eliminatórios limitados, curva de
+  // experiência sempre presente quando há anos_minimos (aqui gerada
+  // automaticamente como linear — não existe ainda editor de curva no
+  // front, é fundação pro motor de match, não o motor em si), pesos
+  // somando 1.0, campos excluídos do score nunca reduzidos.
+  function validarRequisitosVaga(dados) {
+    if (dados.requisitos_estruturados) {
+      const limites = dados.limites || { max_eliminatorios: 3 };
+      const eliminatorios = dados.requisitos_estruturados.filter((r) => r.nivel_exigido === 'eliminatorio');
+      if (eliminatorios.length > (limites.max_eliminatorios ?? 3)) {
+        return `Máximo de ${limites.max_eliminatorios ?? 3} requisitos eliminatórios (tem ${eliminatorios.length}) — rebaixe o mais fraco pra "importante"`;
+      }
+      dados.requisitos_estruturados = dados.requisitos_estruturados.map((r) => {
+        if (r.categoria === 'experiencia' && r.anos_minimos != null && !r.curva_experiencia) {
+          return {
+            ...r,
+            curva_experiencia: {
+              tipo: 'linear_auto',
+              pontos: [{ anos: 0, score: 0 }, { anos: r.anos_minimos, score: 1 }],
+              penaliza_excesso: false,
+            },
+          };
+        }
+        return r;
+      });
+    }
+    if (dados.pesos) {
+      const soma = Object.values(dados.pesos).reduce((s, v) => s + Number(v || 0), 0);
+      if (soma > 0 && Math.abs(soma - 1) > 0.001) {
+        dados.pesos = Object.fromEntries(
+          Object.entries(dados.pesos).map(([k, v]) => [k, Math.round((Number(v || 0) / soma) * 1000) / 1000])
+        );
+      }
+    }
+    if (dados.campos_excluidos_score) {
+      const extras = dados.campos_excluidos_score.filter((c) => !CAMPOS_EXCLUIDOS_SCORE_DEFAULT.includes(c));
+      dados.campos_excluidos_score = [...CAMPOS_EXCLUIDOS_SCORE_DEFAULT, ...extras];
+    }
+    return null;
+  }
 
   fastify.post('/people/api/vagas', { preHandler: fastify.authenticate }, async (request, reply) => {
     const dados = request.body || {};
-    const faltando = CAMPOS_VAGA_OBRIGATORIOS.filter((campo) => !dados[campo]);
-    if (faltando.length) {
-      return reply.code(400).send({ error: `Campos obrigatórios faltando: ${faltando.join(', ')}` });
+    if (!dados.nome) return reply.code(400).send({ error: 'Nome da vaga é obrigatório' });
+
+    const rascunho = Boolean(dados.rascunho);
+    if (!rascunho) {
+      const faltando = CAMPOS_VAGA_OBRIGATORIOS.filter((campo) => !dados[campo]);
+      if (faltando.length) {
+        return reply.code(400).send({ error: `Campos obrigatórios faltando: ${faltando.join(', ')}` });
+      }
     }
+    const erroValidacao = validarRequisitosVaga(dados);
+    if (erroValidacao) return reply.code(400).send({ error: erroValidacao });
 
     const id = crypto.randomUUID();
-    await pool.query(
-      `insert into vagas (id, tenant_id, codigo, nome, descricao, salario, modalidade, nivel_experiencia, cargo, requisitos, competencias)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [
-        id, request.user.tenantId, dados.codigo || null, dados.nome, dados.descricao,
-        dados.salario || null, dados.modalidade || null, dados.nivel_experiencia,
-        dados.cargo, dados.requisitos, dados.competencias,
-      ]
-    );
+    const camposOpcionais = ['pesos', 'requisitos_estruturados', 'limites', 'campos_excluidos_score'].filter((c) => dados[c] !== undefined);
+    const colunas = ['id', 'tenant_id', 'codigo', 'nome', 'descricao', 'salario', 'modalidade', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias', 'status', ...camposOpcionais];
+    const valoresBase = [
+      id, request.user.tenantId, dados.codigo || null, dados.nome, dados.descricao || null,
+      dados.salario || null, dados.modalidade || null, dados.nivel_experiencia || null,
+      dados.cargo || null, dados.requisitos || null, dados.competencias || null,
+      rascunho ? 'rascunho' : 'nova',
+    ];
+    const valoresOpcionais = camposOpcionais.map((c) => JSON.stringify(dados[c]));
+    const placeholders = colunas.map((_, i) => `$${i + 1}`).join(', ');
+    await pool.query(`insert into vagas (${colunas.join(', ')}) values (${placeholders})`, [...valoresBase, ...valoresOpcionais]);
     return reply.code(201).send({ id });
   });
 
@@ -270,9 +333,11 @@ async function build() {
     if (!campos.length) {
       return reply.code(400).send({ error: 'Nenhum campo válido para atualizar' });
     }
-    if (dados.status && !['nova', 'em_andamento', 'pausada', 'encerrada'].includes(dados.status)) {
+    if (dados.status && !STATUS_VAGA_VALIDOS.includes(dados.status)) {
       return reply.code(400).send({ error: 'Status inválido' });
     }
+    const erroValidacao = validarRequisitosVaga(dados);
+    if (erroValidacao) return reply.code(400).send({ error: erroValidacao });
 
     const sets = campos.map((campo, i) => `${campo} = $${i + 3}`).join(', ');
     const valores = campos.map((campo) => (CAMPOS_VAGA_JSONB.includes(campo) ? JSON.stringify(dados[campo]) : dados[campo]));
@@ -303,7 +368,8 @@ async function build() {
   // a candidatura em si não guarda mais identidade (ver nota 2026-08-28).
   fastify.get('/people/api/candidaturas', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      `select c.id, p.nome, p.email, p.telefone_e164 as whatsapp, c.status, c.criado_em, v.nome as vaga_nome
+      `select c.id, c.candidato_id, c.vaga_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.anonimizado_em,
+              c.status, c.criado_em, v.nome as vaga_nome, v.status as vaga_status
        from candidaturas c
        join candidatos p on p.id = c.candidato_id
        join vagas v on v.id = c.vaga_id
@@ -316,7 +382,7 @@ async function build() {
 
   fastify.get('/people/api/candidaturas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query(
-      `select c.id, c.candidato_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.linkedin,
+      `select c.id, c.candidato_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.linkedin, p.anonimizado_em,
               c.status, c.etapa_id, c.vaga_id, c.avaliacao_id, c.score, c.pesos_snapshot,
               c.motivo_reprovacao, c.origem, c.curriculo_nome, c.curriculo_tipo, c.criado_em, v.nome as vaga_nome
        from candidaturas c
@@ -456,17 +522,51 @@ async function build() {
     return reply.code(201).send({ id: resultado.candidatura.id, reaproveitada: resultado.reaproveitada });
   });
 
-  // LGPD: anonimiza a pessoa (nome/e-mail/telefone/linkedin removidos),
-  // preserva candidaturas e avaliações como agregados — não é uma exclusão
-  // física, é o que sustenta o direito de exclusão sem apagar histórico
-  // que a conta ainda precisa (relatórios, funil, auditoria).
+  // Mascara a pessoa (nome/e-mail/telefone truncados, LinkedIn removido),
+  // preserva candidaturas e avaliações como agregados. Reversível a pedido
+  // do Bruno (2026-08-28) — o valor original fica em `dados_originais`.
+  // Nota: por ser reversível, isto é pseudonimização, não anonimização —
+  // deixou de sustentar sozinho a exceção da LGPD Art. 12 (dado
+  // verdadeiramente anonimizado sai do escopo da lei); o dado seguem
+  // sendo dado pessoal enquanto `dados_originais` existir.
   fastify.post('/people/api/candidatos/:id/anonimizar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: atuais } = await pool.query(
+      'select nome, email, telefone_e164, linkedin from candidatos where id = $1 and tenant_id = $2',
+      [request.params.id, request.user.tenantId]
+    );
+    const original = atuais[0];
+    if (!original) return reply.code(404).send({ error: 'Candidato não encontrado' });
+
+    await pool.query(
+      `update candidatos set nome = $3, email = $4, telefone_e164 = $5, linkedin = null,
+              anonimizado_em = now(), dados_originais = $6
+       where id = $1 and tenant_id = $2`,
+      [
+        request.params.id, request.user.tenantId,
+        mascararNome(original.nome),
+        original.email ? mascararEmail(original.email) : null,
+        original.telefone_e164 ? mascararTelefone(original.telefone_e164) : null,
+        JSON.stringify(original),
+      ]
+    );
+    return { ok: true };
+  });
+
+  fastify.post('/people/api/candidatos/:id/reverter-anonimizacao', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query(
-      `update candidatos set nome = '[removido]', email = null, telefone_e164 = null, linkedin = null, anonimizado_em = now()
-       where id = $1 and tenant_id = $2 returning id`,
+      'select dados_originais from candidatos where id = $1 and tenant_id = $2',
       [request.params.id, request.user.tenantId]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Candidato não encontrado' });
+    const original = rows[0].dados_originais;
+    if (!original) return reply.code(409).send({ error: 'Este candidato não está mascarado' });
+
+    await pool.query(
+      `update candidatos set nome = $3, email = $4, telefone_e164 = $5, linkedin = $6,
+              anonimizado_em = null, dados_originais = null
+       where id = $1 and tenant_id = $2`,
+      [request.params.id, request.user.tenantId, original.nome, original.email, original.telefone_e164, original.linkedin]
+    );
     return { ok: true };
   });
 
@@ -699,7 +799,7 @@ async function build() {
       [request.params.id]
     );
     const vaga = rows[0];
-    if (!vaga || vaga.status === 'encerrada') {
+    if (!vaga || vaga.status === 'encerrada' || vaga.status === 'rascunho') {
       return reply.code(404).send({ error: 'Vaga não encontrada ou encerrada' });
     }
     return vaga;
@@ -708,7 +808,7 @@ async function build() {
   fastify.post('/people/api/vaga-publica/:id/candidatar', async (request, reply) => {
     const { rows: vagaRows } = await pool.query("select id, tenant_id, status from vagas where id = $1", [request.params.id]);
     const vaga = vagaRows[0];
-    if (!vaga || vaga.status === 'encerrada') {
+    if (!vaga || vaga.status === 'encerrada' || vaga.status === 'rascunho') {
       return reply.code(404).send({ error: 'Vaga não encontrada ou encerrada' });
     }
 

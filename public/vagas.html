@@ -15,6 +15,10 @@
   .candidaturas-lista .item { display:flex; justify-content:space-between; align-items:center; gap:12px;
     padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
   .candidaturas-lista .item:last-child { border-bottom:none; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chips .badge { display:inline-flex; align-items:center; gap:2px; }
+  .linha-requisito { display:grid; grid-template-columns:2fr 1fr 1fr 80px 90px 28px; gap:8px; align-items:center; margin-bottom:8px; }
+  @media(max-width:700px) { .linha-requisito { grid-template-columns:1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -98,9 +102,14 @@
 
   <script src="/people/shell.js"></script>
   <script>
-    const STATUS_CLASSE = { nova: 'destaque', em_andamento: 'aviso', pausada: 'aviso', encerrada: 'neutro' };
-    const STATUS_LABEL = { nova: 'Nova', em_andamento: 'Em andamento', pausada: 'Pausada', encerrada: 'Encerrada' };
+    const STATUS_CLASSE = { rascunho: 'neutro', nova: 'destaque', em_andamento: 'aviso', pausada: 'aviso', encerrada: 'neutro' };
+    const STATUS_LABEL = { rascunho: 'Rascunho', nova: 'Nova', em_andamento: 'Em andamento', pausada: 'Pausada', encerrada: 'Encerrada' };
     const CAMPOS = ['codigo', 'nome', 'descricao', 'salario', 'modalidade', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
+    const CAMPOS_OBRIGATORIOS = ['nome', 'descricao', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
+    const CAMPOS_EXCLUIDOS_DEFAULT = ['idade', 'ano_formatura', 'genero', 'estado_civil', 'nome', 'foto', 'endereco_completo', 'gaps_temporais_nao_justificados'];
+
+    let formRequisitos = [];
+    let formCamposExtras = [];
 
     async function carregarVagas() {
       const res = await apiFetch('/people/api/vagas');
@@ -108,12 +117,13 @@
       const corpo = document.getElementById('tabela-vagas');
       corpo.innerHTML = vagas.map((v) => `
         <tr>
-          <td>${v.nome}</td>
-          <td>${v.cargo}</td>
+          <td>${v.status === 'rascunho' ? '<span class="badge neutro" style="margin-right:6px">Rascunho</span>' : ''}${v.nome}</td>
+          <td>${v.cargo || '—'}</td>
           <td><span class="badge ${STATUS_CLASSE[v.status]}">${STATUS_LABEL[v.status]}</span></td>
           <td>${new Date(v.criado_em).toLocaleDateString('pt-BR')}</td>
           <td>
             <a class="acao" href="#" data-editar="${v.id}">Editar</a>
+            <a class="acao" href="#" data-duplicar="${v.id}">Duplicar</a>
             <a class="acao" href="#" data-candidaturas="${v.id}" data-nome="${v.nome}">Ver candidaturas</a>
             <a class="acao" href="#" data-link="${v.id}">Copiar link</a>
           </td>
@@ -121,8 +131,11 @@
       `).join('') || '<tr><td colspan="5" class="vazio">Nenhuma vaga cadastrada ainda.</td></tr>';
     }
 
-    function formularioVaga(vaga) {
+    function formularioVaga(vaga, modo) {
       const v = vaga || {};
+      const editando = modo === 'editar';
+      const mostrarAvancado = modo !== 'criar';
+      const limites = v.limites || { max_eliminatorios: 3 };
       return `
         <div class="modal-erro" id="msg-vaga"></div>
         <div class="grid2">
@@ -130,7 +143,7 @@
           <div><label for="nome">Nome da vaga *</label><input id="nome" required value="${v.nome || ''}"></div>
         </div>
         <label for="descricao">Descrição *</label>
-        <textarea id="descricao" required>${v.descricao || ''}</textarea>
+        <textarea id="descricao">${v.descricao || ''}</textarea>
         <div class="grid2">
           <div>
             <label for="salario">Salário</label>
@@ -149,22 +162,25 @@
         <div class="grid2">
           <div>
             <label for="nivel_experiencia">Nível de experiência *</label>
-            <input id="nivel_experiencia" placeholder="Ex: Júnior, Pleno, Sênior" required value="${v.nivel_experiencia || ''}">
+            <input id="nivel_experiencia" placeholder="Ex: Júnior, Pleno, Sênior" value="${v.nivel_experiencia || ''}">
           </div>
-          <div><label for="cargo">Cargo *</label><input id="cargo" required value="${v.cargo || ''}"></div>
+          <div><label for="cargo">Cargo *</label><input id="cargo" value="${v.cargo || ''}"></div>
         </div>
         <label for="requisitos">Requisitos *</label>
-        <textarea id="requisitos" required>${v.requisitos || ''}</textarea>
+        <textarea id="requisitos">${v.requisitos || ''}</textarea>
         <label for="competencias">Competências *</label>
-        <textarea id="competencias" required>${v.competencias || ''}</textarea>
-        ${vaga ? `
+        <textarea id="competencias">${v.competencias || ''}</textarea>
+        ${editando ? `
           <label for="status">Status</label>
           <select id="status">
+            <option value="rascunho" ${v.status === 'rascunho' ? 'selected' : ''}>Rascunho</option>
             <option value="nova" ${v.status === 'nova' ? 'selected' : ''}>Nova</option>
             <option value="em_andamento" ${v.status === 'em_andamento' ? 'selected' : ''}>Em andamento</option>
             <option value="pausada" ${v.status === 'pausada' ? 'selected' : ''}>Pausada</option>
             <option value="encerrada" ${v.status === 'encerrada' ? 'selected' : ''}>Encerrada</option>
           </select>
+        ` : ''}
+        ${mostrarAvancado ? `
           <label>Pesos do score de aderência</label>
           <p class="campo-ajuda">Usados quando a psicóloga lança nota (0-100) em cada componente da candidatura — o "geral" é a média ponderada por esses pesos.</p>
           <div class="grid2" style="grid-template-columns:1fr 1fr 1fr">
@@ -172,49 +188,196 @@
             <div><label for="peso-experiencia">Experiência</label><input id="peso-experiencia" type="number" step="0.05" min="0" max="1" value="${(v.pesos && v.pesos.experiencia) ?? 0.4}"></div>
             <div><label for="peso-entrevista">Entrevista</label><input id="peso-entrevista" type="number" step="0.05" min="0" max="1" value="${(v.pesos && v.pesos.entrevista) ?? 0.2}"></div>
           </div>
+
+          <label>Requisitos estruturados (motor de match)</label>
+          <p class="campo-ajuda">Fundação pro cálculo automático de aderência — hoje só grava os dados; o cálculo em si ainda é manual (lançar score no candidato).</p>
+          <div id="lista-requisitos-estruturados"></div>
+          <button type="button" class="btn-secundario" id="btn-add-requisito" style="margin:4px 0 8px">+ Adicionar requisito</button>
+
+          <label for="max-eliminatorios">Máximo de requisitos eliminatórios</label>
+          <input id="max-eliminatorios" type="number" min="1" max="10" value="${limites.max_eliminatorios ?? 3}" style="max-width:120px">
+
+          <label>Campos excluídos do score</label>
+          <p class="campo-ajuda">Nunca entram no cálculo de aderência — a lista padrão não pode ser removida, só ampliada.</p>
+          <div id="lista-campos-excluidos" class="chips"></div>
+          <div class="campo-arquivo" style="margin-top:8px">
+            <input id="novo-campo-excluido" placeholder="Ex: nome_da_faculdade" style="flex:1">
+            <button type="button" class="btn-secundario" id="btn-add-campo-excluido">Adicionar</button>
+          </div>
         ` : ''}
         <div class="modal-acoes">
           <button type="button" class="btn-secundario" id="btn-cancelar-vaga">Cancelar</button>
-          <button type="submit" class="btn">${vaga ? 'Salvar alterações' : 'Criar vaga'}</button>
+          <button type="submit" class="btn">${editando ? 'Salvar alterações' : 'Criar vaga'}</button>
         </div>
       `;
     }
 
-    function abrirModalVaga(vaga) {
-      abrirModal(
-        `<h3>${vaga ? `Editando: ${vaga.nome}` : 'Nova vaga'}</h3>`,
-        `<form id="form-vaga">${formularioVaga(vaga)}</form>`,
-        'modal-card-larga'
-      );
+    function renderizarRequisitos() {
+      const el = document.getElementById('lista-requisitos-estruturados');
+      el.innerHTML = formRequisitos.map((r, i) => `
+        <div class="linha-requisito" data-i="${i}">
+          <input class="req-capacidade" placeholder="Capacidade (ex: Controladoria)" value="${r.capacidade || ''}">
+          <select class="req-categoria">
+            <option value="tecnica" ${r.categoria === 'tecnica' ? 'selected' : ''}>Técnica</option>
+            <option value="experiencia" ${r.categoria === 'experiencia' ? 'selected' : ''}>Experiência</option>
+            <option value="idioma" ${r.categoria === 'idioma' ? 'selected' : ''}>Idioma</option>
+            <option value="comportamental" ${r.categoria === 'comportamental' ? 'selected' : ''}>Comportamental</option>
+          </select>
+          <select class="req-nivel">
+            <option value="eliminatorio" ${r.nivel_exigido === 'eliminatorio' ? 'selected' : ''}>Eliminatório</option>
+            <option value="importante" ${r.nivel_exigido === 'importante' ? 'selected' : ''}>Importante</option>
+            <option value="desejavel" ${r.nivel_exigido === 'desejavel' ? 'selected' : ''}>Desejável</option>
+          </select>
+          <input class="req-peso" type="number" step="0.1" min="0" max="1" value="${r.peso ?? 0.5}" title="Peso">
+          <input class="req-anos" type="number" min="0" step="1" placeholder="Anos mín." value="${r.anos_minimos ?? ''}" title="Anos mínimos (só experiência)">
+          <button type="button" class="btn-remover-requisito" data-i="${i}" title="Remover" style="background:transparent;color:var(--danger);padding:0">${icon('x', 16)}</button>
+        </div>
+      `).join('') || '<p class="campo-ajuda">Nenhum requisito estruturado ainda.</p>';
 
-      document.getElementById('btn-cancelar-vaga').addEventListener('click', fecharModal);
+      el.querySelectorAll('.btn-remover-requisito').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          sincronizarRequisitosDoDom();
+          formRequisitos.splice(Number(btn.dataset.i), 1);
+          renderizarRequisitos();
+        });
+      });
+    }
+
+    function sincronizarRequisitosDoDom() {
+      const el = document.getElementById('lista-requisitos-estruturados');
+      if (!el) return;
+      el.querySelectorAll('.linha-requisito').forEach((linha, i) => {
+        formRequisitos[i] = {
+          ...formRequisitos[i],
+          capacidade: linha.querySelector('.req-capacidade').value,
+          categoria: linha.querySelector('.req-categoria').value,
+          nivel_exigido: linha.querySelector('.req-nivel').value,
+          peso: Number(linha.querySelector('.req-peso').value) || 0,
+          anos_minimos: linha.querySelector('.req-anos').value ? Number(linha.querySelector('.req-anos').value) : null,
+        };
+      });
+    }
+
+    function renderizarCamposExcluidos() {
+      const el = document.getElementById('lista-campos-excluidos');
+      el.innerHTML = [
+        ...CAMPOS_EXCLUIDOS_DEFAULT.map((c) => `<span class="badge neutro" title="Padrão fixo, não pode ser removido">${c}</span>`),
+        ...formCamposExtras.map((c, i) => `<span class="badge aviso">${c} <button type="button" class="btn-remover-campo-excluido" data-i="${i}" style="background:transparent;border:none;color:inherit;cursor:pointer;padding:0 0 0 4px">×</button></span>`),
+      ].join(' ');
+      el.querySelectorAll('.btn-remover-campo-excluido').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          formCamposExtras.splice(Number(btn.dataset.i), 1);
+          renderizarCamposExcluidos();
+        });
+      });
+    }
+
+    function coletarDadosForm() {
+      const dados = {};
+      CAMPOS.forEach((c) => { dados[c] = document.getElementById(c).value; });
+      return dados;
+    }
+
+    function formularioTemAlgumConteudo() {
+      return CAMPOS.some((id) => document.getElementById(id) && document.getElementById(id).value.trim());
+    }
+
+    function formularioEstaCompleto() {
+      return CAMPOS_OBRIGATORIOS.every((id) => document.getElementById(id) && document.getElementById(id).value.trim());
+    }
+
+    async function salvarVaga(modo, vagaOrigem) {
+      const msg = document.getElementById('msg-vaga');
+      msg.textContent = '';
+      const dados = coletarDadosForm();
+
+      if (modo === 'editar') dados.status = document.getElementById('status').value;
+      if (modo !== 'criar') {
+        dados.pesos = {
+          tecnica: Number(document.getElementById('peso-tecnica').value) || 0,
+          experiencia: Number(document.getElementById('peso-experiencia').value) || 0,
+          entrevista: Number(document.getElementById('peso-entrevista').value) || 0,
+        };
+        sincronizarRequisitosDoDom();
+        dados.requisitos_estruturados = formRequisitos;
+        dados.limites = { max_eliminatorios: Number(document.getElementById('max-eliminatorios').value) || 3 };
+        dados.campos_excluidos_score = [...CAMPOS_EXCLUIDOS_DEFAULT, ...formCamposExtras];
+      }
+
+      try {
+        const res = modo === 'editar'
+          ? await apiFetch(`/people/api/vagas/${vagaOrigem.id}`, { method: 'PATCH', body: JSON.stringify(dados) })
+          : await apiFetch('/people/api/vagas', { method: 'POST', body: JSON.stringify(dados) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha ao salvar vaga');
+        fecharModal();
+        carregarVagas();
+      } catch (err) {
+        msg.textContent = err.message;
+      }
+    }
+
+    function tentarFecharVaga(modo) {
+      if (modo === 'editar' || !formularioTemAlgumConteudo() || formularioEstaCompleto()) { fecharModal(); return; }
+      confirmarSalvarRascunho(coletarDadosForm());
+    }
+
+    function confirmarSalvarRascunho(dados) {
+      abrirModal(
+        '<h3>Deseja salvar como rascunho?</h3>',
+        `
+          <p class="modal-texto">A vaga ainda não está completa. Pode salvar o que já foi preenchido como rascunho e continuar depois, ou descartar.</p>
+          <div class="modal-erro" id="msg-rascunho"></div>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="nao-salvar-rascunho">Não, descartar</button>
+            <button type="button" class="btn" id="sim-salvar-rascunho">Sim, salvar rascunho</button>
+          </div>
+        `
+      );
+      document.getElementById('nao-salvar-rascunho').addEventListener('click', fecharModal);
+      document.getElementById('sim-salvar-rascunho').addEventListener('click', async () => {
+        if (!dados.nome || !dados.nome.trim()) {
+          document.getElementById('msg-rascunho').textContent = 'Dê ao menos um nome pra vaga antes de salvar como rascunho.';
+          return;
+        }
+        dados.rascunho = true;
+        const res = await apiFetch('/people/api/vagas', { method: 'POST', body: JSON.stringify(dados) });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById('msg-rascunho').textContent = data.error || 'Falha ao salvar rascunho'; return; }
+        fecharModal();
+        carregarVagas();
+      });
+    }
+
+    function abrirModalVaga(vaga, modo) {
+      formRequisitos = (vaga && vaga.requisitos_estruturados) ? JSON.parse(JSON.stringify(vaga.requisitos_estruturados)) : [];
+      formCamposExtras = (vaga && vaga.campos_excluidos_score) ? vaga.campos_excluidos_score.filter((c) => !CAMPOS_EXCLUIDOS_DEFAULT.includes(c)) : [];
+
+      const titulo = modo === 'editar' ? `Editando: ${vaga.nome}` : modo === 'duplicar' ? `Duplicar vaga: ${vaga.nome || vaga.nomeOriginal || ''}` : 'Nova vaga';
+      abrirModal(`<h3>${titulo}</h3>`, `<form id="form-vaga">${formularioVaga(vaga, modo)}</form>`, 'modal-card-larga');
+
+      if (modo !== 'criar') {
+        renderizarRequisitos();
+        renderizarCamposExcluidos();
+        document.getElementById('btn-add-requisito').addEventListener('click', () => {
+          sincronizarRequisitosDoDom();
+          formRequisitos.push({ capacidade: '', categoria: 'tecnica', nivel_exigido: 'importante', peso: 0.5, anos_minimos: null });
+          renderizarRequisitos();
+        });
+        document.getElementById('btn-add-campo-excluido').addEventListener('click', () => {
+          const input = document.getElementById('novo-campo-excluido');
+          const valor = input.value.trim();
+          if (!valor || CAMPOS_EXCLUIDOS_DEFAULT.includes(valor) || formCamposExtras.includes(valor)) { input.value = ''; return; }
+          formCamposExtras.push(valor);
+          input.value = '';
+          renderizarCamposExcluidos();
+        });
+      }
+
+      document.getElementById('btn-cancelar-vaga').addEventListener('click', () => tentarFecharVaga(modo));
       document.getElementById('form-vaga').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const msg = document.getElementById('msg-vaga');
-        msg.textContent = '';
-        const dados = {};
-        CAMPOS.forEach((c) => { dados[c] = document.getElementById(c).value; });
-
-        try {
-          let res;
-          if (vaga) {
-            dados.status = document.getElementById('status').value;
-            dados.pesos = {
-              tecnica: Number(document.getElementById('peso-tecnica').value) || 0,
-              experiencia: Number(document.getElementById('peso-experiencia').value) || 0,
-              entrevista: Number(document.getElementById('peso-entrevista').value) || 0,
-            };
-            res = await apiFetch(`/people/api/vagas/${vaga.id}`, { method: 'PATCH', body: JSON.stringify(dados) });
-          } else {
-            res = await apiFetch('/people/api/vagas', { method: 'POST', body: JSON.stringify(dados) });
-          }
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Falha ao salvar vaga');
-          fecharModal();
-          carregarVagas();
-        } catch (err) {
-          msg.textContent = err.message;
-        }
+        await salvarVaga(modo, vaga);
       });
     }
 
@@ -222,7 +385,14 @@
       const res = await apiFetch(`/people/api/vagas/${id}`);
       const vaga = await res.json();
       if (!res.ok) { alert(vaga.error || 'Falha ao carregar vaga'); return; }
-      abrirModalVaga(vaga);
+      abrirModalVaga(vaga, 'editar');
+    }
+
+    async function abrirModalDuplicar(id) {
+      const res = await apiFetch(`/people/api/vagas/${id}`);
+      const vaga = await res.json();
+      if (!res.ok) { alert(vaga.error || 'Falha ao carregar vaga'); return; }
+      abrirModalVaga({ ...vaga, nomeOriginal: vaga.nome, nome: '' }, 'duplicar');
     }
 
     async function abrirModalCandidaturas(id, nome) {
@@ -237,11 +407,14 @@
       `).join('') || '<div class="vazio">Nenhuma candidatura recebida ainda.</div>';
     }
 
-    document.getElementById('btn-nova-vaga').addEventListener('click', () => abrirModalVaga(null));
+    document.getElementById('btn-nova-vaga').addEventListener('click', () => abrirModalVaga(null, 'criar'));
 
     document.getElementById('tabela-vagas').addEventListener('click', (e) => {
       const editar = e.target.closest('[data-editar]');
       if (editar) { e.preventDefault(); abrirModalEditar(editar.dataset.editar); return; }
+
+      const duplicar = e.target.closest('[data-duplicar]');
+      if (duplicar) { e.preventDefault(); abrirModalDuplicar(duplicar.dataset.duplicar); return; }
 
       const candidaturas = e.target.closest('[data-candidaturas]');
       if (candidaturas) { e.preventDefault(); abrirModalCandidaturas(candidaturas.dataset.candidaturas, candidaturas.dataset.nome); return; }

@@ -149,20 +149,43 @@
       return etapa ? etapa.nome : 'Nova';
     }
 
+    // Uma pessoa pode ter várias candidaturas simultâneas — a listagem
+    // mostra 1 linha por pessoa (não por candidatura), com a vaga mais
+    // antiga entre as ainda em andamento (vaga encerrada não conta pra
+    // essa escolha, mas a candidatura em si nunca some da base). Se a
+    // pessoa concorre a mais de uma vaga ativa ao mesmo tempo, mostra um
+    // badge "+N" — o detalhe de cada candidatura fica a 1 clique, sem
+    // duplicar linha na tabela.
+    function agruparPorPessoa() {
+      const porPessoa = new Map();
+      candidaturas.forEach((c) => {
+        if (!porPessoa.has(c.candidato_id)) porPessoa.set(c.candidato_id, []);
+        porPessoa.get(c.candidato_id).push(c);
+      });
+      return Array.from(porPessoa.values()).map((lista) => {
+        const porIdadeAsc = [...lista].sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em));
+        const ativas = porIdadeAsc.filter((c) => c.vaga_status !== 'encerrada');
+        const principal = ativas[0] || porIdadeAsc[0];
+        const maisRecente = [...lista].sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))[0];
+        return { principal, extras: Math.max(ativas.length - 1, 0), ordenacao: maisRecente.criado_em };
+      }).sort((a, b) => new Date(b.ordenacao) - new Date(a.ordenacao));
+    }
+
     function renderizarLista() {
       const container = document.getElementById('lista-container');
       const layout = document.getElementById('candidatos-layout');
       layout.classList.toggle('selecionado', Boolean(idSelecionado));
 
       if (!idSelecionado) {
+        const grupos = agruparPorPessoa();
         container.innerHTML = `
           <table>
             <thead><tr><th>Nome</th><th>Vaga</th><th>Contato</th><th>Etapa</th><th>Candidatou-se em</th></tr></thead>
             <tbody>
-              ${candidaturas.map((c) => `
+              ${grupos.map(({ principal: c, extras }) => `
                 <tr class="linha-candidatura" data-id="${c.id}" style="cursor:pointer">
                   <td>${c.nome}</td>
-                  <td>${c.vaga_nome}</td>
+                  <td>${extras > 0 ? `<span class="badge neutro" title="Concorrendo a mais ${extras} vaga(s) ao mesmo tempo">+${extras}</span> ` : ''}${c.vaga_nome}${c.vaga_status === 'encerrada' ? ' <span class="badge neutro">Encerrada</span>' : ''}</td>
                   <td>${c.whatsapp} · ${c.email}</td>
                   <td><span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span></td>
                   <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
@@ -170,7 +193,7 @@
               `).join('') || ''}
             </tbody>
           </table>
-          ${!candidaturas.length ? '<div class="vazio" style="padding:16px">Nenhuma candidatura recebida ainda.</div>' : ''}
+          ${!grupos.length ? '<div class="vazio" style="padding:16px">Nenhuma candidatura recebida ainda.</div>' : ''}
         `;
       } else {
         container.innerHTML = `
@@ -209,6 +232,8 @@
       url.searchParams.delete('id');
       history.pushState({}, '', url);
       document.getElementById('detalhe-container').hidden = true;
+      aplicarSidebarOculta(false);
+      localStorage.setItem('people_sidebar_oculta', '0');
       renderizarLista();
     }
 
@@ -221,6 +246,11 @@
       if (!res.ok) { detalheEl.innerHTML = '<div class="vazio" style="padding:20px">Candidatura não encontrada.</div>'; return; }
       const c = await res.json();
 
+      // Mesma pessoa pode ter mais de uma candidatura simultânea — a
+      // listagem principal comprime isso numa linha só (badge +N), aqui
+      // no detalhe é onde as outras ficam acessíveis de fato.
+      const irmas = candidaturas.filter((x) => x.candidato_id === c.candidato_id);
+
       detalheEl.innerHTML = `
         <div class="detalhe-cabecalho">
           <div>
@@ -231,7 +261,12 @@
               <a class="acao" href="#" id="btn-editar-score" style="margin-left:6px">${c.score ? 'Editar score' : 'Lançar score'}</a><br>
               ${c.whatsapp} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}<br>
               <a class="acao" href="#" id="btn-banco-talentos">Adicionar a outra vaga</a>
-              <a class="acao" href="#" id="btn-anonimizar" style="color:var(--danger)">Anonimizar (LGPD)</a>
+              ${c.anonimizado_em
+                ? '<a class="acao" href="#" id="btn-reverter-anonimizar">Reverter mascaramento</a>'
+                : '<a class="acao" href="#" id="btn-anonimizar" style="color:var(--danger)">Anonimizar</a>'}
+              ${irmas.length > 1 ? `
+                <div style="margin-top:6px">Outras candidaturas: ${irmas.map((x) => `<a href="#" class="acao candidatura-irma" data-id="${x.id}" style="margin-right:10px${x.id === c.id ? ';font-weight:700;color:var(--text);pointer-events:none' : ''}">${x.vaga_nome}${x.vaga_status === 'encerrada' ? ' (encerrada)' : ''}</a>`).join('')}</div>
+              ` : ''}
             </div>
           </div>
           <button class="detalhe-fechar" id="btn-fechar-detalhe" type="button" aria-label="Fechar">${icon('x', 16)}</button>
@@ -253,7 +288,13 @@
       document.getElementById('btn-proxima-etapa').addEventListener('click', () => avancarEtapa(c));
       document.getElementById('btn-editar-score').addEventListener('click', (e) => { e.preventDefault(); formularioScore(c); });
       document.getElementById('btn-banco-talentos').addEventListener('click', (e) => { e.preventDefault(); formularioBancoDeTalentos(c); });
-      document.getElementById('btn-anonimizar').addEventListener('click', (e) => { e.preventDefault(); confirmarAnonimizar(c); });
+      const btnAnonimizar = document.getElementById('btn-anonimizar');
+      if (btnAnonimizar) btnAnonimizar.addEventListener('click', (e) => { e.preventDefault(); confirmarAnonimizar(c); });
+      const btnReverter = document.getElementById('btn-reverter-anonimizar');
+      if (btnReverter) btnReverter.addEventListener('click', (e) => { e.preventDefault(); reverterAnonimizar(c); });
+      detalheEl.querySelectorAll('.candidatura-irma').forEach((el) => {
+        el.addEventListener('click', (e) => { e.preventDefault(); if (el.dataset.id !== c.id) selecionar(el.dataset.id); });
+      });
 
       carregarPreview(c);
     }
@@ -332,7 +373,7 @@
       abrirModal(
         '<h3>Anonimizar candidato?</h3>',
         `
-          <p class="modal-texto">Remove nome, e-mail, telefone e LinkedIn de "${c.nome}" (LGPD). As candidaturas e avaliações continuam existindo como histórico/agregado, sem identificar a pessoa. Essa ação não pode ser desfeita.</p>
+          <p class="modal-texto">Mascara nome, e-mail e telefone de "${c.nome}" e remove o LinkedIn. Dá pra reverter depois, quando precisar. Por ser reversível, isto não é anonimização legal (LGPD Art. 12) — o dado original fica guardado e continua sendo dado pessoal enquanto a reversão for possível.</p>
           <div class="modal-acoes">
             <button type="button" class="btn-secundario" id="cancelar-anonimizar">Cancelar</button>
             <button type="button" class="btn-perigo" id="confirmar-anonimizar">Anonimizar</button>
@@ -343,9 +384,30 @@
       document.getElementById('confirmar-anonimizar').addEventListener('click', async () => {
         fecharModal();
         await apiFetch(`/people/api/candidatos/${c.candidato_id}/anonimizar`, { method: 'POST' });
-        fecharDetalhe();
         await carregarListas();
         renderizarLista();
+        renderizarDetalhe();
+      });
+    }
+
+    function reverterAnonimizar(c) {
+      abrirModal(
+        '<h3>Reverter mascaramento?</h3>',
+        `
+          <p class="modal-texto">Restaura nome, e-mail, telefone e LinkedIn originais de "${c.nome}".</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-reverter">Cancelar</button>
+            <button type="button" class="btn" id="confirmar-reverter">Reverter</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-reverter').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-reverter').addEventListener('click', async () => {
+        fecharModal();
+        await apiFetch(`/people/api/candidatos/${c.candidato_id}/reverter-anonimizacao`, { method: 'POST' });
+        await carregarListas();
+        renderizarLista();
+        renderizarDetalhe();
       });
     }
 
