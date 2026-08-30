@@ -98,10 +98,9 @@ async function build() {
     }
     const { tenantId } = await acessoRes.json();
 
-    // Cria a linha de assinatura (trial de 14 dias a partir de agora) no
-    // primeiro login do tenant — não existe um momento de "ativação do
-    // módulo" que o People enxergue, então o trial nasce aqui mesmo.
-    // ON CONFLICT DO NOTHING: idempotente, login seguinte não reseta o trial.
+    // Cria a linha de assinatura (status 'sem_assinatura' por padrão — o
+    // People não tem teste grátis, ver migration 014) no primeiro login do
+    // tenant. ON CONFLICT DO NOTHING: idempotente, login seguinte não mexe.
     await pool.query('insert into assinaturas (tenant_id) values ($1) on conflict (tenant_id) do nothing', [tenantId]);
 
     const token = fastify.jwt.sign({ tenantId, email, nome }, { expiresIn: '12h' });
@@ -120,23 +119,11 @@ async function build() {
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR',
     'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
   ];
-  const TRIAL_DIAS_PAGAMENTO = 14;
-
-  function proximaCobrancaRespeitandoTrial(assinatura) {
-    const trialFim = new Date(new Date(assinatura.trial_iniciado_em).getTime() + TRIAL_DIAS_PAGAMENTO * 24 * 60 * 60 * 1000);
-    if (trialFim.getTime() > Date.now()) return trialFim.toISOString().slice(0, 10);
-    return new Date().toISOString().slice(0, 10);
-  }
-
   function montarResumoPagamento(a) {
     if (!a) return null;
-    const trialFim = new Date(new Date(a.trial_iniciado_em).getTime() + TRIAL_DIAS_PAGAMENTO * 24 * 60 * 60 * 1000);
-    const trialAtivo = a.status === 'trial' && trialFim.getTime() > Date.now();
     return {
       plano: a.plano,
       status: a.status,
-      trial_ativo: trialAtivo,
-      trial_fim: trialFim.toISOString().slice(0, 10),
       asaas_meio_pagamento: a.asaas_meio_pagamento,
       asaas_cartao_final: a.asaas_cartao_final,
       cpf_cnpj: a.cpf_cnpj,
@@ -291,7 +278,7 @@ async function build() {
       } else {
         const subscription = await asaas.criarSubscription({
           customerId: customer.id, billingType, valor: Number(planoInfo.preco_mensal), planoNome: planoInfo.nome,
-          nextDueDate: proximaCobrancaRespeitandoTrial(assinatura), creditCardToken, tenantId,
+          nextDueDate: new Date().toISOString().slice(0, 10), creditCardToken, tenantId,
         });
         subscriptionId = subscription.id;
       }
@@ -300,9 +287,11 @@ async function build() {
       return reply.code(400).send({ error: 'Não foi possível processar o pagamento agora. Tente novamente em instantes.' });
     }
 
-    const trialFim = new Date(new Date(assinatura.trial_iniciado_em).getTime() + TRIAL_DIAS_PAGAMENTO * 24 * 60 * 60 * 1000);
-    const trialAindaAtivo = assinatura.status === 'trial' && trialFim.getTime() > Date.now();
-    const novoStatus = trialAindaAtivo ? 'trial' : 'ativo';
+    // Sem trial — a assinatura fica 'ativo' assim que a Subscription é
+    // criada na Asaas (cobrança já sai pra hoje, ver nextDueDate acima). O
+    // webhook corrige pra 'inadimplente'/'suspenso' depois se a cobrança
+    // de fato falhar — mesmo padrão otimista que o Studio já usa.
+    const novoStatus = 'ativo';
 
     const { rows: atualizado } = await pool.query(
       `update assinaturas set

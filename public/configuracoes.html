@@ -112,8 +112,8 @@
 
   <script src="/people/shell.js"></script>
   <script>
-    const STATUS_ASSINATURA_CLASSE = { trial: 'neutro', ativo: 'sucesso', inadimplente: 'aviso', suspenso: 'perigo', cancelado: 'neutro' };
-    const STATUS_ASSINATURA_LABEL = { trial: 'Período de teste', ativo: 'Ativa', inadimplente: 'Pagamento pendente', suspenso: 'Suspensa', cancelado: 'Cancelada' };
+    const STATUS_ASSINATURA_CLASSE = { sem_assinatura: 'neutro', ativo: 'sucesso', inadimplente: 'aviso', suspenso: 'perigo', cancelado: 'neutro' };
+    const STATUS_ASSINATURA_LABEL = { sem_assinatura: 'Sem assinatura', ativo: 'Ativa', inadimplente: 'Pagamento pendente', suspenso: 'Suspensa', cancelado: 'Cancelada' };
 
     let pagamento = null;
     let planos = [];
@@ -148,8 +148,7 @@
       container.innerHTML = `
         <h3 style="margin:0 0 10px;font-family:var(--font-display);font-size:16px;color:var(--text)">Assinatura e cobrança</h3>
         <p style="font-size:13.5px;color:var(--muted-strong);line-height:1.7;margin:0 0 4px">
-          Status: <span class="badge ${STATUS_ASSINATURA_CLASSE[pagamento.status]}">${STATUS_ASSINATURA_LABEL[pagamento.status]}</span>
-          ${pagamento.trial_ativo ? ` · Teste grátis até ${formatarData(pagamento.trial_fim)}` : ''}<br>
+          Status: <span class="badge ${STATUS_ASSINATURA_CLASSE[pagamento.status]}">${STATUS_ASSINATURA_LABEL[pagamento.status]}</span><br>
           Plano atual: <strong>${planoAtual ? planoAtual.nome : 'Nenhum ainda'}</strong>
           ${pagamento.asaas_meio_pagamento ? ` · ${pagamento.asaas_meio_pagamento === 'cartao' ? `Cartão final ${pagamento.asaas_cartao_final}` : 'Pix'}` : ''}
         </p>
@@ -165,7 +164,7 @@
           </div>
         </div>
         <p style="font-size:12px;color:var(--muted);margin:8px 0 0">
-          Avaliações, candidatos, relatórios e resumos por IA são ilimitados em todos os planos. Cartão ou Pix, cobrança mensal recorrente — trial de 14 dias sem cartão.
+          Avaliações, candidatos, relatórios e resumos por IA são ilimitados em todos os planos. Cartão ou Pix, cobrança mensal recorrente.
         </p>
 
         ${pagamento.tem_assinatura && pagamento.status !== 'cancelado' ? `
@@ -255,7 +254,7 @@
         `
           <form id="form-pagamento">
             <div class="modal-erro" id="msg-pagamento"></div>
-            <p class="campo-ajuda">${formatarPreco(plano.preco_mensal)}/mês. ${pagamento.trial_ativo ? `Sem cobrança até o fim do teste grátis (${formatarData(pagamento.trial_fim)}).` : 'Cobrado a partir de hoje.'}</p>
+            <p class="campo-ajuda">${formatarPreco(plano.preco_mensal)}/mês. Cobrado a partir de hoje.</p>
 
             <label>Forma de pagamento</label>
             <div class="grid2" style="margin-bottom:10px">
