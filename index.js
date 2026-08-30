@@ -15,6 +15,8 @@ const { gerarRelatorioPdf } = require('./lib/pdf');
 const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
+const asaas = require('./lib/asaas');
+const planosPeople = require('./lib/planos');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
@@ -96,8 +98,326 @@ async function build() {
     }
     const { tenantId } = await acessoRes.json();
 
+    // Cria a linha de assinatura (trial de 14 dias a partir de agora) no
+    // primeiro login do tenant — não existe um momento de "ativação do
+    // módulo" que o People enxergue, então o trial nasce aqui mesmo.
+    // ON CONFLICT DO NOTHING: idempotente, login seguinte não reseta o trial.
+    await pool.query('insert into assinaturas (tenant_id) values ($1) on conflict (tenant_id) do nothing', [tenantId]);
+
     const token = fastify.jwt.sign({ tenantId, email, nome }, { expiresIn: '12h' });
     return { token, nome };
+  });
+
+  // --- Pagamentos / Asaas (seção 10 da especificação) ---
+  // Preço lido de GET /api/planos/people no Kyvvo principal (admin edita lá,
+  // mesmo lugar que já edita os planos do Studio) — nunca hardcoded aqui.
+  const CARTAO_FINAL_REGEX = /^\d{4}$/;
+  // A Asaas exige CPF (11 dígitos) ou CNPJ (14) do Customer pra emitir
+  // cobrança — mesma exigência descoberta pelo time do Studio ao testar com
+  // uma chave de API real.
+  const CPF_CNPJ_REGEX = /^\d{11}$|^\d{14}$/;
+  const UF_VALIDAS = [
+    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR',
+    'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+  ];
+  const TRIAL_DIAS_PAGAMENTO = 14;
+
+  function proximaCobrancaRespeitandoTrial(assinatura) {
+    const trialFim = new Date(new Date(assinatura.trial_iniciado_em).getTime() + TRIAL_DIAS_PAGAMENTO * 24 * 60 * 60 * 1000);
+    if (trialFim.getTime() > Date.now()) return trialFim.toISOString().slice(0, 10);
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function montarResumoPagamento(a) {
+    if (!a) return null;
+    const trialFim = new Date(new Date(a.trial_iniciado_em).getTime() + TRIAL_DIAS_PAGAMENTO * 24 * 60 * 60 * 1000);
+    const trialAtivo = a.status === 'trial' && trialFim.getTime() > Date.now();
+    return {
+      plano: a.plano,
+      status: a.status,
+      trial_ativo: trialAtivo,
+      trial_fim: trialFim.toISOString().slice(0, 10),
+      asaas_meio_pagamento: a.asaas_meio_pagamento,
+      asaas_cartao_final: a.asaas_cartao_final,
+      cpf_cnpj: a.cpf_cnpj,
+      tem_assinatura: Boolean(a.asaas_subscription_id),
+      cancelado_em: a.cancelado_em,
+      acesso_ate: a.acesso_ate,
+    };
+  }
+
+  fastify.get('/people/api/pagamentos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [request.user.tenantId]);
+    if (!rows[0]) return reply.code(404).send({ error: 'Assinatura não encontrada' });
+    return montarResumoPagamento(rows[0]);
+  });
+
+  fastify.get('/people/api/pagamentos/planos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    try {
+      return await planosPeople.buscarPlanos(KYVVO_APP_URL);
+    } catch (err) {
+      request.log.error(`Falha ao buscar planos do People: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível carregar os planos agora. Tente novamente em instantes.' });
+    }
+  });
+
+  // Orquestra Customer + Subscription no Asaas — cria na primeira vez; se o
+  // tenant já tem assinatura, só troca o meio de pagamento (atualiza, nunca
+  // cancela). Cartão: número/validade/CVV chegam brutos (via HTTPS) e são
+  // tokenizados neste handler, nunca armazenados nem logados — só repassados
+  // à Asaas e descartados.
+  fastify.post('/people/api/pagamentos/cadastrar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId, email, nome } = request.user;
+    const {
+      plano: planoChave,
+      meio,
+      cpf_cnpj: cpfCnpjBruto,
+      cartao_numero: cartaoNumeroBruto,
+      cartao_nome: cartaoNome,
+      cartao_validade_mes: cartaoValidadeMes,
+      cartao_validade_ano: cartaoValidadeAno,
+      cartao_cvv: cartaoCvv,
+      endereco: enderecoBruto,
+    } = request.body || {};
+
+    if (!['pix', 'cartao'].includes(meio)) {
+      return reply.code(400).send({ error: 'Campo "meio" deve ser "pix" ou "cartao"' });
+    }
+
+    const cartaoNumeroLimpo = String(cartaoNumeroBruto || '').replace(/\D/g, '');
+    if (meio === 'cartao') {
+      if (!CARTAO_FINAL_REGEX.test(cartaoNumeroLimpo.slice(-4))) {
+        return reply.code(400).send({ error: 'Informe um número de cartão válido.' });
+      }
+      if (!(cartaoNome || '').trim()) {
+        return reply.code(400).send({ error: 'Informe o nome impresso no cartão.' });
+      }
+      if (!/^\d{1,2}$/.test(cartaoValidadeMes || '') || !/^\d{4}$/.test(cartaoValidadeAno || '')) {
+        return reply.code(400).send({ error: 'Informe a validade do cartão (MM/AAAA).' });
+      }
+      if (!/^\d{3,4}$/.test(cartaoCvv || '')) {
+        return reply.code(400).send({ error: 'Informe o CVV do cartão.' });
+      }
+    }
+
+    const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [tenantId]);
+    const assinatura = rows[0];
+    if (!assinatura) return reply.code(404).send({ error: 'Assinatura não encontrada' });
+
+    const cpfCnpjLimpo = String(cpfCnpjBruto || '').replace(/\D/g, '') || assinatura.cpf_cnpj;
+    if (!assinatura.asaas_customer_id && !CPF_CNPJ_REGEX.test(cpfCnpjLimpo || '')) {
+      return reply.code(400).send({ error: 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.' });
+    }
+
+    let endereco = {
+      cep: assinatura.endereco_cep,
+      logradouro: assinatura.endereco_logradouro,
+      numero: assinatura.endereco_numero,
+      complemento: assinatura.endereco_complemento,
+      bairro: assinatura.endereco_bairro,
+      cidade: assinatura.endereco_cidade,
+      uf: assinatura.endereco_uf,
+    };
+    if (meio === 'cartao') {
+      if (enderecoBruto) {
+        const { cep, logradouro, numero, complemento, bairro, cidade, uf } = enderecoBruto;
+        const cepLimpo = String(cep || '').replace(/\D/g, '');
+        const enderecoValido =
+          /^\d{8}$/.test(cepLimpo) &&
+          (logradouro || '').trim() &&
+          (numero || '').trim() &&
+          (bairro || '').trim() &&
+          (cidade || '').trim() &&
+          UF_VALIDAS.includes(String(uf || '').toUpperCase());
+        if (!enderecoValido) {
+          return reply.code(400).send({ error: 'Preencha todos os campos do endereço.' });
+        }
+        endereco = {
+          cep: cepLimpo, logradouro: logradouro.trim(), numero: numero.trim(),
+          complemento: (complemento || '').trim() || null, bairro: bairro.trim(),
+          cidade: cidade.trim(), uf: String(uf).toUpperCase(),
+        };
+      } else if (!(endereco.cep && endereco.numero)) {
+        return reply.code(400).send({ error: 'Informe seu endereço para cadastrar um cartão.' });
+      }
+    }
+
+    const chavePlano = assinatura.plano || planoChave;
+    if (!chavePlano) return reply.code(400).send({ error: 'Escolha um plano.' });
+    let planoInfo;
+    try {
+      planoInfo = await planosPeople.buscarPlano(KYVVO_APP_URL, chavePlano);
+    } catch (err) {
+      request.log.error(`Falha ao buscar plano ${chavePlano}: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível confirmar o plano agora. Tente novamente em instantes.' });
+    }
+    if (!planoInfo) return reply.code(400).send({ error: 'Plano não encontrado.' });
+
+    const billingType = meio === 'pix' ? 'PIX' : 'CREDIT_CARD';
+    const cartaoFinal = meio === 'cartao' ? cartaoNumeroLimpo.slice(-4) : null;
+
+    let customer;
+    let subscriptionId;
+    try {
+      customer = await asaas.criarOuRecuperarCustomer({
+        tenantId, nome, email, cpfCnpj: cpfCnpjLimpo, asaasCustomerId: assinatura.asaas_customer_id,
+      });
+
+      let creditCardToken;
+      if (meio === 'cartao') {
+        const tokenizado = await asaas.tokenizarCartao({
+          customerId: customer.id,
+          holderName: cartaoNome.trim(),
+          number: cartaoNumeroLimpo,
+          expiryMonth: cartaoValidadeMes,
+          expiryYear: cartaoValidadeAno,
+          ccv: cartaoCvv,
+          holderInfo: {
+            name: nome,
+            email,
+            cpfCnpj: cpfCnpjLimpo,
+            postalCode: endereco.cep,
+            addressNumber: endereco.numero,
+            addressComplement: endereco.complemento || undefined,
+          },
+          remoteIp: request.ip,
+        });
+        creditCardToken = tokenizado.creditCardToken;
+      }
+
+      if (assinatura.asaas_subscription_id && assinatura.status !== 'cancelado') {
+        await asaas.atualizarSubscription({ subscriptionId: assinatura.asaas_subscription_id, billingType, creditCardToken, tenantId });
+        subscriptionId = assinatura.asaas_subscription_id;
+      } else {
+        const subscription = await asaas.criarSubscription({
+          customerId: customer.id, billingType, valor: Number(planoInfo.preco_mensal), planoNome: planoInfo.nome,
+          nextDueDate: proximaCobrancaRespeitandoTrial(assinatura), creditCardToken, tenantId,
+        });
+        subscriptionId = subscription.id;
+      }
+    } catch (erro) {
+      request.log.error(`Falha na integração com a Asaas para tenant ${tenantId}: ${erro.message}`);
+      return reply.code(400).send({ error: 'Não foi possível processar o pagamento agora. Tente novamente em instantes.' });
+    }
+
+    const trialFim = new Date(new Date(assinatura.trial_iniciado_em).getTime() + TRIAL_DIAS_PAGAMENTO * 24 * 60 * 60 * 1000);
+    const trialAindaAtivo = assinatura.status === 'trial' && trialFim.getTime() > Date.now();
+    const novoStatus = trialAindaAtivo ? 'trial' : 'ativo';
+
+    const { rows: atualizado } = await pool.query(
+      `update assinaturas set
+         asaas_customer_id = $2, asaas_subscription_id = $3, plano = $4, status = $5,
+         asaas_meio_pagamento = $6, asaas_cartao_final = $7, cpf_cnpj = $8,
+         endereco_cep = $9, endereco_logradouro = $10, endereco_numero = $11, endereco_complemento = $12,
+         endereco_bairro = $13, endereco_cidade = $14, endereco_uf = $15,
+         cancelado_em = null, acesso_ate = null, status_alterado_em = now(), atualizado_em = now()
+       where tenant_id = $1
+       returning *`,
+      [
+        tenantId, customer.id, subscriptionId, planoInfo.chave, novoStatus, meio,
+        meio === 'cartao' ? cartaoFinal : null, cpfCnpjLimpo,
+        endereco.cep, endereco.logradouro, endereco.numero, endereco.complemento, endereco.bairro, endereco.cidade, endereco.uf,
+      ]
+    );
+
+    return montarResumoPagamento(atualizado[0]);
+  });
+
+  fastify.patch('/people/api/pagamentos/plano', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { plano: planoChave } = request.body || {};
+
+    let planoInfo;
+    try {
+      planoInfo = await planosPeople.buscarPlano(KYVVO_APP_URL, planoChave);
+    } catch (err) {
+      request.log.error(`Falha ao buscar plano ${planoChave}: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível confirmar o plano agora. Tente novamente em instantes.' });
+    }
+    if (!planoInfo) return reply.code(400).send({ error: 'Plano inválido ou não disponível.' });
+
+    const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [tenantId]);
+    const assinatura = rows[0];
+    if (!assinatura || !assinatura.asaas_subscription_id || assinatura.status === 'cancelado') {
+      return reply.code(400).send({ error: 'Nenhuma assinatura ativa pra trocar de plano. Cadastre uma forma de pagamento primeiro.' });
+    }
+    if (assinatura.plano === planoInfo.chave) {
+      return reply.code(400).send({ error: 'Você já está nesse plano.' });
+    }
+
+    try {
+      await asaas.atualizarSubscription({ subscriptionId: assinatura.asaas_subscription_id, valor: Number(planoInfo.preco_mensal), tenantId });
+    } catch (erro) {
+      request.log.error(`Falha ao trocar plano do tenant ${tenantId} para ${planoInfo.chave}: ${erro.message}`);
+      return reply.code(400).send({ error: 'Não foi possível trocar de plano agora. Tente novamente em instantes.' });
+    }
+
+    const { rows: atualizado } = await pool.query(
+      'update assinaturas set plano = $2, atualizado_em = now() where tenant_id = $1 returning *',
+      [tenantId, planoInfo.chave]
+    );
+    return montarResumoPagamento(atualizado[0]);
+  });
+
+  fastify.delete('/people/api/pagamentos/assinatura', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [tenantId]);
+    const assinatura = rows[0];
+    if (!assinatura) return reply.code(404).send({ error: 'Assinatura não encontrada' });
+    if (assinatura.status !== 'ativo') {
+      return reply.code(400).send({ error: 'Só é possível cancelar uma assinatura ativa.' });
+    }
+    if (!assinatura.asaas_subscription_id) {
+      return reply.code(400).send({ error: 'Nenhuma assinatura encontrada para cancelar.' });
+    }
+
+    let acessoAte;
+    try {
+      const subscription = await asaas.buscarSubscription(assinatura.asaas_subscription_id);
+      acessoAte = subscription ? subscription.nextDueDate : null;
+      await asaas.cancelarSubscription({ subscriptionId: assinatura.asaas_subscription_id, tenantId });
+    } catch (erro) {
+      request.log.error(`Falha ao cancelar assinatura na Asaas para tenant ${tenantId}: ${erro.message}`);
+      return reply.code(400).send({ error: 'Não foi possível cancelar a assinatura agora. Tente novamente em instantes.' });
+    }
+
+    await pool.query(
+      `update assinaturas set status = 'cancelado', cancelado_em = now(), acesso_ate = $2, status_alterado_em = now(), atualizado_em = now() where tenant_id = $1`,
+      [tenantId, acessoAte]
+    );
+    return { cancelado: true, acesso_ate: acessoAte };
+  });
+
+  // Webhook da Asaas: atualiza o status da assinatura conforme o evento da
+  // cobrança. Sem fastify.authenticate — quem chama é a Asaas, não um
+  // usuário logado; a validação é pelo token no header.
+  const ASAAS_EVENTO_PARA_STATUS = {
+    PAYMENT_CONFIRMED: 'ativo',
+    PAYMENT_RECEIVED: 'ativo',
+    PAYMENT_OVERDUE: 'inadimplente',
+    PAYMENT_DELETED: 'suspenso',
+    SUBSCRIPTION_CANCELLED: 'cancelado',
+  };
+
+  fastify.post('/people/webhooks/asaas', async (request, reply) => {
+    const tokenEsperado = process.env.ASAAS_WEBHOOK_TOKEN;
+    const tokenRecebido = request.headers['asaas-access-token'];
+    if (!tokenEsperado || tokenRecebido !== tokenEsperado) {
+      return reply.code(401).send({ error: 'Token de webhook inválido' });
+    }
+
+    const { event, payment, subscription } = request.body || {};
+    const novoStatus = ASAAS_EVENTO_PARA_STATUS[event];
+    if (!novoStatus) return { ok: true };
+    const subscriptionId = (payment && payment.subscription) || (subscription && subscription.id);
+    if (!subscriptionId) return { ok: true };
+
+    await pool.query(
+      `update assinaturas set status = $2, status_alterado_em = now(), atualizado_em = now()
+       where asaas_subscription_id = $1 and status is distinct from $2`,
+      [subscriptionId, novoStatus]
+    );
+    return { ok: true };
   });
 
   // --- Portal da psicóloga (autenticado) ---
