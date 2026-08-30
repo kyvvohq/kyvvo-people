@@ -34,13 +34,32 @@
   .menu-acoes-painel a { display:block; padding:8px 10px; border-radius:8px; font-size:13px; color:var(--text-secondary); text-decoration:none; }
   .menu-acoes-painel a:hover { background:var(--surface-muted); }
 
-  .kanban-vagas { display:grid; grid-template-columns:repeat(5, minmax(220px, 1fr)); gap:14px; align-items:start; overflow-x:auto; padding-bottom:8px; }
-  .kanban-coluna { display:flex; flex-direction:column; gap:10px; min-width:0; }
-  .kanban-coluna-titulo { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); padding:0 2px; }
-  .card-vaga { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; }
-  .card-vaga-topo { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-  .card-vaga-nome { font-size:13.5px; font-weight:700; color:var(--text); }
-  .card-vaga-data { font-size:11.5px; color:var(--muted); margin-top:6px; }
+  /* Visão em colunas: mesma estrutura raia×coluna do Quadro (menu
+     Quadro) — aqui raia = vaga, coluna = status, e cada raia só tem 1
+     cartão populado (a própria vaga), na coluna do status atual. Reusa
+     os nomes de classe do quadro.html de propósito (são <style> isolados
+     por página, não colidem) pra manter o mesmo sistema visual. */
+  /* Só contém o overflow horizontal quando a visão em colunas está ativa
+     (classe alternada via JS) — sem isso o grid largo do kanban faria a
+     página inteira rolar de lado; mas aplicar isso sempre clipparia a
+     tabela da visão em Lista sem dar jeito de rolar até o fim em telas
+     estreitas. */
+  .painel-main.conter-scroll-x { overflow-x:hidden; }
+  .quadro-scroll { overflow-x:auto; padding-bottom:12px; }
+  .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
+  .raia-label { position:sticky; left:0; padding:10px 8px; font-weight:700; font-size:13px; border-radius:var(--radius-md);
+    display:flex; align-items:center; z-index:3; color:var(--text); }
+  .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
+    font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); min-width:200px; }
+  .celula { border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:8px; min-width:200px; min-height:64px;
+    display:flex; flex-direction:column; gap:6px; }
+  .celula.arrastando-sobre { border-color:var(--accent); }
+  .cartao { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:12px; cursor:grab; }
+  .cartao:active { cursor:grabbing; }
+  .cartao-topo { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+  .cartao .nome { font-weight:700; color:var(--text); }
+  .cartao .data { color:var(--muted); font-size:11px; margin-top:4px; }
+  .celula-vazia { color:var(--muted); font-size:11px; padding:6px; }
 </style>
 </head>
 <body>
@@ -131,7 +150,9 @@
         </div>
       </div>
       <div id="vista-kanban" hidden>
-        <div class="kanban-vagas" id="kanban-vagas"></div>
+        <div class="quadro-scroll">
+          <div class="quadro-grid" id="kanban-vagas"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -154,6 +175,8 @@
     let vagas = [];
     let visualizacao = localStorage.getItem('people_vagas_visualizacao') === 'kanban' ? 'kanban' : 'lista';
     const STATUS_ORDEM = ['rascunho', 'nova', 'em_andamento', 'pausada', 'encerrada'];
+    // Mesmos tons leves do menu Quadro, rotativos por posição da raia.
+    const CORES_RAIA = ['#F1EEFF', '#E6F9FC', '#E9FBF2', '#FFF6E8'];
 
     function menuAcoesHtml(v) {
       return `
@@ -176,6 +199,7 @@
     function aplicarVisualizacao() {
       document.getElementById('vista-lista').hidden = visualizacao !== 'lista';
       document.getElementById('vista-kanban').hidden = visualizacao !== 'kanban';
+      document.querySelector('.painel-main').classList.toggle('conter-scroll-x', visualizacao === 'kanban');
       document.querySelectorAll('#visualizacao-toggle button').forEach((b) => b.classList.toggle('ativo', b.dataset.vis === visualizacao));
     }
 
@@ -197,25 +221,72 @@
       `).join('') || '<tr><td colspan="6" class="vazio">Nenhuma vaga cadastrada ainda.</td></tr>';
     }
 
+    // Raia = vaga, coluna = status — cada raia só tem 1 cartão populado
+    // (a própria vaga), na coluna do status atual; arrastar pra outra
+    // coluna da mesma raia muda o status (igual ao Quadro, só que lá a
+    // raia guarda N cartões de candidatura por etapa).
     function renderizarKanban() {
-      const container = document.getElementById('kanban-vagas');
-      container.innerHTML = STATUS_ORDEM.map((status) => {
-        const doStatus = vagas.filter((v) => v.status === status);
-        return `
-          <div class="kanban-coluna">
-            <div class="kanban-coluna-titulo">${STATUS_LABEL[status]} (${doStatus.length})</div>
-            ${doStatus.map((v) => `
-              <div class="card-vaga">
-                <div class="card-vaga-topo">
-                  <span class="card-vaga-nome">${v.nome}</span>
-                  ${menuAcoesHtml(v)}
-                </div>
-                <div class="card-vaga-data">${new Date(v.criado_em).toLocaleDateString('pt-BR')}</div>
+      const grid = document.getElementById('kanban-vagas');
+      grid.style.gridTemplateColumns = `200px repeat(${STATUS_ORDEM.length}, minmax(200px, 1fr))`;
+
+      let html = '<div></div>';
+      STATUS_ORDEM.forEach((status) => {
+        html += `<div class="coluna-header">${STATUS_LABEL[status]}</div>`;
+      });
+
+      vagas.forEach((v, indice) => {
+        const cor = CORES_RAIA[indice % CORES_RAIA.length];
+        html += `<div class="raia-label" style="background:${cor}">${v.nome}</div>`;
+        STATUS_ORDEM.forEach((status) => {
+          html += `<div class="celula" data-vaga-status="${v.id}" data-status="${status}" style="background:${cor}">`;
+          html += status === v.status ? `
+            <div class="cartao" draggable="true" data-cartao-vaga="${v.id}">
+              <div class="cartao-topo">
+                <span class="nome">${v.nome}</span>
+                ${menuAcoesHtml(v)}
               </div>
-            `).join('') || '<p class="campo-ajuda">Nenhuma vaga.</p>'}
-          </div>
-        `;
-      }).join('');
+              <div class="data">${new Date(v.criado_em).toLocaleDateString('pt-BR')}</div>
+            </div>
+          ` : '<div class="celula-vazia">—</div>';
+          html += '</div>';
+        });
+      });
+
+      grid.innerHTML = html;
+      if (!vagas.length) {
+        grid.insertAdjacentHTML('beforeend', '<div class="celula-vazia" style="grid-column:1/-1">Nenhuma vaga cadastrada ainda.</div>');
+      }
+      ligarDragDropVagas();
+    }
+
+    function ligarDragDropVagas() {
+      document.querySelectorAll('[data-cartao-vaga]').forEach((cartao) => {
+        cartao.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', cartao.dataset.cartaoVaga);
+        });
+      });
+      document.querySelectorAll('[data-vaga-status]').forEach((celula) => {
+        celula.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer.types.includes('text/plain')) return;
+          e.preventDefault();
+          celula.classList.add('arrastando-sobre');
+        });
+        celula.addEventListener('dragleave', () => celula.classList.remove('arrastando-sobre'));
+        celula.addEventListener('drop', async (e) => {
+          if (!e.dataTransfer.types.includes('text/plain')) return;
+          e.preventDefault();
+          celula.classList.remove('arrastando-sobre');
+          const vagaId = e.dataTransfer.getData('text/plain');
+          const novoStatus = celula.dataset.status;
+          const vaga = vagas.find((v) => v.id === vagaId);
+          if (!vaga || vaga.status === novoStatus) return;
+
+          vaga.status = novoStatus;
+          renderizarKanban();
+          const res = await apiFetch(`/people/api/vagas/${vagaId}`, { method: 'PATCH', body: JSON.stringify({ status: novoStatus }) });
+          if (!res.ok) { avisar('Erro', 'Falha ao mover vaga'); carregarVagas(); }
+        });
+      });
     }
 
     document.getElementById('visualizacao-toggle').addEventListener('click', (e) => {
