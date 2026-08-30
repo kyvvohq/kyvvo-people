@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — Vagas</title>
+<link rel="icon" type="image/svg+xml" href="/people/images/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -129,7 +130,7 @@
 
       <div class="visualizacao-toggle" id="visualizacao-toggle">
         <button type="button" data-vis="lista">Lista</button>
-        <button type="button" data-vis="kanban">Colunas</button>
+        <button type="button" data-vis="kanban">Quadro</button>
       </div>
 
       <div id="vista-lista">
@@ -227,7 +228,7 @@
     // raia guarda N cartões de candidatura por etapa).
     function renderizarKanban() {
       const grid = document.getElementById('kanban-vagas');
-      grid.style.gridTemplateColumns = `200px repeat(${STATUS_ORDEM.length}, minmax(200px, 1fr))`;
+      grid.style.gridTemplateColumns = `10px repeat(${STATUS_ORDEM.length}, minmax(200px, 1fr))`;
 
       let html = '<div></div>';
       STATUS_ORDEM.forEach((status) => {
@@ -236,7 +237,7 @@
 
       vagas.forEach((v, indice) => {
         const cor = CORES_RAIA[indice % CORES_RAIA.length];
-        html += `<div class="raia-label" style="background:${cor}">${v.nome}</div>`;
+        html += `<div class="raia-label" style="background:${cor}" title="${v.nome}"></div>`;
         STATUS_ORDEM.forEach((status) => {
           html += `<div class="celula" data-vaga-status="${v.id}" data-status="${status}" style="background:${cor}">`;
           html += status === v.status ? `

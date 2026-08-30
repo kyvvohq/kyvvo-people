@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — Configurações</title>
+<link rel="icon" type="image/svg+xml" href="/people/images/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,7 +19,7 @@
   .plano-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; }
   .plano-card .nome { font-weight:700; font-size:13.5px; color:var(--text); margin-bottom:4px; }
   .plano-card .preco { font-family:var(--font-display); font-size:20px; color:var(--text); margin-bottom:6px; }
-  .plano-card .detalhe { font-size:12px; color:var(--muted); }
+  .plano-card .detalhe { font-size:12px; color:var(--muted); margin-top:3px; }
 </style>
 </head>
 <body>
@@ -98,28 +99,50 @@
         <div class="card" style="padding:24px">
           <h3 style="margin:0 0 8px;font-family:var(--font-display);font-size:16px;color:var(--text)">Assinatura e cobrança</h3>
           <p style="font-size:13.5px;color:var(--muted-strong);line-height:1.6;margin:0 0 4px">
-            Cobrança recorrente por cartão via Asaas ainda não está ativa — os valores dos planos abaixo são a proposta em avaliação,
-            não uma cobrança em vigor. Assim que estiverem confirmados, a assinatura fica disponível aqui.
+            Cobrança recorrente por cartão via Asaas ainda não está ativa — o que está abaixo é a proposta da seção 10 do documento de
+            especificação em avaliação, não uma cobrança em vigor. Assim que os valores estiverem confirmados, a assinatura fica disponível aqui.
           </p>
+
+          <h4 style="margin:20px 0 4px;font-size:13px;color:var(--text)">Planos</h4>
           <div class="planos-preview">
             <div class="plano-card">
               <div class="nome">Start</div>
               <div class="preco">R$ 197<span style="font-size:12px;color:var(--muted)">/mês</span></div>
               <div class="detalhe">3 vagas ativas simultâneas</div>
+              <div class="detalhe">150 candidatos notificados/mês (WhatsApp)</div>
+              <div class="detalhe">Número WhatsApp: Kyvvo</div>
             </div>
             <div class="plano-card">
               <div class="nome">Professional</div>
               <div class="preco">R$ 497<span style="font-size:12px;color:var(--muted)">/mês</span></div>
               <div class="detalhe">10 vagas ativas simultâneas</div>
+              <div class="detalhe">600 candidatos notificados/mês (WhatsApp)</div>
+              <div class="detalhe">Número WhatsApp: Kyvvo</div>
             </div>
             <div class="plano-card">
               <div class="nome">Business</div>
               <div class="preco">Sob consulta</div>
-              <div class="detalhe">Vagas ilimitadas, WhatsApp próprio</div>
+              <div class="detalhe">Vagas ilimitadas</div>
+              <div class="detalhe">Candidatos notificados: sem limite</div>
+              <div class="detalhe">Número WhatsApp: próprio (WABA)</div>
             </div>
           </div>
           <p style="font-size:12px;color:var(--muted);margin:8px 0 0">
             Avaliações, candidatos, relatórios e resumos por IA são ilimitados em todos os planos.
+          </p>
+
+          <h4 style="margin:20px 0 4px;font-size:13px;color:var(--text)">Forma de pagamento</h4>
+          <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--muted-strong);line-height:1.8">
+            <li>Cartão no plano mensal</li>
+            <li>Pix no plano anual</li>
+            <li>Boleto não é oferecido</li>
+            <li>Trial de 14 dias, sem cartão</li>
+          </ul>
+
+          <h4 style="margin:20px 0 4px;font-size:13px;color:var(--text)">Suspensão por inadimplência</h4>
+          <p style="font-size:13px;color:var(--muted-strong);line-height:1.6;margin:0">
+            Suspensão automática, reaproveitando a mesma lógica já usada com Asaas no Kyvvo principal. Split de pagamento nativo do Asaas
+            fica reservado para uma fase futura (marketplace de consultorias) — não implementado agora.
           </p>
         </div>
       </div>
