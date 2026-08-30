@@ -8,7 +8,6 @@ const fastifyStatic = require('@fastify/static');
 const fastifyMultipart = require('@fastify/multipart');
 
 const { pool, migrar } = require('./lib/db');
-const { validarCpf, normalizar } = require('./lib/cpf');
 const { calcularResultado, CARACTERISTICAS } = require('./lib/inferencia');
 const { montarResumo } = require('./lib/conteudo');
 const { enviarLinkAvaliacao } = require('./lib/email');
@@ -102,39 +101,6 @@ async function build() {
   });
 
   // --- Portal da psicóloga (autenticado) ---
-  // Avaliação comportamental pertence à PESSOA, não à vaga (ver nota de
-  // arquitetura 2026-08-28) — passa por dedup de pessoa (telefone/e-mail)
-  // antes de criar o convite. Continua exigindo CPF na criação porque é o
-  // mecanismo de acesso ao link (candidato precisa digitar o mesmo CPF pra
-  // destravar) — diferente de dedup de pessoa, que usa telefone/e-mail.
-  fastify.post('/people/api/avaliacoes', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { nome, email, whatsapp, cpf } = request.body || {};
-    if (!nome || !email || !cpf) {
-      return reply.code(400).send({ error: 'nome, email e cpf são obrigatórios' });
-    }
-    if (!validarCpf(cpf)) {
-      return reply.code(400).send({ error: 'CPF inválido' });
-    }
-
-    const pessoa = await encontrarOuCriarPessoa(pool, request.user.tenantId, { nome, email, telefone: whatsapp });
-
-    const reaproveitavel = await avaliacaoReaproveitavel(pool, pessoa.id);
-    if (reaproveitavel) {
-      return reply.code(200).send({ id: reaproveitavel.id, reaproveitada: true, concluido_em: reaproveitavel.concluido_em });
-    }
-
-    const id = crypto.randomUUID();
-    const token = crypto.randomUUID();
-    await pool.query(
-      'insert into avaliacoes (id, tenant_id, candidato_id, cpf, token) values ($1, $2, $3, $4, $5)',
-      [id, request.user.tenantId, pessoa.id, normalizar(cpf), token]
-    );
-
-    const link = `${PUBLIC_URL}/people/avaliacao/${token}`;
-    await enviarLinkAvaliacao({ email, nome, link });
-
-    return reply.code(201).send({ id, token, link, reaproveitada: false });
-  });
 
   // Lista TODOS os candidatos (pessoa) da conta, não só quem já tem
   // avaliação — cada linha traz a avaliação mais recente (se houver) via
@@ -158,11 +124,11 @@ async function build() {
   });
 
   // Encaminha (ou reenvia) o convite de avaliação pra um candidato já
-  // cadastrado — não pede nome/e-mail/telefone de novo (já se tem pelo
-  // candidato_id). CPF só é exigido quando de fato precisa criar uma
-  // avaliação nova (primeira vez, ou a anterior já passou da validade de
-  // reaproveitamento); se já existe uma pendente/em andamento, reenvia o
-  // mesmo link por e-mail sem pedir CPF de novo.
+  // cadastrado — não pede nenhum dado de novo, já tem tudo pelo
+  // candidato_id. O gate de acesso ao link não é mais CPF, é o e-mail já
+  // cadastrado no perfil (candidatos.email) — ver validar-email abaixo.
+  // Se já existe uma avaliação pendente/em andamento, reenvia o mesmo
+  // link em vez de criar uma nova.
   fastify.post('/people/api/candidatos/:id/enviar-avaliacao', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows: pessoaRows } = await pool.query(
       'select id, nome, email, anonimizado_em from candidatos where id = $1 and tenant_id = $2',
@@ -188,15 +154,11 @@ async function build() {
       return reply.code(200).send({ id: reaproveitavel.id, reaproveitada: true, concluido_em: reaproveitavel.concluido_em });
     }
 
-    const { cpf } = request.body || {};
-    if (!cpf) return reply.code(409).send({ error: 'cpf_necessario' });
-    if (!validarCpf(cpf)) return reply.code(400).send({ error: 'CPF inválido' });
-
     const id = crypto.randomUUID();
     const token = crypto.randomUUID();
     await pool.query(
-      'insert into avaliacoes (id, tenant_id, candidato_id, cpf, token) values ($1, $2, $3, $4, $5)',
-      [id, request.user.tenantId, pessoa.id, normalizar(cpf), token]
+      'insert into avaliacoes (id, tenant_id, candidato_id, token) values ($1, $2, $3, $4)',
+      [id, request.user.tenantId, pessoa.id, token]
     );
     const link = `${PUBLIC_URL}/people/avaliacao/${token}`;
     await enviarLinkAvaliacao({ email: pessoa.email, nome: pessoa.nome, link });
@@ -370,12 +332,25 @@ async function build() {
     return reply.code(201).send({ id });
   });
 
+  // "Em andamento" aqui é por etapa, não pelo status de 3 valores da
+  // candidatura (nova/reprovada/aprovada — não tem meio-termo nesse
+  // campo): novo = ainda na coluna fixa "Nova" do quadro (etapa_id nulo);
+  // em andamento = já foi movido pra alguma etapa e continua ativo
+  // (status ainda 'nova'); reprovada/aprovada não contam em nenhum dos
+  // dois totais (já saíram do funil).
   fastify.get('/people/api/vagas', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      'select id, codigo, nome, cargo, status, criado_em from vagas where tenant_id = $1 order by criado_em desc',
+      `select v.id, v.codigo, v.nome, v.cargo, v.status, v.criado_em,
+              count(c.id) as total_candidatos,
+              count(c.id) filter (where c.status = 'nova' and c.etapa_id is not null) as total_em_andamento
+       from vagas v
+       left join candidaturas c on c.vaga_id = v.id
+       where v.tenant_id = $1
+       group by v.id
+       order by v.criado_em desc`,
       [request.user.tenantId]
     );
-    return rows;
+    return rows.map((v) => ({ ...v, total_candidatos: Number(v.total_candidatos), total_em_andamento: Number(v.total_em_andamento) }));
   });
 
   fastify.get('/people/api/vagas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -670,6 +645,11 @@ async function build() {
     if (avaliacaoExistente) {
       await registrarEvento(pool, { tenantId, candidaturaId: candidatura.id, tipo: 'avaliacao_reaproveitada', payload: { avaliacao_id: avaliacaoExistente.id } });
     }
+    // Vaga "nova" que recebe a primeira candidatura já é evidência de que
+    // o processo começou de verdade — some pro status "em_andamento"
+    // sozinha (só a partir de 'nova', nunca mexe em rascunho/pausada/
+    // encerrada, que são decisões deliberadas do recrutador).
+    await pool.query("update vagas set status = 'em_andamento' where id = $1 and status = 'nova'", [vagaId]);
     return { candidatura, pessoa, reaproveitada: false };
   }
 
@@ -901,7 +881,7 @@ async function build() {
     return reply.code(201).send({ ok: true });
   });
 
-  // --- Avaliação pública (candidato, sem login — gate por CPF) ---
+  // --- Avaliação pública (candidato, sem login — gate por e-mail cadastrado) ---
   fastify.get('/people/avaliacao/:token', async (request, reply) => {
     return reply.sendFile('avaliacao.html');
   });
@@ -916,16 +896,26 @@ async function build() {
     return { status: avaliacao.status, nome: avaliacao.nome };
   });
 
-  fastify.post('/people/api/avaliacao/:token/validar-cpf', async (request, reply) => {
-    const { cpf } = request.body || {};
-    const { rows } = await pool.query('select id, cpf, status from avaliacoes where token = $1', [request.params.token]);
+  // Gate de acesso ao link: o candidato confirma o mesmo e-mail já
+  // cadastrado no perfil dele (candidatos.email), não mais CPF (troca
+  // pedida pelo Bruno em 2026-08-28 — CPF nunca foi necessário pra
+  // identificar a pessoa, só servia como segredo de destrave do link).
+  fastify.post('/people/api/avaliacao/:token/validar-email', async (request, reply) => {
+    const { email } = request.body || {};
+    const { rows } = await pool.query(
+      `select a.id, a.status, p.email as email_cadastrado
+       from avaliacoes a join candidatos p on p.id = a.candidato_id
+       where a.token = $1`,
+      [request.params.token]
+    );
     const avaliacao = rows[0];
     if (!avaliacao) return reply.code(404).send({ error: 'Link inválido' });
     if (avaliacao.status === 'concluido') {
       return reply.code(403).send({ error: 'Esta avaliação já foi concluída e não pode ser refeita' });
     }
-    if (normalizar(cpf) !== avaliacao.cpf) {
-      return reply.code(401).send({ error: 'CPF não confere' });
+    const emailConfere = (email || '').trim().toLowerCase() === (avaliacao.email_cadastrado || '').trim().toLowerCase();
+    if (!emailConfere) {
+      return reply.code(401).send({ error: 'E-mail não confere' });
     }
 
     if (avaliacao.status === 'pendente') {
@@ -977,8 +967,8 @@ async function build() {
     return { ok: true };
   });
 
-  // Busca uma avaliação pelo token garantindo que está em andamento (CPF já
-  // validado, ainda não concluída) — usado pelas rotas de rodada 1/2 pra
+  // Busca uma avaliação pelo token garantindo que está em andamento (e-mail
+  // já validado, ainda não concluída) — usado pelas rotas de rodada 1/2 pra
   // impedir salvar respostas fora do fluxo (token errado, já concluído, ou
   // nunca iniciado).
   async function buscarPorTokenEmAndamento(token, reply) {
@@ -993,7 +983,7 @@ async function build() {
       return null;
     }
     if (avaliacao.status === 'pendente') {
-      reply.code(403).send({ error: 'Valide seu CPF antes de responder' });
+      reply.code(403).send({ error: 'Valide seu e-mail antes de responder' });
       return null;
     }
     return avaliacao;

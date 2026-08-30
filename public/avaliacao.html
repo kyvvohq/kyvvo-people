@@ -49,8 +49,6 @@
   let caracteristicas = [];
   let selecionadasRodada1 = [];
 
-  function normalizarCpf(v) { return v.replace(/\D/g, ''); }
-
   function telaErro(msg) {
     conteudo.innerHTML = `<h1>Não foi possível continuar</h1><p class="sub">${msg}</p>`;
   }
@@ -61,27 +59,27 @@
       <p class="sub">Este link já foi utilizado e não pode ser respondido novamente. Se você acredita que isso é um engano, entre em contato com quem te enviou o link.</p>`;
   }
 
-  function telaCpf(nome) {
+  function telaEmail(nome) {
     conteudo.innerHTML = `
       <h1>Olá${nome ? ', ' + nome : ''}!</h1>
-      <p class="sub">Para começar, confirme seu CPF. O link só pode ser usado uma vez.</p>
-      <label class="campo" for="cpf">CPF</label>
-      <input type="text" id="cpf" placeholder="Somente números" inputmode="numeric">
+      <p class="sub">Para começar, confirme o e-mail para o qual este convite foi enviado. O link só pode ser usado uma vez.</p>
+      <label class="campo" for="email">E-mail</label>
+      <input type="text" id="email" placeholder="seu@email.com" inputmode="email" autocomplete="email">
       <div class="erro" id="erro"></div>
-      <button id="btn-cpf">Continuar</button>
+      <button id="btn-email">Continuar</button>
     `;
-    document.getElementById('btn-cpf').addEventListener('click', async () => {
+    document.getElementById('btn-email').addEventListener('click', async () => {
       const erro = document.getElementById('erro');
       erro.textContent = '';
-      const cpf = normalizarCpf(document.getElementById('cpf').value);
+      const email = document.getElementById('email').value.trim();
       try {
-        const res = await fetch(`/people/api/avaliacao/${token}/validar-cpf`, {
+        const res = await fetch(`/people/api/avaliacao/${token}/validar-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cpf }),
+          body: JSON.stringify({ email }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Não foi possível validar o CPF');
+        if (!res.ok) throw new Error(data.error || 'Não foi possível validar o e-mail');
         caracteristicas = data.caracteristicas;
         telaInstrucoes();
       } catch (err) {
@@ -183,7 +181,7 @@
       const data = await res.json();
       if (!res.ok) return telaErro(data.error || 'Link inválido.');
       if (data.status === 'concluido') return telaConcluido();
-      telaCpf(data.nome);
+      telaEmail(data.nome);
     } catch {
       telaErro('Não foi possível carregar a avaliação. Tente novamente em instantes.');
     }

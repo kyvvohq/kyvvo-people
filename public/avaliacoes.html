@@ -237,17 +237,13 @@
     ['filtro-vaga', 'filtro-status'].forEach((id) => document.getElementById(id).addEventListener('change', renderizarTabela));
     document.getElementById('filtro-busca').addEventListener('input', renderizarTabela);
 
-    function encaminharAvaliacao(candidatoId, nome, cpf) {
-      const opts = { method: 'POST' };
-      if (cpf) opts.body = JSON.stringify({ cpf });
-      return apiFetch(`/people/api/candidatos/${candidatoId}/enviar-avaliacao`, opts);
-    }
-
+    // O gate de acesso ao link não pede mais CPF, é o e-mail já cadastrado
+    // no perfil — então encaminhar/reenviar não precisa coletar nada, é
+    // uma ação de 1 clique.
     async function acionarEnvio(candidatoId, nome) {
-      const res = await encaminharAvaliacao(candidatoId, nome);
+      const res = await apiFetch(`/people/api/candidatos/${candidatoId}/enviar-avaliacao`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
-        if (data.error === 'cpf_necessario') { abrirModalCpf(candidatoId, nome); return; }
         avisar('Erro', data.error || 'Falha ao encaminhar avaliação');
         return;
       }
@@ -256,36 +252,6 @@
       else avisar('Avaliação enviada', `Convite enviado por e-mail para ${nome}.`);
       await carregarListas();
       renderizarTabela();
-    }
-
-    function abrirModalCpf(candidatoId, nome) {
-      abrirModal(
-        '<h3>Enviar avaliação</h3>',
-        `
-          <form id="form-cpf-avaliacao">
-            <div class="modal-erro" id="msg-cpf-avaliacao"></div>
-            <p class="campo-ajuda">Primeira avaliação de "${nome}" — o CPF é o mecanismo de acesso ao link (o candidato digita o mesmo CPF pra destravar).</p>
-            <label for="cpf-avaliacao">CPF (só números)</label>
-            <input id="cpf-avaliacao" required>
-            <div class="modal-acoes">
-              <button type="button" class="btn-secundario" id="cancelar-cpf-avaliacao">Cancelar</button>
-              <button type="submit" class="btn">Enviar</button>
-            </div>
-          </form>
-        `
-      );
-      document.getElementById('cancelar-cpf-avaliacao').addEventListener('click', fecharModal);
-      document.getElementById('form-cpf-avaliacao').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msg = document.getElementById('msg-cpf-avaliacao');
-        const res = await encaminharAvaliacao(candidatoId, nome, document.getElementById('cpf-avaliacao').value);
-        const data = await res.json();
-        if (!res.ok) { msg.textContent = data.error || 'Falha ao enviar avaliação'; return; }
-        fecharModal();
-        avisar('Avaliação enviada', `Convite enviado por e-mail para ${nome}.`);
-        await carregarListas();
-        renderizarTabela();
-      });
     }
 
     function confirmarRefazer(id, nome) {

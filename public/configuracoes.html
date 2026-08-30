@@ -9,6 +9,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>document.documentElement.setAttribute('data-tema', localStorage.getItem('people_tema') || 'claro');</script>
 <link rel="stylesheet" href="/people/shell.css">
+<style>
+  .visualizacao-toggle { display:inline-flex; gap:4px; background:var(--surface-muted); border-radius:var(--radius-md); padding:4px; margin-bottom:16px; }
+  .visualizacao-toggle button { background:transparent; color:var(--muted-strong); border:none; border-radius:8px;
+    padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; height:auto; margin:0; }
+  .visualizacao-toggle button.ativo { background:var(--card); color:var(--text); box-shadow:0 1px 2px rgba(15,17,26,.08); }
+  .planos-preview { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; margin:16px 0; }
+  .plano-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; }
+  .plano-card .nome { font-weight:700; font-size:13.5px; color:var(--text); margin-bottom:4px; }
+  .plano-card .preco { font-family:var(--font-display); font-size:20px; color:var(--text); margin-bottom:6px; }
+  .plano-card .detalhe { font-size:12px; color:var(--muted); }
+</style>
 </head>
 <body>
   <header class="topo-app">
@@ -69,10 +80,48 @@
       <div class="cabecalho-pagina">
         <div class="textos"><div class="linha-titulo"><h1>Configurações</h1></div></div>
       </div>
-      <div class="estado-vazio">
-        <div class="tile" data-icon="settings" data-size="26"></div>
-        <h3>Em breve</h3>
-        <p>Preferências da conta chegam em breve por aqui.</p>
+
+      <div class="visualizacao-toggle" id="config-tabs">
+        <button type="button" data-tab="geral" class="ativo">Geral</button>
+        <button type="button" data-tab="cobranca">Cobrança</button>
+      </div>
+
+      <div id="tab-geral">
+        <div class="estado-vazio">
+          <div class="tile" data-icon="settings" data-size="26"></div>
+          <h3>Em breve</h3>
+          <p>Preferências da conta chegam em breve por aqui.</p>
+        </div>
+      </div>
+
+      <div id="tab-cobranca" hidden>
+        <div class="card" style="padding:24px">
+          <h3 style="margin:0 0 8px;font-family:var(--font-display);font-size:16px;color:var(--text)">Assinatura e cobrança</h3>
+          <p style="font-size:13.5px;color:var(--muted-strong);line-height:1.6;margin:0 0 4px">
+            Cobrança recorrente por cartão via Asaas ainda não está ativa — os valores dos planos abaixo são a proposta em avaliação,
+            não uma cobrança em vigor. Assim que estiverem confirmados, a assinatura fica disponível aqui.
+          </p>
+          <div class="planos-preview">
+            <div class="plano-card">
+              <div class="nome">Start</div>
+              <div class="preco">R$ 197<span style="font-size:12px;color:var(--muted)">/mês</span></div>
+              <div class="detalhe">3 vagas ativas simultâneas</div>
+            </div>
+            <div class="plano-card">
+              <div class="nome">Professional</div>
+              <div class="preco">R$ 497<span style="font-size:12px;color:var(--muted)">/mês</span></div>
+              <div class="detalhe">10 vagas ativas simultâneas</div>
+            </div>
+            <div class="plano-card">
+              <div class="nome">Business</div>
+              <div class="preco">Sob consulta</div>
+              <div class="detalhe">Vagas ilimitadas, WhatsApp próprio</div>
+            </div>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin:8px 0 0">
+            Avaliações, candidatos, relatórios e resumos por IA são ilimitados em todos os planos.
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -83,5 +132,14 @@
   </footer>
 
   <script src="/people/shell.js"></script>
+  <script>
+    document.getElementById('config-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-tab]');
+      if (!btn) return;
+      document.querySelectorAll('#config-tabs button').forEach((b) => b.classList.toggle('ativo', b === btn));
+      document.getElementById('tab-geral').hidden = btn.dataset.tab !== 'geral';
+      document.getElementById('tab-cobranca').hidden = btn.dataset.tab !== 'cobranca';
+    });
+  </script>
 </body>
 </html>

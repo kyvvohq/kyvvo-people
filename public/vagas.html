@@ -19,6 +19,28 @@
   .chips .badge { display:inline-flex; align-items:center; gap:2px; }
   .linha-requisito { display:grid; grid-template-columns:2fr 1fr 1fr 80px 90px 28px; gap:8px; align-items:center; margin-bottom:8px; }
   @media(max-width:700px) { .linha-requisito { grid-template-columns:1fr 1fr; } }
+
+  .visualizacao-toggle { display:inline-flex; gap:4px; background:var(--surface-muted); border-radius:var(--radius-md); padding:4px; margin-bottom:16px; }
+  .visualizacao-toggle button { background:transparent; color:var(--muted-strong); border:none; border-radius:8px;
+    padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; height:auto; margin:0; }
+  .visualizacao-toggle button.ativo { background:var(--card); color:var(--text); box-shadow:0 1px 2px rgba(15,17,26,.08); }
+
+  .menu-acoes { position:relative; display:inline-block; }
+  .menu-acoes-btn { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; margin:0;
+    border-radius:8px; display:inline-flex; align-items:center; justify-content:center; }
+  .menu-acoes-btn:hover { background:var(--surface-muted); color:var(--text); }
+  .menu-acoes-painel { position:absolute; top:calc(100% + 4px); right:0; min-width:180px; background:var(--card);
+    border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:0 12px 32px rgba(15,17,26,.12); padding:6px; z-index:40; }
+  .menu-acoes-painel a { display:block; padding:8px 10px; border-radius:8px; font-size:13px; color:var(--text-secondary); text-decoration:none; }
+  .menu-acoes-painel a:hover { background:var(--surface-muted); }
+
+  .kanban-vagas { display:grid; grid-template-columns:repeat(5, minmax(220px, 1fr)); gap:14px; align-items:start; overflow-x:auto; padding-bottom:8px; }
+  .kanban-coluna { display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .kanban-coluna-titulo { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); padding:0 2px; }
+  .card-vaga { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; }
+  .card-vaga-topo { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .card-vaga-nome { font-size:13.5px; font-weight:700; color:var(--text); }
+  .card-vaga-data { font-size:11.5px; color:var(--muted); margin-top:6px; }
 </style>
 </head>
 <body>
@@ -86,11 +108,30 @@
         </div>
       </div>
 
-      <div class="card" style="padding:0">
-        <table>
-          <thead><tr><th>Nome</th><th>Cargo</th><th>Status</th><th>Criada em</th><th></th></tr></thead>
-          <tbody id="tabela-vagas"></tbody>
-        </table>
+      <div class="visualizacao-toggle" id="visualizacao-toggle">
+        <button type="button" data-vis="lista">Lista</button>
+        <button type="button" data-vis="kanban">Colunas</button>
+      </div>
+
+      <div id="vista-lista">
+        <div class="card" style="padding:0">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome vaga</th>
+                <th>Status</th>
+                <th>Total de candidatos</th>
+                <th>Total em andamento</th>
+                <th>Criada em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabela-vagas"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="vista-kanban" hidden>
+        <div class="kanban-vagas" id="kanban-vagas"></div>
       </div>
     </div>
   </div>
@@ -110,25 +151,102 @@
 
     let formRequisitos = [];
     let formCamposExtras = [];
+    let vagas = [];
+    let visualizacao = localStorage.getItem('people_vagas_visualizacao') === 'kanban' ? 'kanban' : 'lista';
+    const STATUS_ORDEM = ['rascunho', 'nova', 'em_andamento', 'pausada', 'encerrada'];
 
-    async function carregarVagas() {
-      const res = await apiFetch('/people/api/vagas');
-      const vagas = await res.json();
+    function menuAcoesHtml(v) {
+      return `
+        <div class="menu-acoes">
+          <button class="menu-acoes-btn" type="button" data-abrir-menu="${v.id}" aria-label="Ações" title="Ações">${icon('menu', 18)}</button>
+          <div class="menu-acoes-painel" id="menu-acoes-${v.id}" hidden>
+            <a href="#" data-editar="${v.id}">Editar</a>
+            <a href="#" data-duplicar="${v.id}">Duplicar</a>
+            <a href="#" data-candidaturas="${v.id}" data-nome="${v.nome}">Ver candidaturas</a>
+            <a href="#" data-link="${v.id}">Copiar link</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function fecharMenusAcoes() {
+      document.querySelectorAll('.menu-acoes-painel').forEach((p) => { p.hidden = true; });
+    }
+
+    function aplicarVisualizacao() {
+      document.getElementById('vista-lista').hidden = visualizacao !== 'lista';
+      document.getElementById('vista-kanban').hidden = visualizacao !== 'kanban';
+      document.querySelectorAll('#visualizacao-toggle button').forEach((b) => b.classList.toggle('ativo', b.dataset.vis === visualizacao));
+    }
+
+    function renderizar() {
+      if (visualizacao === 'kanban') renderizarKanban(); else renderizarLista();
+    }
+
+    function renderizarLista() {
       const corpo = document.getElementById('tabela-vagas');
       corpo.innerHTML = vagas.map((v) => `
         <tr>
           <td>${v.status === 'rascunho' ? '<span class="badge neutro" style="margin-right:6px">Rascunho</span>' : ''}${v.nome}</td>
-          <td>${v.cargo || '—'}</td>
           <td><span class="badge ${STATUS_CLASSE[v.status]}">${STATUS_LABEL[v.status]}</span></td>
+          <td>${v.total_candidatos}</td>
+          <td>${v.total_em_andamento}</td>
           <td>${new Date(v.criado_em).toLocaleDateString('pt-BR')}</td>
-          <td>
-            <a class="acao" href="#" data-editar="${v.id}">Editar</a>
-            <a class="acao" href="#" data-duplicar="${v.id}">Duplicar</a>
-            <a class="acao" href="#" data-candidaturas="${v.id}" data-nome="${v.nome}">Ver candidaturas</a>
-            <a class="acao" href="#" data-link="${v.id}">Copiar link</a>
-          </td>
+          <td>${menuAcoesHtml(v)}</td>
         </tr>
-      `).join('') || '<tr><td colspan="5" class="vazio">Nenhuma vaga cadastrada ainda.</td></tr>';
+      `).join('') || '<tr><td colspan="6" class="vazio">Nenhuma vaga cadastrada ainda.</td></tr>';
+    }
+
+    function renderizarKanban() {
+      const container = document.getElementById('kanban-vagas');
+      container.innerHTML = STATUS_ORDEM.map((status) => {
+        const doStatus = vagas.filter((v) => v.status === status);
+        return `
+          <div class="kanban-coluna">
+            <div class="kanban-coluna-titulo">${STATUS_LABEL[status]} (${doStatus.length})</div>
+            ${doStatus.map((v) => `
+              <div class="card-vaga">
+                <div class="card-vaga-topo">
+                  <span class="card-vaga-nome">${v.nome}</span>
+                  ${menuAcoesHtml(v)}
+                </div>
+                <div class="card-vaga-data">${new Date(v.criado_em).toLocaleDateString('pt-BR')}</div>
+              </div>
+            `).join('') || '<p class="campo-ajuda">Nenhuma vaga.</p>'}
+          </div>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('visualizacao-toggle').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-vis]');
+      if (!btn) return;
+      visualizacao = btn.dataset.vis;
+      localStorage.setItem('people_vagas_visualizacao', visualizacao);
+      aplicarVisualizacao();
+      renderizar();
+    });
+
+    async function carregarVagas() {
+      const res = await apiFetch('/people/api/vagas');
+      vagas = await res.json();
+      aplicarVisualizacao();
+      renderizar();
+    }
+
+    async function copiarLink(vaga) {
+      const url = `${window.location.origin}/people/vaga/${vaga.id}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        avisar('Link copiado', url);
+      } catch {
+        avisar('Não foi possível copiar automaticamente', `Copie manualmente: ${url}`);
+      }
+      if (vaga.status === 'nova') {
+        await apiFetch(`/people/api/vagas/${vaga.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'em_andamento' }) });
+        vaga.status = 'em_andamento';
+        renderizar();
+      }
     }
 
     function formularioVaga(vaga, modo) {
@@ -409,22 +527,40 @@
 
     document.getElementById('btn-nova-vaga').addEventListener('click', () => abrirModalVaga(null, 'criar'));
 
-    document.getElementById('tabela-vagas').addEventListener('click', (e) => {
+    // Os links de ação agora vivem dentro do menu sanduíche (por linha na
+    // lista, por card nas colunas) — um único listener no document cobre
+    // as duas visualizações em vez de um por container.
+    document.addEventListener('click', (e) => {
+      const abrirBtn = e.target.closest('[data-abrir-menu]');
+      if (abrirBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const painel = document.getElementById(`menu-acoes-${abrirBtn.dataset.abrirMenu}`);
+        const jaAberto = !painel.hidden;
+        fecharMenusAcoes();
+        painel.hidden = jaAberto;
+        return;
+      }
+
       const editar = e.target.closest('[data-editar]');
-      if (editar) { e.preventDefault(); abrirModalEditar(editar.dataset.editar); return; }
+      if (editar) { e.preventDefault(); fecharMenusAcoes(); abrirModalEditar(editar.dataset.editar); return; }
 
       const duplicar = e.target.closest('[data-duplicar]');
-      if (duplicar) { e.preventDefault(); abrirModalDuplicar(duplicar.dataset.duplicar); return; }
+      if (duplicar) { e.preventDefault(); fecharMenusAcoes(); abrirModalDuplicar(duplicar.dataset.duplicar); return; }
 
       const candidaturas = e.target.closest('[data-candidaturas]');
-      if (candidaturas) { e.preventDefault(); abrirModalCandidaturas(candidaturas.dataset.candidaturas, candidaturas.dataset.nome); return; }
+      if (candidaturas) { e.preventDefault(); fecharMenusAcoes(); abrirModalCandidaturas(candidaturas.dataset.candidaturas, candidaturas.dataset.nome); return; }
 
       const link = e.target.closest('[data-link]');
       if (link) {
         e.preventDefault();
-        const url = `${window.location.origin}/people/vaga/${link.dataset.link}`;
-        navigator.clipboard.writeText(url).then(() => alert(`Link copiado:\n${url}`));
+        fecharMenusAcoes();
+        const vaga = vagas.find((v) => v.id === link.dataset.link);
+        if (vaga) copiarLink(vaga);
+        return;
       }
+
+      if (!e.target.closest('.menu-acoes-painel')) fecharMenusAcoes();
     });
 
     document.addEventListener('click', async (e) => {
