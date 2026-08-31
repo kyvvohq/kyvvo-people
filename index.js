@@ -299,7 +299,7 @@ async function build() {
       if (assinatura.asaas_subscription_id && assinatura.status !== 'cancelado') {
         await asaas.atualizarSubscription({
           subscriptionId: assinatura.asaas_subscription_id, billingType, creditCardToken,
-          valor: valorCiclo, cycle: CICLO_ASAAS[ciclo], tenantId,
+          valor: valorCiclo, cycle: CICLO_ASAAS[ciclo], planoNome: planoInfo.nome, tenantId,
         });
         subscriptionId = assinatura.asaas_subscription_id;
       } else {
@@ -371,7 +371,8 @@ async function build() {
     const valorCiclo = Number(planoInfo.preco_mensal) * MULTIPLICADOR_CICLO[ciclo];
     try {
       await asaas.atualizarSubscription({
-        subscriptionId: assinatura.asaas_subscription_id, valor: valorCiclo, cycle: CICLO_ASAAS[ciclo], tenantId,
+        subscriptionId: assinatura.asaas_subscription_id, valor: valorCiclo, cycle: CICLO_ASAAS[ciclo],
+        planoNome: planoInfo.nome, tenantId,
       });
     } catch (erro) {
       request.log.error(`Falha ao trocar plano do tenant ${tenantId} para ${planoInfo.chave}/${ciclo}: ${erro.message}`);

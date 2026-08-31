@@ -475,7 +475,7 @@
     async function avancarEtapa(c) {
       const res = await apiFetch(`/people/api/candidaturas/${c.id}/avancar-etapa`, { method: 'PATCH' });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Falha ao avançar etapa'); return; }
+      if (!res.ok) { avisar('Erro', data.error || 'Falha ao avançar etapa'); return; }
 
       if (data.semProximaEtapa) {
         perguntarNovaEtapa(c);

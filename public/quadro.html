@@ -317,7 +317,7 @@
             method: 'PATCH',
             body: JSON.stringify({ etapa_id: etapaId }),
           });
-          if (!res.ok) { alert('Falha ao mover candidatura'); carregar(); }
+          if (!res.ok) { avisar('Erro', 'Falha ao mover candidatura'); carregar(); }
         });
       });
 

@@ -574,14 +574,14 @@
     async function abrirModalEditar(id) {
       const res = await apiFetch(`/people/api/vagas/${id}`);
       const vaga = await res.json();
-      if (!res.ok) { alert(vaga.error || 'Falha ao carregar vaga'); return; }
+      if (!res.ok) { avisar('Erro', vaga.error || 'Falha ao carregar vaga'); return; }
       abrirModalVaga(vaga, 'editar');
     }
 
     async function abrirModalDuplicar(id) {
       const res = await apiFetch(`/people/api/vagas/${id}`);
       const vaga = await res.json();
-      if (!res.ok) { alert(vaga.error || 'Falha ao carregar vaga'); return; }
+      if (!res.ok) { avisar('Erro', vaga.error || 'Falha ao carregar vaga'); return; }
       abrirModalVaga({ ...vaga, nomeOriginal: vaga.nome, nome: '' }, 'duplicar');
     }
 
