@@ -127,6 +127,7 @@ async function build() {
       asaas_meio_pagamento: a.asaas_meio_pagamento,
       asaas_cartao_final: a.asaas_cartao_final,
       cpf_cnpj: a.cpf_cnpj,
+      contato_telefone: a.contato_telefone,
       tem_assinatura: Boolean(a.asaas_subscription_id),
       cancelado_em: a.cancelado_em,
       acesso_ate: a.acesso_ate,
@@ -164,6 +165,7 @@ async function build() {
       cartao_validade_mes: cartaoValidadeMes,
       cartao_validade_ano: cartaoValidadeAno,
       cartao_cvv: cartaoCvv,
+      telefone: telefoneBruto,
       endereco: enderecoBruto,
     } = request.body || {};
 
@@ -194,6 +196,15 @@ async function build() {
     const cpfCnpjLimpo = String(cpfCnpjBruto || '').replace(/\D/g, '') || assinatura.cpf_cnpj;
     if (!assinatura.asaas_customer_id && !CPF_CNPJ_REGEX.test(cpfCnpjLimpo || '')) {
       return reply.code(400).send({ error: 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.' });
+    }
+
+    // A Asaas exige o telefone (celular, DDD + 9 dígitos) do titular do
+    // cartão pra tokenizar — "Informe o número de contato com DDD do
+    // titular do cartão" se faltar. Reaproveita o valor já salvo (mesmo
+    // padrão do CPF/CNPJ) pra não pedir de novo em toda troca de cartão.
+    const telefoneLimpo = String(telefoneBruto || '').replace(/\D/g, '') || assinatura.contato_telefone;
+    if (meio === 'cartao' && !/^\d{10,11}$/.test(telefoneLimpo || '')) {
+      return reply.code(400).send({ error: 'Informe o telefone (com DDD) do titular do cartão.' });
     }
 
     let endereco = {
@@ -267,6 +278,7 @@ async function build() {
             postalCode: endereco.cep,
             addressNumber: endereco.numero,
             addressComplement: endereco.complemento || undefined,
+            mobilePhone: telefoneLimpo,
           },
           remoteIp: request.ip,
         });
@@ -304,7 +316,7 @@ async function build() {
          asaas_customer_id = $2, asaas_subscription_id = $3, plano = $4, status = $5,
          asaas_meio_pagamento = $6, asaas_cartao_final = $7, cpf_cnpj = $8,
          endereco_cep = $9, endereco_logradouro = $10, endereco_numero = $11, endereco_complemento = $12,
-         endereco_bairro = $13, endereco_cidade = $14, endereco_uf = $15,
+         endereco_bairro = $13, endereco_cidade = $14, endereco_uf = $15, contato_telefone = $16,
          cancelado_em = null, acesso_ate = null, status_alterado_em = now(), atualizado_em = now()
        where tenant_id = $1
        returning *`,
@@ -312,6 +324,7 @@ async function build() {
         tenantId, customer.id, subscriptionId, planoInfo.chave, novoStatus, meio,
         meio === 'cartao' ? cartaoFinal : null, cpfCnpjLimpo,
         endereco.cep, endereco.logradouro, endereco.numero, endereco.complemento, endereco.bairro, endereco.cidade, endereco.uf,
+        telefoneLimpo || null,
       ]
     );
 

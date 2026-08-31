@@ -283,6 +283,8 @@
                 <div><label for="pg-cartao-mes">Validade — mês</label><input id="pg-cartao-mes" placeholder="MM"></div>
                 <div><label for="pg-cartao-ano">Validade — ano</label><input id="pg-cartao-ano" placeholder="AAAA"></div>
               </div>
+              <label for="pg-telefone">Telefone do titular do cartão (com DDD)</label>
+              <input id="pg-telefone" placeholder="Só números" value="${pagamento.contato_telefone || ''}">
               <label>Endereço de cobrança</label>
               <div class="grid2">
                 <div><input id="pg-cep" placeholder="CEP"></div>
@@ -327,6 +329,7 @@
           corpo.cartao_cvv = document.getElementById('pg-cartao-cvv').value.trim();
           corpo.cartao_validade_mes = document.getElementById('pg-cartao-mes').value.trim();
           corpo.cartao_validade_ano = document.getElementById('pg-cartao-ano').value.trim();
+          corpo.telefone = document.getElementById('pg-telefone').value.trim();
           corpo.endereco = {
             cep: document.getElementById('pg-cep').value.trim(),
             numero: document.getElementById('pg-numero').value.trim(),
