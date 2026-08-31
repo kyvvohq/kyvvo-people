@@ -396,11 +396,18 @@ async function build() {
   // é SUBSCRIPTION_DELETED. server/panel/routes/pagamentos.js do Kyvvo
   // principal tem esse mesmo mapeamento errado — não corrigido lá agora,
   // só aqui.
+  // PAYMENT_REFUNDED/PAYMENT_CHARGEBACK_REQUESTED faltavam (achado
+  // 2026-08-31: Bruno estornou um Pix de teste e a assinatura continuou
+  // 'ativo', porque nenhum dos dois eventos tinha mapeamento — a Asaas
+  // pode até ter disparado certinho, meu código simplesmente ignorava por
+  // não reconhecer o evento).
   const ASAAS_EVENTO_PARA_STATUS = {
     PAYMENT_CONFIRMED: 'ativo',
     PAYMENT_RECEIVED: 'ativo',
     PAYMENT_OVERDUE: 'inadimplente',
     PAYMENT_DELETED: 'suspenso',
+    PAYMENT_REFUNDED: 'suspenso',
+    PAYMENT_CHARGEBACK_REQUESTED: 'suspenso',
     SUBSCRIPTION_DELETED: 'cancelado',
   };
 
@@ -413,7 +420,12 @@ async function build() {
 
     const { event, payment, subscription } = request.body || {};
     const novoStatus = ASAAS_EVENTO_PARA_STATUS[event];
-    if (!novoStatus) return { ok: true };
+    if (!novoStatus) {
+      // Loga em vez de só ignorar — foi assim que PAYMENT_REFUNDED passou
+      // batido antes (evento sem mapeamento nunca deixava rastro nenhum).
+      request.log.info(`Webhook Asaas: evento "${event}" sem mapeamento, ignorado`);
+      return { ok: true };
+    }
     const subscriptionId = (payment && payment.subscription) || (subscription && subscription.id);
     if (!subscriptionId) return { ok: true };
 
