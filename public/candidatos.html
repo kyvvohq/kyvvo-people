@@ -11,6 +11,9 @@
 <script>document.documentElement.setAttribute('data-tema', localStorage.getItem('people_tema') || 'claro');</script>
 <link rel="stylesheet" href="/people/shell.css">
 <style>
+  .linha-candidatura-extra { background:var(--surface-muted); }
+  .linha-candidatura-extra td { color:var(--muted-strong); }
+  .badge-mais-vagas:hover { filter:brightness(0.95); }
   .candidatos-layout { display:flex; gap:var(--space-4); align-items:flex-start; }
   .candidatos-lista-col { flex:1; min-width:0; }
   .candidatos-layout.selecionado .candidatos-lista-col { flex:0 0 300px; }
@@ -132,6 +135,7 @@
     let etapas = [];
     let idSelecionado = new URLSearchParams(window.location.search).get('id') || null;
     let urlPreview = null;
+    let pessoasExpandidas = new Set();
 
     async function carregarListas() {
       const [resCand, resVagas, resEtapas] = await Promise.all([
@@ -167,8 +171,9 @@
         const porIdadeAsc = [...lista].sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em));
         const ativas = porIdadeAsc.filter((c) => c.vaga_status !== 'encerrada');
         const principal = ativas[0] || porIdadeAsc[0];
+        const extrasList = ativas.slice(1);
         const maisRecente = [...lista].sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))[0];
-        return { principal, extras: Math.max(ativas.length - 1, 0), ordenacao: maisRecente.criado_em };
+        return { principal, extrasList, extras: extrasList.length, ordenacao: maisRecente.criado_em };
       }).sort((a, b) => new Date(b.ordenacao) - new Date(a.ordenacao));
     }
 
@@ -183,19 +188,41 @@
           <table>
             <thead><tr><th>Nome</th><th>Vaga</th><th>Contato</th><th>Etapa</th><th>Candidatou-se em</th></tr></thead>
             <tbody>
-              ${grupos.map(({ principal: c, extras }) => `
-                <tr class="linha-candidatura" data-id="${c.id}" style="cursor:pointer">
-                  <td>${c.nome}</td>
-                  <td>${extras > 0 ? `<span class="badge neutro" title="Concorrendo a mais ${extras} vaga(s) ao mesmo tempo">+${extras}</span> ` : ''}${c.vaga_nome}${c.vaga_status === 'encerrada' ? ' <span class="badge neutro">Encerrada</span>' : ''}</td>
-                  <td>${c.whatsapp} · ${c.email}</td>
-                  <td><span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span></td>
-                  <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
-                </tr>
-              `).join('') || ''}
+              ${grupos.map(({ principal: c, extras, extrasList }) => {
+                const expandido = extras > 0 && pessoasExpandidas.has(c.candidato_id);
+                const linhaPrincipal = `
+                  <tr class="linha-candidatura" data-id="${c.id}" style="cursor:pointer">
+                    <td>${c.nome}</td>
+                    <td>${extras > 0 ? `<span class="badge neutro badge-mais-vagas" data-toggle-extras="${c.candidato_id}" title="${expandido ? 'Ocultar' : 'Mostrar'} mais ${extras} vaga(s)" style="cursor:pointer">+${extras}</span> ` : ''}${c.vaga_nome}${c.vaga_status === 'encerrada' ? ' <span class="badge neutro">Encerrada</span>' : ''}</td>
+                    <td>${c.whatsapp} · ${c.email}</td>
+                    <td><span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span></td>
+                    <td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td>
+                  </tr>
+                `;
+                const linhasExtras = expandido ? extrasList.map((x) => `
+                  <tr class="linha-candidatura linha-candidatura-extra" data-id="${x.id}" style="cursor:pointer">
+                    <td></td>
+                    <td>${x.vaga_nome}${x.vaga_status === 'encerrada' ? ' <span class="badge neutro">Encerrada</span>' : ''}</td>
+                    <td></td>
+                    <td><span class="badge ${STATUS_CLASSE[x.status]}">${STATUS_LABEL[x.status]}</span></td>
+                    <td>${new Date(x.criado_em).toLocaleDateString('pt-BR')}</td>
+                  </tr>
+                `).join('') : '';
+                return linhaPrincipal + linhasExtras;
+              }).join('') || ''}
             </tbody>
           </table>
           ${!grupos.length ? '<div class="vazio" style="padding:16px">Nenhuma candidatura recebida ainda.</div>' : ''}
         `;
+        container.querySelectorAll('[data-toggle-extras]').forEach((badge) => {
+          badge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const candidatoId = badge.dataset.toggleExtras;
+            if (pessoasExpandidas.has(candidatoId)) pessoasExpandidas.delete(candidatoId);
+            else pessoasExpandidas.add(candidatoId);
+            renderizarLista();
+          });
+        });
       } else {
         container.innerHTML = `
           <div class="lista-candidaturas">

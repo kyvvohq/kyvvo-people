@@ -612,14 +612,18 @@ async function build() {
   });
 
   // --- Vagas (autenticado) ---
-  const CAMPOS_VAGA_OBRIGATORIOS = ['nome', 'descricao', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
+  // Redesenho do formulário (2026-08-31): código/cargo/competências saíram
+  // (colunas continuam no banco pra não perder dado de vaga antiga, só não
+  // são mais coletadas); nível de experiência deixou de ser obrigatório.
+  const CAMPOS_VAGA_OBRIGATORIOS = ['nome', 'descricao', 'requisitos'];
   const CAMPOS_VAGA_EDITAVEIS = [
-    'codigo', 'nome', 'descricao', 'salario', 'modalidade',
-    'nivel_experiencia', 'cargo', 'requisitos', 'competencias', 'status', 'pesos',
+    'nome', 'empresa', 'cidade', 'descricao', 'salario', 'modalidade', 'tipo_vaga',
+    'nivel_experiencia', 'requisitos', 'status', 'pesos',
     'requisitos_estruturados', 'limites', 'campos_excluidos_score',
   ];
   const CAMPOS_VAGA_JSONB = ['pesos', 'requisitos_estruturados', 'limites', 'campos_excluidos_score'];
   const STATUS_VAGA_VALIDOS = ['rascunho', 'nova', 'em_andamento', 'pausada', 'encerrada'];
+  const TIPO_VAGA_VALIDOS = ['CLT', 'PJ', 'Estágio', 'Integral', 'Meio período'];
 
   // Lista fixa do que o motor de match nunca deve considerar — o
   // recrutador só pode ADICIONAR itens, nunca remover os defaults
@@ -683,16 +687,19 @@ async function build() {
         return reply.code(400).send({ error: `Campos obrigatórios faltando: ${faltando.join(', ')}` });
       }
     }
+    if (dados.tipo_vaga && !TIPO_VAGA_VALIDOS.includes(dados.tipo_vaga)) {
+      return reply.code(400).send({ error: 'Tipo de vaga inválido' });
+    }
     const erroValidacao = validarRequisitosVaga(dados);
     if (erroValidacao) return reply.code(400).send({ error: erroValidacao });
 
     const id = crypto.randomUUID();
     const camposOpcionais = ['pesos', 'requisitos_estruturados', 'limites', 'campos_excluidos_score'].filter((c) => dados[c] !== undefined);
-    const colunas = ['id', 'tenant_id', 'codigo', 'nome', 'descricao', 'salario', 'modalidade', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias', 'status', ...camposOpcionais];
+    const colunas = ['id', 'tenant_id', 'nome', 'empresa', 'cidade', 'descricao', 'salario', 'modalidade', 'tipo_vaga', 'nivel_experiencia', 'requisitos', 'status', ...camposOpcionais];
     const valoresBase = [
-      id, request.user.tenantId, dados.codigo || null, dados.nome, dados.descricao || null,
-      dados.salario || null, dados.modalidade || null, dados.nivel_experiencia || null,
-      dados.cargo || null, dados.requisitos || null, dados.competencias || null,
+      id, request.user.tenantId, dados.nome, dados.empresa || null, dados.cidade || null, dados.descricao || null,
+      dados.salario || null, dados.modalidade || null, dados.tipo_vaga || null, dados.nivel_experiencia || null,
+      dados.requisitos || null,
       rascunho ? 'rascunho' : 'nova',
     ];
     const valoresOpcionais = camposOpcionais.map((c) => JSON.stringify(dados[c]));
@@ -736,6 +743,9 @@ async function build() {
     }
     if (dados.status && !STATUS_VAGA_VALIDOS.includes(dados.status)) {
       return reply.code(400).send({ error: 'Status inválido' });
+    }
+    if (dados.tipo_vaga && !TIPO_VAGA_VALIDOS.includes(dados.tipo_vaga)) {
+      return reply.code(400).send({ error: 'Tipo de vaga inválido' });
     }
     const erroValidacao = validarRequisitosVaga(dados);
     if (erroValidacao) return reply.code(400).send({ error: erroValidacao });
@@ -1200,7 +1210,7 @@ async function build() {
 
   fastify.get('/people/api/vaga-publica/:id', async (request, reply) => {
     const { rows } = await pool.query(
-      `select nome, descricao, salario, modalidade, nivel_experiencia, cargo, requisitos, competencias, status
+      `select nome, empresa, cidade, descricao, salario, modalidade, tipo_vaga, nivel_experiencia, cargo, requisitos, competencias, status
        from vagas where id = $1`,
       [request.params.id]
     );

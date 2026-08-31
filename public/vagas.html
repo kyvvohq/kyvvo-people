@@ -167,8 +167,8 @@
   <script>
     const STATUS_CLASSE = { rascunho: 'neutro', nova: 'destaque', em_andamento: 'aviso', pausada: 'aviso', encerrada: 'neutro' };
     const STATUS_LABEL = { rascunho: 'Rascunho', nova: 'Nova', em_andamento: 'Em andamento', pausada: 'Pausada', encerrada: 'Encerrada' };
-    const CAMPOS = ['codigo', 'nome', 'descricao', 'salario', 'modalidade', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
-    const CAMPOS_OBRIGATORIOS = ['nome', 'descricao', 'nivel_experiencia', 'cargo', 'requisitos', 'competencias'];
+    const CAMPOS = ['nome', 'empresa', 'cidade', 'descricao', 'salario', 'modalidade', 'tipo_vaga', 'nivel_experiencia', 'requisitos'];
+    const CAMPOS_OBRIGATORIOS = ['nome', 'descricao', 'requisitos'];
     const CAMPOS_EXCLUIDOS_DEFAULT = ['idade', 'ano_formatura', 'genero', 'estado_civil', 'nome', 'foto', 'endereco_completo', 'gaps_temporais_nao_justificados'];
 
     let formRequisitos = [];
@@ -328,17 +328,13 @@
       const limites = v.limites || { max_eliminatorios: 3 };
       return `
         <div class="modal-erro" id="msg-vaga"></div>
+        <label for="nome">Nome da vaga *</label>
+        <input id="nome" required value="${v.nome || ''}">
         <div class="grid2">
-          <div><label for="codigo">Código da vaga</label><input id="codigo" value="${v.codigo || ''}"></div>
-          <div><label for="nome">Nome da vaga *</label><input id="nome" required value="${v.nome || ''}"></div>
+          <div><label for="empresa">Empresa</label><input id="empresa" value="${v.empresa || ''}"></div>
+          <div><label for="cidade">Cidade</label><input id="cidade" value="${v.cidade || ''}"></div>
         </div>
-        <label for="descricao">Descrição *</label>
-        <textarea id="descricao">${v.descricao || ''}</textarea>
         <div class="grid2">
-          <div>
-            <label for="salario">Salário</label>
-            <input id="salario" placeholder="Ex: A combinar, R$ 3.000 a R$ 4.000" value="${v.salario || ''}">
-          </div>
           <div>
             <label for="modalidade">Modalidade</label>
             <select id="modalidade">
@@ -348,18 +344,32 @@
               <option ${v.modalidade === 'Híbrido' ? 'selected' : ''}>Híbrido</option>
             </select>
           </div>
+          <div>
+            <label for="tipo_vaga">Tipo de vaga</label>
+            <select id="tipo_vaga">
+              <option value="" ${!v.tipo_vaga ? 'selected' : ''}>Selecione</option>
+              <option ${v.tipo_vaga === 'CLT' ? 'selected' : ''}>CLT</option>
+              <option ${v.tipo_vaga === 'PJ' ? 'selected' : ''}>PJ</option>
+              <option ${v.tipo_vaga === 'Estágio' ? 'selected' : ''}>Estágio</option>
+              <option ${v.tipo_vaga === 'Integral' ? 'selected' : ''}>Integral</option>
+              <option ${v.tipo_vaga === 'Meio período' ? 'selected' : ''}>Meio período</option>
+            </select>
+          </div>
         </div>
+        <label for="descricao">Descrição *</label>
+        <textarea id="descricao">${v.descricao || ''}</textarea>
         <div class="grid2">
           <div>
-            <label for="nivel_experiencia">Nível de experiência *</label>
+            <label for="salario">Salário</label>
+            <input id="salario" placeholder="Ex: A combinar, R$ 3.000 a R$ 4.000" value="${v.salario || ''}">
+          </div>
+          <div>
+            <label for="nivel_experiencia">Nível de experiência</label>
             <input id="nivel_experiencia" placeholder="Ex: Júnior, Pleno, Sênior" value="${v.nivel_experiencia || ''}">
           </div>
-          <div><label for="cargo">Cargo *</label><input id="cargo" value="${v.cargo || ''}"></div>
         </div>
         <label for="requisitos">Requisitos *</label>
         <textarea id="requisitos">${v.requisitos || ''}</textarea>
-        <label for="competencias">Competências *</label>
-        <textarea id="competencias">${v.competencias || ''}</textarea>
         ${editando ? `
           <label for="status">Status</label>
           <select id="status">
