@@ -112,8 +112,8 @@
 
   <script src="/people/shell.js"></script>
   <script>
-    const STATUS_ASSINATURA_CLASSE = { sem_assinatura: 'neutro', ativo: 'sucesso', inadimplente: 'aviso', suspenso: 'perigo', cancelado: 'neutro' };
-    const STATUS_ASSINATURA_LABEL = { sem_assinatura: 'Sem assinatura', ativo: 'Ativa', inadimplente: 'Pagamento pendente', suspenso: 'Suspensa', cancelado: 'Cancelada' };
+    const STATUS_ASSINATURA_CLASSE = { sem_assinatura: 'neutro', pendente: 'aviso', ativo: 'sucesso', inadimplente: 'aviso', suspenso: 'perigo', cancelado: 'neutro' };
+    const STATUS_ASSINATURA_LABEL = { sem_assinatura: 'Sem assinatura', pendente: 'Aguardando confirmação do pagamento', ativo: 'Ativa', inadimplente: 'Pagamento em atraso', suspenso: 'Suspensa', cancelado: 'Cancelada' };
 
     let pagamento = null;
     let planos = [];
@@ -152,6 +152,13 @@
           Plano atual: <strong>${planoAtual ? planoAtual.nome : 'Nenhum ainda'}</strong>
           ${pagamento.asaas_meio_pagamento ? ` · ${pagamento.asaas_meio_pagamento === 'cartao' ? `Cartão final ${pagamento.asaas_cartao_final}` : 'Pix'}` : ''}
         </p>
+        ${pagamento.status === 'pendente' ? `
+          <p style="font-size:13px;color:var(--warning-text,#B54708);background:var(--accent-tint);border-radius:var(--radius-md);padding:10px 12px;margin:8px 0 0">
+            ${pagamento.asaas_meio_pagamento === 'cartao'
+              ? 'Cartão em processamento — assim que a Asaas confirmar a cobrança, o plano vira ativo automaticamente.'
+              : 'Falta pagar o Pix pra ativar o plano — confira o e-mail que a Asaas te enviou com o QR code/código copia-e-cola.'}
+          </p>
+        ` : ''}
 
         <h4 style="margin:20px 0 4px;font-size:13px;color:var(--text)">Planos</h4>
         <div class="planos-preview">

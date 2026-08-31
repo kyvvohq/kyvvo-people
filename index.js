@@ -245,6 +245,7 @@ async function build() {
 
     let customer;
     let subscriptionId;
+    let assinaturaNova = false;
     try {
       customer = await asaas.criarOuRecuperarCustomer({
         tenantId, nome, email, cpfCnpj: cpfCnpjLimpo, asaasCustomerId: assinatura.asaas_customer_id,
@@ -281,17 +282,22 @@ async function build() {
           nextDueDate: new Date().toISOString().slice(0, 10), creditCardToken, tenantId,
         });
         subscriptionId = subscription.id;
+        assinaturaNova = true;
       }
     } catch (erro) {
       request.log.error(`Falha na integração com a Asaas para tenant ${tenantId}: ${erro.message}`);
       return reply.code(400).send({ error: 'Não foi possível processar o pagamento agora. Tente novamente em instantes.' });
     }
 
-    // Sem trial — a assinatura fica 'ativo' assim que a Subscription é
-    // criada na Asaas (cobrança já sai pra hoje, ver nextDueDate acima). O
-    // webhook corrige pra 'inadimplente'/'suspenso' depois se a cobrança
-    // de fato falhar — mesmo padrão otimista que o Studio já usa.
-    const novoStatus = 'ativo';
+    // Criar a Subscription não significa que já foi paga — Pix só confirma
+    // quando o candidato de fato paga o QR code/copia-e-cola (evento
+    // assíncrono, pode nunca acontecer), e cartão pode ser recusado na
+    // cobrança da primeira fatura. Correção: 'ativo' só quando o webhook
+    // confirmar de verdade (PAYMENT_CONFIRMED/PAYMENT_RECEIVED) — até lá
+    // fica 'pendente'. Só se aplica a assinatura NOVA; trocar de forma de
+    // pagamento numa assinatura já ativa não mexe no status atual (não é
+    // uma cobrança nova acontecendo agora, é só atualização de cadastro).
+    const novoStatus = assinaturaNova ? 'pendente' : assinatura.status;
 
     const { rows: atualizado } = await pool.query(
       `update assinaturas set
@@ -353,8 +359,11 @@ async function build() {
     const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [tenantId]);
     const assinatura = rows[0];
     if (!assinatura) return reply.code(404).send({ error: 'Assinatura não encontrada' });
-    if (assinatura.status !== 'ativo') {
-      return reply.code(400).send({ error: 'Só é possível cancelar uma assinatura ativa.' });
+    // 'pendente' inclui de propósito — cancelar antes da 1ª confirmação
+    // (ex: desistiu de pagar o Pix) precisa ser possível, não só depois de
+    // já estar 'ativo'.
+    if (!['ativo', 'pendente', 'inadimplente'].includes(assinatura.status)) {
+      return reply.code(400).send({ error: 'Não há assinatura em cobrança pra cancelar.' });
     }
     if (!assinatura.asaas_subscription_id) {
       return reply.code(400).send({ error: 'Nenhuma assinatura encontrada para cancelar.' });
