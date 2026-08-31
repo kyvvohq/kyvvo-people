@@ -380,12 +380,19 @@ async function build() {
   // Webhook da Asaas: atualiza o status da assinatura conforme o evento da
   // cobrança. Sem fastify.authenticate — quem chama é a Asaas, não um
   // usuário logado; a validação é pelo token no header.
+  // SUBSCRIPTION_CANCELLED não existe na API da Asaas (achado 2026-08-31
+  // consultando GET /v3/webhooks — a lista de eventos que a conta realmente
+  // dispara não tem esse nome) — o evento certo pra assinatura removida via
+  // DELETE /subscriptions/:id (mesma chamada que cancelarSubscription faz)
+  // é SUBSCRIPTION_DELETED. server/panel/routes/pagamentos.js do Kyvvo
+  // principal tem esse mesmo mapeamento errado — não corrigido lá agora,
+  // só aqui.
   const ASAAS_EVENTO_PARA_STATUS = {
     PAYMENT_CONFIRMED: 'ativo',
     PAYMENT_RECEIVED: 'ativo',
     PAYMENT_OVERDUE: 'inadimplente',
     PAYMENT_DELETED: 'suspenso',
-    SUBSCRIPTION_CANCELLED: 'cancelado',
+    SUBSCRIPTION_DELETED: 'cancelado',
   };
 
   fastify.post('/people/webhooks/asaas', async (request, reply) => {
