@@ -119,10 +119,16 @@ async function build() {
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR',
     'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
   ];
+  // Anual = valor da parcela mensal × 10 (2 meses de desconto), sempre
+  // calculado aqui a partir de planoInfo.preco_mensal — nunca aceito do
+  // cliente. `cycle` já sai no formato que a API da Asaas espera.
+  const MULTIPLICADOR_CICLO = { mensal: 1, anual: 10 };
+  const CICLO_ASAAS = { mensal: 'MONTHLY', anual: 'YEARLY' };
   function montarResumoPagamento(a) {
     if (!a) return null;
     return {
       plano: a.plano,
+      ciclo: a.ciclo,
       status: a.status,
       asaas_meio_pagamento: a.asaas_meio_pagamento,
       asaas_cartao_final: a.asaas_cartao_final,
@@ -159,6 +165,7 @@ async function build() {
     const {
       plano: planoChave,
       meio,
+      ciclo: cicloBruto,
       cpf_cnpj: cpfCnpjBruto,
       cartao_numero: cartaoNumeroBruto,
       cartao_nome: cartaoNome,
@@ -192,6 +199,8 @@ async function build() {
     const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [tenantId]);
     const assinatura = rows[0];
     if (!assinatura) return reply.code(404).send({ error: 'Assinatura não encontrada' });
+
+    const ciclo = ['mensal', 'anual'].includes(cicloBruto) ? cicloBruto : (assinatura.ciclo || 'mensal');
 
     const cpfCnpjLimpo = String(cpfCnpjBruto || '').replace(/\D/g, '') || assinatura.cpf_cnpj;
     if (!assinatura.asaas_customer_id && !CPF_CNPJ_REGEX.test(cpfCnpjLimpo || '')) {
@@ -285,13 +294,18 @@ async function build() {
         creditCardToken = tokenizado.creditCardToken;
       }
 
+      const valorCiclo = Number(planoInfo.preco_mensal) * MULTIPLICADOR_CICLO[ciclo];
+
       if (assinatura.asaas_subscription_id && assinatura.status !== 'cancelado') {
-        await asaas.atualizarSubscription({ subscriptionId: assinatura.asaas_subscription_id, billingType, creditCardToken, tenantId });
+        await asaas.atualizarSubscription({
+          subscriptionId: assinatura.asaas_subscription_id, billingType, creditCardToken,
+          valor: valorCiclo, cycle: CICLO_ASAAS[ciclo], tenantId,
+        });
         subscriptionId = assinatura.asaas_subscription_id;
       } else {
         const subscription = await asaas.criarSubscription({
-          customerId: customer.id, billingType, valor: Number(planoInfo.preco_mensal), planoNome: planoInfo.nome,
-          nextDueDate: new Date().toISOString().slice(0, 10), creditCardToken, tenantId,
+          customerId: customer.id, billingType, valor: valorCiclo, planoNome: planoInfo.nome,
+          nextDueDate: new Date().toISOString().slice(0, 10), creditCardToken, tenantId, cycle: CICLO_ASAAS[ciclo],
         });
         subscriptionId = subscription.id;
         assinaturaNova = true;
@@ -316,7 +330,7 @@ async function build() {
          asaas_customer_id = $2, asaas_subscription_id = $3, plano = $4, status = $5,
          asaas_meio_pagamento = $6, asaas_cartao_final = $7, cpf_cnpj = $8,
          endereco_cep = $9, endereco_logradouro = $10, endereco_numero = $11, endereco_complemento = $12,
-         endereco_bairro = $13, endereco_cidade = $14, endereco_uf = $15, contato_telefone = $16,
+         endereco_bairro = $13, endereco_cidade = $14, endereco_uf = $15, contato_telefone = $16, ciclo = $17,
          cancelado_em = null, acesso_ate = null, status_alterado_em = now(), atualizado_em = now()
        where tenant_id = $1
        returning *`,
@@ -324,7 +338,7 @@ async function build() {
         tenantId, customer.id, subscriptionId, planoInfo.chave, novoStatus, meio,
         meio === 'cartao' ? cartaoFinal : null, cpfCnpjLimpo,
         endereco.cep, endereco.logradouro, endereco.numero, endereco.complemento, endereco.bairro, endereco.cidade, endereco.uf,
-        telefoneLimpo || null,
+        telefoneLimpo || null, ciclo,
       ]
     );
 
@@ -333,7 +347,7 @@ async function build() {
 
   fastify.patch('/people/api/pagamentos/plano', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { plano: planoChave } = request.body || {};
+    const { plano: planoChave, ciclo: cicloBruto } = request.body || {};
 
     let planoInfo;
     try {
@@ -349,20 +363,24 @@ async function build() {
     if (!assinatura || !assinatura.asaas_subscription_id || assinatura.status === 'cancelado') {
       return reply.code(400).send({ error: 'Nenhuma assinatura ativa pra trocar de plano. Cadastre uma forma de pagamento primeiro.' });
     }
-    if (assinatura.plano === planoInfo.chave) {
+    const ciclo = ['mensal', 'anual'].includes(cicloBruto) ? cicloBruto : assinatura.ciclo;
+    if (assinatura.plano === planoInfo.chave && assinatura.ciclo === ciclo) {
       return reply.code(400).send({ error: 'Você já está nesse plano.' });
     }
 
+    const valorCiclo = Number(planoInfo.preco_mensal) * MULTIPLICADOR_CICLO[ciclo];
     try {
-      await asaas.atualizarSubscription({ subscriptionId: assinatura.asaas_subscription_id, valor: Number(planoInfo.preco_mensal), tenantId });
+      await asaas.atualizarSubscription({
+        subscriptionId: assinatura.asaas_subscription_id, valor: valorCiclo, cycle: CICLO_ASAAS[ciclo], tenantId,
+      });
     } catch (erro) {
-      request.log.error(`Falha ao trocar plano do tenant ${tenantId} para ${planoInfo.chave}: ${erro.message}`);
+      request.log.error(`Falha ao trocar plano do tenant ${tenantId} para ${planoInfo.chave}/${ciclo}: ${erro.message}`);
       return reply.code(400).send({ error: 'Não foi possível trocar de plano agora. Tente novamente em instantes.' });
     }
 
     const { rows: atualizado } = await pool.query(
-      'update assinaturas set plano = $2, atualizado_em = now() where tenant_id = $1 returning *',
-      [tenantId, planoInfo.chave]
+      'update assinaturas set plano = $2, ciclo = $3, atualizado_em = now() where tenant_id = $1 returning *',
+      [tenantId, planoInfo.chave, ciclo]
     );
     return montarResumoPagamento(atualizado[0]);
   });

@@ -118,6 +118,7 @@
     let pagamento = null;
     let planos = [];
     let cobrancaCarregada = false;
+    let cicloSelecionado = 'mensal';
 
     function formatarData(iso) {
       if (!iso) return '—';
@@ -136,6 +137,7 @@
       ]);
       if (!resPagamento.ok) { container.textContent = 'Não foi possível carregar sua assinatura agora.'; return; }
       pagamento = await resPagamento.json();
+      cicloSelecionado = pagamento.ciclo === 'anual' ? 'anual' : 'mensal';
       planos = resPlanos.ok ? await resPlanos.json() : [];
       cobrancaCarregada = true;
       renderizarCobranca();
@@ -149,7 +151,7 @@
         <h3 style="margin:0 0 10px;font-family:var(--font-display);font-size:16px;color:var(--text)">Assinatura e cobrança</h3>
         <p style="font-size:13.5px;color:var(--muted-strong);line-height:1.7;margin:0 0 4px">
           Status: <span class="badge ${STATUS_ASSINATURA_CLASSE[pagamento.status]}">${STATUS_ASSINATURA_LABEL[pagamento.status]}</span><br>
-          Plano atual: <strong>${planoAtual ? planoAtual.nome : 'Nenhum ainda'}</strong>
+          Plano atual: <strong>${planoAtual ? planoAtual.nome : 'Nenhum ainda'}</strong>${planoAtual ? ` (${pagamento.ciclo === 'anual' ? 'anual' : 'mensal'})` : ''}
           ${pagamento.asaas_meio_pagamento ? ` · ${pagamento.asaas_meio_pagamento === 'cartao' ? `Cartão final ${pagamento.asaas_cartao_final}` : 'Pix'}` : ''}
         </p>
         ${pagamento.status === 'pendente' ? `
@@ -161,6 +163,10 @@
         ` : ''}
 
         <h4 style="margin:20px 0 4px;font-size:13px;color:var(--text)">Planos</h4>
+        <div class="visualizacao-toggle" id="ciclo-toggle" style="margin-bottom:12px">
+          <button type="button" data-ciclo="mensal" class="${cicloSelecionado === 'mensal' ? 'ativo' : ''}">Mensal</button>
+          <button type="button" data-ciclo="anual" class="${cicloSelecionado === 'anual' ? 'ativo' : ''}">Anual <span style="opacity:.75">— 2 meses grátis</span></button>
+        </div>
         <div class="planos-preview">
           ${planos.map(renderizarPlanoCard).join('')}
           <div class="plano-card">
@@ -171,7 +177,7 @@
           </div>
         </div>
         <p style="font-size:12px;color:var(--muted);margin:8px 0 0">
-          Avaliações, candidatos, relatórios e resumos por IA são ilimitados em todos os planos. Cartão ou Pix, cobrança mensal recorrente.
+          Avaliações, candidatos, relatórios e resumos por IA são ilimitados em todos os planos. Cartão ou Pix. Anual cobra o valor de 10 parcelas mensais de uma vez.
         </p>
 
         ${pagamento.tem_assinatura && pagamento.status !== 'cancelado' ? `
@@ -182,11 +188,17 @@
         ` : ''}
       `;
 
+      document.querySelectorAll('#ciclo-toggle button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          cicloSelecionado = btn.dataset.ciclo;
+          renderizarCobranca();
+        });
+      });
       container.querySelectorAll('[data-assinar]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const chave = btn.dataset.assinar;
-          if (pagamento.tem_assinatura) confirmarTrocaPlano(chave);
-          else abrirModalPagamento(chave);
+          if (pagamento.tem_assinatura) confirmarTrocaPlano(chave, cicloSelecionado);
+          else abrirModalPagamento(chave, cicloSelecionado);
         });
       });
       const btnCancelar = document.getElementById('btn-cancelar-assinatura');
@@ -194,13 +206,22 @@
     }
 
     function renderizarPlanoCard(p) {
-      const atual = p.chave === pagamento.plano;
+      const mesmoPlano = p.chave === pagamento.plano;
+      const atual = mesmoPlano && cicloSelecionado === pagamento.ciclo;
+      const trocaSoDeCiclo = mesmoPlano && !atual && pagamento.tem_assinatura;
       const limites = p.limites || {};
-      const rotulo = atual ? 'Plano atual' : (pagamento.tem_assinatura ? 'Trocar pra este' : 'Assinar');
+      const precoMensal = Number(p.preco_mensal);
+      const precoExibido = cicloSelecionado === 'anual' ? precoMensal * 10 : precoMensal;
+      const sufixoPreco = cicloSelecionado === 'anual' ? '/ano' : '/mês';
+      let rotulo = 'Assinar';
+      if (atual) rotulo = 'Plano atual';
+      else if (trocaSoDeCiclo) rotulo = cicloSelecionado === 'anual' ? 'Mudar pra anual' : 'Mudar pra mensal';
+      else if (pagamento.tem_assinatura) rotulo = 'Trocar pra este';
       return `
         <div class="plano-card${atual ? ' atual' : ''}">
           <div class="nome">${p.nome}</div>
-          <div class="preco">${formatarPreco(p.preco_mensal)}<span style="font-size:12px;color:var(--muted)">/mês</span></div>
+          <div class="preco">${formatarPreco(precoExibido)}<span style="font-size:12px;color:var(--muted)">${sufixoPreco}</span></div>
+          ${cicloSelecionado === 'anual' ? `<div class="detalhe">equivalente a ${formatarPreco(precoMensal)}/mês, cobrado uma vez por ano</div>` : ''}
           <div class="detalhe">${limites.vagas_ativas ?? 'Ilimitadas'} vagas ativas simultâneas</div>
           <div class="detalhe">${limites.candidatos_notificados_mes ?? 'Sem limite'} candidatos notificados/mês</div>
           <button class="btn${atual ? ' btn-secundario' : ''}" data-assinar="${p.chave}" ${atual ? 'disabled' : ''}>${rotulo}</button>
@@ -208,12 +229,15 @@
       `;
     }
 
-    function confirmarTrocaPlano(chave) {
+    function confirmarTrocaPlano(chave, ciclo) {
       const plano = planos.find((p) => p.chave === chave);
+      const precoMensal = Number(plano.preco_mensal);
+      const precoExibido = ciclo === 'anual' ? precoMensal * 10 : precoMensal;
+      const sufixoPreco = ciclo === 'anual' ? '/ano' : '/mês';
       abrirModal(
         '<h3>Trocar de plano?</h3>',
         `
-          <p class="modal-texto">Muda pra "${plano.nome}" (${formatarPreco(plano.preco_mensal)}/mês). O novo valor só vale a partir da próxima cobrança — sem cálculo proporcional.</p>
+          <p class="modal-texto">Muda pra "${plano.nome}" (${formatarPreco(precoExibido)}${sufixoPreco}, cobrança ${ciclo === 'anual' ? 'anual' : 'mensal'}). O novo valor só vale a partir da próxima cobrança — sem cálculo proporcional.</p>
           <div class="modal-acoes">
             <button type="button" class="btn-secundario" id="cancelar-troca-plano">Cancelar</button>
             <button type="button" class="btn" id="confirmar-troca-plano">Trocar</button>
@@ -222,13 +246,13 @@
       );
       document.getElementById('cancelar-troca-plano').addEventListener('click', fecharModal);
       document.getElementById('confirmar-troca-plano').addEventListener('click', async () => {
-        const res = await apiFetch('/people/api/pagamentos/plano', { method: 'PATCH', body: JSON.stringify({ plano: chave }) });
+        const res = await apiFetch('/people/api/pagamentos/plano', { method: 'PATCH', body: JSON.stringify({ plano: chave, ciclo }) });
         const data = await res.json();
         fecharModal();
         if (!res.ok) { avisar('Erro', data.error || 'Falha ao trocar de plano'); return; }
         pagamento = data;
         renderizarCobranca();
-        avisar('Plano alterado', `Agora você está no plano ${plano.nome}.`);
+        avisar('Plano alterado', `Agora você está no plano ${plano.nome} (${ciclo === 'anual' ? 'anual' : 'mensal'}).`);
       });
     }
 
@@ -254,14 +278,17 @@
       });
     }
 
-    function abrirModalPagamento(planoChave) {
+    function abrirModalPagamento(planoChave, ciclo) {
       const plano = planos.find((p) => p.chave === planoChave);
+      const precoMensal = Number(plano.preco_mensal);
+      const precoExibido = ciclo === 'anual' ? precoMensal * 10 : precoMensal;
+      const sufixoPreco = ciclo === 'anual' ? '/ano' : '/mês';
       abrirModal(
         `<h3>Assinar ${plano.nome}</h3>`,
         `
           <form id="form-pagamento">
             <div class="modal-erro" id="msg-pagamento"></div>
-            <p class="campo-ajuda">${formatarPreco(plano.preco_mensal)}/mês. Cobrado a partir de hoje.</p>
+            <p class="campo-ajuda">${formatarPreco(precoExibido)}${sufixoPreco}${ciclo === 'anual' ? ` (equivalente a ${formatarPreco(precoMensal)}/mês)` : ''}. Cobrado a partir de hoje.</p>
 
             <label>Forma de pagamento</label>
             <div class="grid2" style="margin-bottom:10px">
@@ -322,7 +349,7 @@
         msg.textContent = '';
         const meio = document.querySelector('input[name="pg-meio"]:checked').value;
 
-        const corpo = { plano: planoChave, meio, cpf_cnpj: document.getElementById('pg-cpf-cnpj').value.trim() };
+        const corpo = { plano: planoChave, meio, ciclo, cpf_cnpj: document.getElementById('pg-cpf-cnpj').value.trim() };
         if (meio === 'cartao') {
           corpo.cartao_numero = document.getElementById('pg-cartao-numero').value.trim();
           corpo.cartao_nome = document.getElementById('pg-cartao-nome').value.trim();
@@ -349,7 +376,7 @@
         fecharModal();
         pagamento = data;
         renderizarCobranca();
-        avisar('Assinatura confirmada', `Você está no plano ${plano.nome}.`);
+        avisar('Assinatura confirmada', `Você está no plano ${plano.nome} (${ciclo === 'anual' ? 'anual' : 'mensal'}).`);
       });
     }
 
