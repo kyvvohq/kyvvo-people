@@ -9,6 +9,8 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "@kyvvohq/asaas": "^1.0.0",
+    "@kyvvohq/db-migrate": "^1.0.0",
     "@fastify/jwt": "^10.2.2",
     "@fastify/multipart": "^10.1.1",
     "@fastify/static": "^10.1.3",
