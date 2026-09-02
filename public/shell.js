@@ -86,17 +86,20 @@ document.querySelectorAll('.menu-item[href]').forEach((item) => {
 // Aplicado o mais cedo possível por um snippet inline no <head> de cada
 // página (evita flash do tema errado); aqui só sincronizamos os controles
 // visuais (toggle, texto, logos) com o que já foi aplicado no <html>.
+// Tema via atributo data-theme no <html> (padrão do @kyvvohq/design-system).
+// A chave de localStorage segue sendo `people_tema`; o snippet no <head>
+// mapeia os valores antigos ('escuro'/'claro') pros novos ('dark'/'light').
 function temaAtual() {
-  return document.documentElement.getAttribute('data-tema') === 'escuro' ? 'escuro' : 'claro';
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 function aplicarLogos() {
-  const escuro = temaAtual() === 'escuro';
+  const escuro = temaAtual() === 'dark';
   document.querySelectorAll('.topo-logo-img').forEach((img) => {
     img.src = escuro ? '/people/images/logo-kyvvo-escuro.svg' : '/people/images/logo-kyvvo.svg';
   });
 }
 function sincronizarToggleTema() {
-  const escuro = temaAtual() === 'escuro';
+  const escuro = temaAtual() === 'dark';
   document.querySelectorAll('.toggle-tema').forEach((btn) => {
     btn.classList.toggle('ligado', escuro);
     btn.setAttribute('aria-checked', String(escuro));
@@ -107,12 +110,12 @@ function sincronizarToggleTema() {
   aplicarLogos();
 }
 function definirTema(tema) {
-  document.documentElement.setAttribute('data-tema', tema);
+  document.documentElement.setAttribute('data-theme', tema);
   localStorage.setItem('people_tema', tema);
   sincronizarToggleTema();
 }
 document.querySelectorAll('.toggle-tema').forEach((btn) => {
-  btn.addEventListener('click', () => definirTema(temaAtual() === 'escuro' ? 'claro' : 'escuro'));
+  btn.addEventListener('click', () => definirTema(temaAtual() === 'dark' ? 'light' : 'dark'));
 });
 sincronizarToggleTema();
 
