@@ -1,60 +1,8 @@
-/* Shell compartilhado das telas autenticadas — Kyvvo Design System (tema
-   claro, "light é trabalho"), fonte: arquivo pen.dev "Kyvvo DS"
-   (https://app.pen.dev/s/B4enTnCo0TqMTBvckHzBcuGENXmGcxcj4hVsNdv-Brg).
-   Tokens e specs de componente extraídos de lá — ver [[project_kyvvo_people]]. */
-:root {
-  color-scheme: light;
-  --bg: #F8F9FC;
-  --card: #FFFFFF;
-  --surface-muted: #F1F3F8;
-  --border: #E7EAF2;
-  --border-strong: #D7DCE8;
-  --text: #0F111A;
-  --text-secondary: #2B3040;
-  --muted: #6B7385;
-  --muted-strong: #5A6274;
-  --accent: #7C5CFC;
-  --accent-dark: #6344E8;
-  --accent-strong: #4E33C4;
-  --accent-tint: #F1EEFF;
-  --cyan: #22C7F2;
-  --success: #12B76A;
-  --warning: #F79009;
-  --warning-text: #B54708;
-  --danger: #F04438;
-  --info: #22C7F2;
-  --whatsapp: #25D366;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-full: 999px;
-  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
-  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
-  --font-display: 'Space Grotesk', Arial, sans-serif;
-  --font-ui: 'Inter', Arial, sans-serif;
-}
-
-/* Tema escuro — escala "night"/"text" do Kyvvo DS. Esses tokens não são
-   pareados automaticamente no arquivo pen.dev (cada variante de componente
-   escolhe a cor certa manualmente) — os valores abaixo foram derivados a
-   partir das variantes "Dark" existentes no DS (cabeçalho, menu de perfil). */
-html[data-tema="escuro"] {
-  color-scheme: dark;
-  --bg: #0B0D13;
-  --card: #11131B;
-  --surface-muted: #171A24;
-  --border: #212533;
-  --border-strong: #2E3444;
-  --text: #F5F6FA;
-  --text-secondary: #C7CBD9;
-  --muted: #7C8497;
-  --muted-strong: #A2A9BA;
-  --accent: #7C5CFC;
-  --accent-dark: #9578FF;
-  --accent-strong: #C9BCFF;
-  --accent-tint: #7C5CFC29;
-}
+/* Shell compartilhado das telas autenticadas. Os tokens (cor, superfície,
+   texto, tema claro/escuro, escalas, fontes) vêm do @kyvvohq/design-system —
+   `<link rel="stylesheet" href="/ds/tokens.css">` no <head>, ANTES deste
+   arquivo. Aqui ficam só as regras de componente. Tema: data-theme="dark"
+   no <html> (ausente/"light" = claro). */
 
 * { box-sizing: border-box; }
 html, body { margin:0; min-height:100vh; }
@@ -82,7 +30,7 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .topo-perfil-gatilho svg { color:var(--muted); flex-shrink:0; }
 
 .menu-perfil { position:absolute; top:calc(100% + 8px); right:0; width:280px; background:var(--card);
-  border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 12px 32px rgba(15,17,26,.18);
+  border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 12px 32px rgba(var(--shadow-rgb),.18);
   overflow:hidden; z-index:50; }
 .menu-perfil-usuario { display:flex; align-items:center; gap:12px; padding:16px; }
 .menu-perfil-usuario .avatar { width:44px; height:44px; border-radius:50%; background:var(--accent); color:#fff;
@@ -97,13 +45,13 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .menu-perfil-item svg { color:var(--muted-strong); flex-shrink:0; }
 .menu-perfil-item .rotulo { flex:1; }
 .menu-perfil-item.perigo, .menu-perfil-item.perigo svg { color:var(--danger); }
-.menu-perfil-item.perigo:hover { background:#F044381A; }
+.menu-perfil-item.perigo:hover { background:var(--danger-bg); }
 
 .menu-perfil-tema { justify-content:space-between; cursor:default; }
 .toggle-tema { position:relative; width:44px; height:24px; border-radius:var(--radius-full); border:none;
   background:var(--border-strong); flex-shrink:0; cursor:pointer; padding:0; }
 .toggle-tema .bolinha { position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
-  background:#fff; box-shadow:0 1px 3px rgba(15,17,26,.25); transition:transform .15s ease; }
+  background:#fff; box-shadow:0 1px 3px rgba(var(--shadow-rgb),.25); transition:transform .15s ease; }
 .toggle-tema.ligado { background:#3E4557; }
 .toggle-tema.ligado .bolinha { transform:translateX(20px); background:var(--accent); }
 
@@ -194,9 +142,9 @@ a.acao:hover { color:var(--accent-dark); }
 .badge.neutro::before { display:none; }
 .badge.destaque { background:var(--accent-tint); color:var(--accent-strong); }
 .badge.destaque::before { display:none; }
-.badge.sucesso { background:#12B76A1A; color:var(--success); }
-.badge.aviso { background:#F790091F; color:var(--warning-text); }
-.badge.perigo { background:#F044381A; color:var(--danger); }
+.badge.sucesso { background:var(--success-bg); color:var(--success); }
+.badge.aviso { background:var(--warning-bg); color:var(--warning-text); }
+.badge.perigo { background:var(--danger-bg); color:var(--danger); }
 
 /* Estado vazio */
 .estado-vazio { max-width:420px; margin:0 auto; background:var(--bg); border:1.5px solid var(--border);
@@ -207,7 +155,7 @@ a.acao:hover { color:var(--accent-dark); }
 .estado-vazio p { font-size:13.5px; color:var(--muted-strong); line-height:1.6; margin:0; }
 
 /* Modal — mesmo padrão do painel principal (.modal-overlay/.modal-card/...) */
-.modal-overlay { position:fixed; inset:0; z-index:1000; background:rgba(15,17,26,.45); backdrop-filter:blur(2px);
+.modal-overlay { position:fixed; inset:0; z-index:1000; background:var(--overlay); backdrop-filter:blur(2px);
   display:flex; align-items:center; justify-content:center; padding:20px; }
 .modal-card { position:relative; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; background:var(--card);
   border:1px solid var(--border); border-radius:var(--radius-lg); padding:28px; }

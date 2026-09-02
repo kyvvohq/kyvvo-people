@@ -8,7 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script>document.documentElement.setAttribute('data-tema', localStorage.getItem('people_tema') || 'claro');</script>
+<script>(function(){var m={escuro:'dark',claro:'light',dark:'dark',light:'light'};document.documentElement.setAttribute('data-theme',m[localStorage.getItem('people_tema')]||'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/people/shell.css">
 <style>
   .visualizacao-toggle { display:inline-flex; gap:4px; background:var(--surface-muted); border-radius:var(--radius-md); padding:4px; margin-bottom:16px; }
