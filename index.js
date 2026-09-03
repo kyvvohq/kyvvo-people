@@ -20,6 +20,13 @@ const planosPeople = require('./lib/planos');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
+// Identidade/sessão saiu do painel do Studio pro serviço kyvvo-platform
+// (corte P3). Default = endereço interno na rede do compose (sem hairpin
+// pela internet). O login do People passa a não depender do painel do Studio
+// estar no ar.
+const PLATFORM_URL = process.env.PLATFORM_URL || 'http://platform:3003';
+// Ainda o painel do Studio: catálogo de planos do People (GET /api/planos/people,
+// editado no admin do Studio) — não migrou pro platform ainda.
 const KYVVO_APP_URL = process.env.KYVVO_APP_URL || 'https://studio.kyvvo.com.br';
 
 // Lista pública das características (sem os pesos de tipo psicológico/OCEAN — só o que o
@@ -62,10 +69,12 @@ async function build() {
   // registro acima (sendFile resolve pelo `root`, não pela rota).
   fastify.get('/', async (request, reply) => reply.sendFile('index.html'));
 
-  // --- Auth: valida contra o serviço de login do Kyvvo principal em vez de
-  // credencial fixa (qualquer usuário Kyvvo com o módulo "people" ativo pode
-  // entrar). O People nunca vê/toca usuarios/tenants — só confia numa
-  // checagem servidor-a-servidor e emite seu próprio JWT interno depois.
+  // --- Auth: valida contra o serviço kyvvo-platform (identidade/sessão) em
+  // vez de credencial fixa — qualquer usuário Kyvvo com o módulo "people"
+  // ativo pode entrar. O People nunca vê/toca usuarios/tenants: só confia numa
+  // checagem servidor-a-servidor (POST /api/auth/login + GET
+  // /api/auth/people/acesso na plataforma) e emite seu próprio JWT interno
+  // (12h, PEOPLE_JWT_SECRET) depois.
   fastify.post('/people/api/login', async (request, reply) => {
     const { email, senha } = request.body || {};
     if (!email || !senha) {
@@ -74,14 +83,14 @@ async function build() {
 
     let loginRes;
     try {
-      loginRes = await fetch(`${KYVVO_APP_URL}/api/auth/login`, {
+      loginRes = await fetch(`${PLATFORM_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, senha }),
         signal: AbortSignal.timeout(8000),
       });
     } catch (err) {
-      request.log.error(`Falha ao contatar login do Kyvvo: ${err.message}`);
+      request.log.error(`Falha ao contatar o serviço de identidade (kyvvo-platform): ${err.message}`);
       return reply.code(502).send({ error: 'Não foi possível validar o login agora. Tente novamente em instantes.' });
     }
     if (!loginRes.ok) {
@@ -92,7 +101,7 @@ async function build() {
 
     let acessoRes;
     try {
-      acessoRes = await fetch(`${KYVVO_APP_URL}/api/auth/people/acesso`, {
+      acessoRes = await fetch(`${PLATFORM_URL}/api/auth/people/acesso`, {
         headers: { Authorization: `Bearer ${kyvvoToken}` },
         signal: AbortSignal.timeout(8000),
       });
