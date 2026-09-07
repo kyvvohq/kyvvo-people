@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>(function(){var m={escuro:'dark',claro:'light',dark:'dark',light:'light'};document.documentElement.setAttribute('data-theme',m[localStorage.getItem('people_tema')]||'light');})();</script>
 <link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/people/shell.css">
 </head>
 <body>
@@ -79,11 +80,9 @@
     </div>
   </div>
 
-  <footer class="rodape-logado">
-    <img src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
-    <span>© 2026 Kyvvo Tecnologia. Todos os direitos reservados.</span>
-  </footer>
+  <footer data-ds-rodape></footer>
 
+  <script src="/ds/components.js"></script>
   <script src="/people/shell.js"></script>
 </body>
 </html>

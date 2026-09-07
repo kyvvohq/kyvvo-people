@@ -174,9 +174,6 @@ a.acao:hover { color:var(--accent-dark); }
 .msg.ok { color:var(--success); }
 .vazio { color:var(--muted); font-size:13px; padding:12px 0; }
 
-/* Rodapé — versão mínima de área logada (o rodapé institucional com colunas
-   de link fica só pro site de marketing, não pra um app de uso diário). */
-.rodape-logado { padding:22px var(--space-5); border-top:1px solid var(--border); display:flex; align-items:center;
-  justify-content:center; gap:8px; flex-wrap:wrap; text-align:center; }
-.rodape-logado img { height:14px; width:auto; }
-.rodape-logado span { font-size:12px; color:var(--muted); }
+/* Rodapé de área logada — agora é o componente `<footer data-ds-rodape>` do
+   @kyvvohq/design-system (components.css/.js), compartilhado com o Studio.
+   O CSS local (.rodape-logado) saiu daqui. */
