@@ -1,14 +1,15 @@
 name: Deploy to EC2
 
-# Espelha kyvvo/.github/workflows/deploy.yml: push na master -> scp pra /opt/rh
-# -> restart do serviço `people`. O container roda `npm install` no command,
-# então pega package.json/@kyvvohq/* novos ao reiniciar (.npmrc + token já
-# estão na EC2). Requer os secrets EC2_HOST, EC2_USER, EC2_SSH_KEY_B64
-# (base64 -w0 da chave privada; mesma do repo kyvvo).
+# push na branch `release` -> scp pra /opt/rh -> recria o serviço `people`.
+# "merge != deploy": PR entra no `master`; publicar = promover `master` -> `release`
+# (git push origin master:release, ou PR master->release). O container roda
+# `npm install` no command, então pega package.json/@kyvvohq/* novos ao
+# reiniciar (.npmrc + token já estão na EC2). Requer EC2_HOST, EC2_USER,
+# EC2_SSH_KEY_B64 (base64 -w0 da chave privada).
 
 on:
   push:
-    branches: [master]
+    branches: [release]
     paths:
       - ".npmrc"
       - "index.js"
