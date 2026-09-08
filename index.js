@@ -15,6 +15,7 @@ const { gerarRelatorioPdf } = require('./lib/pdf');
 const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
+const { garantirAutomacoesPadrao, dispararAutomacoes } = require('./lib/automacoes');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
 
@@ -766,6 +767,13 @@ async function build() {
     const erroValidacao = validarRequisitosVaga(dados);
     if (erroValidacao) return reply.code(400).send({ error: erroValidacao });
 
+    // Status anterior só importa pra saber se é uma transição real pra
+    // "encerrada" (automação de vaga_encerrada não deve repetir a cada PATCH
+    // que não muda o status, ex.: editar a descrição de uma vaga já encerrada).
+    const { rows: atualRows } = await pool.query('select status, nome, empresa from vagas where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!atualRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+    const statusAnterior = atualRows[0].status;
+
     const sets = campos.map((campo, i) => `${campo} = $${i + 3}`).join(', ');
     const valores = campos.map((campo) => (CAMPOS_VAGA_JSONB.includes(campo) ? JSON.stringify(dados[campo]) : dados[campo]));
     const { rows } = await pool.query(
@@ -773,6 +781,19 @@ async function build() {
       [request.params.id, request.user.tenantId, ...valores]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+
+    if (dados.status === 'encerrada' && statusAnterior !== 'encerrada') {
+      const vaga = { nome: dados.nome || atualRows[0].nome, empresa: dados.empresa !== undefined ? dados.empresa : atualRows[0].empresa };
+      const { rows: candidatosEmAberto } = await pool.query(
+        `select p.nome, p.email, p.telefone_e164
+         from candidaturas c join candidatos p on p.id = c.candidato_id
+         where c.vaga_id = $1 and c.status != 'reprovada'`,
+        [request.params.id]
+      );
+      for (const candidato of candidatosEmAberto) {
+        await dispararAutomacoes(pool, { tenantId: request.user.tenantId, gatilho: 'vaga_encerrada', candidato, vaga });
+      }
+    }
     return { ok: true };
   });
 
@@ -861,15 +882,21 @@ async function build() {
     const { motivo } = request.body || {};
     const { rows } = await pool.query(
       `update candidaturas c set status = 'reprovada', motivo_reprovacao = $3
-       from vagas v
-       where c.vaga_id = v.id and c.id = $1 and v.tenant_id = $2
-       returning c.id, c.tenant_id, c.status as status_anterior`,
+       from vagas v, candidatos p
+       where c.vaga_id = v.id and c.candidato_id = p.id and c.id = $1 and v.tenant_id = $2
+       returning c.id, c.tenant_id, c.status as status_anterior, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
       [request.params.id, request.user.tenantId, motivo || null]
     );
-    if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    const candidatura = rows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Candidatura não encontrada' });
     await registrarEvento(pool, {
-      tenantId: request.user.tenantId, candidaturaId: rows[0].id, tipo: 'candidatura_reprovada',
-      de: rows[0].status_anterior, para: 'reprovada', atorEmail: request.user.email, payload: motivo ? { motivo } : null,
+      tenantId: request.user.tenantId, candidaturaId: candidatura.id, tipo: 'candidatura_reprovada',
+      de: candidatura.status_anterior, para: 'reprovada', atorEmail: request.user.email, payload: motivo ? { motivo } : null,
+    });
+    await dispararAutomacoes(pool, {
+      tenantId: request.user.tenantId, gatilho: 'candidatura_reprovada',
+      candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
+      vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
     });
     return { ok: true };
   });
@@ -880,8 +907,8 @@ async function build() {
   // `semProximaEtapa: true` (não é erro) pro front oferecer cadastrar uma.
   fastify.patch('/people/api/candidaturas/:id/avancar-etapa', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows: candidaturaRows } = await pool.query(
-      `select c.id, c.etapa_id
-       from candidaturas c join vagas v on v.id = c.vaga_id
+      `select c.id, c.etapa_id, c.vaga_id, p.id as candidato_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa
+       from candidaturas c join vagas v on v.id = c.vaga_id join candidatos p on p.id = c.candidato_id
        where c.id = $1 and v.tenant_id = $2`,
       [request.params.id, request.user.tenantId]
     );
@@ -903,6 +930,11 @@ async function build() {
     await registrarEvento(pool, {
       tenantId: request.user.tenantId, candidaturaId: candidatura.id, tipo: 'etapa_alterada',
       de: etapaAnteriorNome, para: proxima.nome, atorEmail: request.user.email,
+    });
+    await dispararAutomacoes(pool, {
+      tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: proxima.id, etapaNome: proxima.nome,
+      candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
+      vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
     });
     return { ok: true, etapa: proxima };
   });
@@ -1017,9 +1049,24 @@ async function build() {
     );
     if (existentes[0]) return { candidatura: existentes[0], pessoa, reaproveitada: true };
 
-    const { rows: vagaRows } = await pool.query('select pesos from vagas where id = $1', [vagaId]);
-    const pesosSnapshot = vagaRows[0] ? vagaRows[0].pesos : null;
+    const { rows: vagaRows } = await pool.query('select nome, empresa, pesos from vagas where id = $1', [vagaId]);
+    const vagaInfo = vagaRows[0] || {};
+    const pesosSnapshot = vagaInfo.pesos;
     const avaliacaoExistente = await avaliacaoReaproveitavel(pool, pessoa.id);
+
+    // Automação "candidatura recebida" (lib/automacoes.js) sempre leva o link
+    // de avaliação — se não há uma reaproveitável, cria uma pendente já aqui
+    // (antes só acontecia quando o recrutador clicava "enviar avaliação" à
+    // mão em /candidatos/:id/enviar-avaliacao).
+    let avaliacaoId = avaliacaoExistente ? avaliacaoExistente.id : null;
+    let tokenAvaliacao = avaliacaoExistente ? null : crypto.randomUUID();
+    if (!avaliacaoExistente) {
+      avaliacaoId = crypto.randomUUID();
+      await pool.query(
+        'insert into avaliacoes (id, tenant_id, candidato_id, token) values ($1, $2, $3, $4)',
+        [avaliacaoId, tenantId, pessoa.id, tokenAvaliacao]
+      );
+    }
 
     const id = crypto.randomUUID();
     const { rows } = await pool.query(
@@ -1029,7 +1076,7 @@ async function build() {
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        returning *`,
       [
-        id, vagaId, tenantId, pessoa.id, avaliacaoExistente ? avaliacaoExistente.id : null, origem,
+        id, vagaId, tenantId, pessoa.id, avaliacaoId, origem,
         pesosSnapshot ? JSON.stringify(pesosSnapshot) : null,
         curriculo ? curriculo.nome : 'sem-arquivo', curriculo ? curriculo.tipo : 'application/octet-stream',
         curriculo ? curriculo.buffer : Buffer.alloc(0),
@@ -1045,6 +1092,18 @@ async function build() {
     // sozinha (só a partir de 'nova', nunca mexe em rascunho/pausada/
     // encerrada, que são decisões deliberadas do recrutador).
     await pool.query("update vagas set status = 'em_andamento' where id = $1 and status = 'nova'", [vagaId]);
+
+    // Automações não fazem sentido pra reaproveitamento manual do banco de
+    // talentos (origem='banco_de_talentos', sem currículo novo, ator é o
+    // recrutador) — só dispara pra quem entrou de fato pelo fluxo público.
+    if (origem !== 'banco_de_talentos') {
+      const tokenParaLink = tokenAvaliacao || (avaliacaoExistente && avaliacaoExistente.token);
+      await dispararAutomacoes(pool, {
+        tenantId, gatilho: 'candidatura_criada',
+        candidato: pessoa, vaga: vagaInfo,
+        linkAvaliacao: tokenParaLink ? `${PUBLIC_URL}/people/avaliacao/${tokenParaLink}` : null,
+      });
+    }
     return { candidatura, pessoa, reaproveitada: false };
   }
 
@@ -1181,6 +1240,90 @@ async function build() {
     return { ok: true };
   });
 
+  // --- Automações do fluxo de vaga (e-mail/WhatsApp por gatilho) ---
+  const GATILHOS_AUTOMACAO_VALIDOS = ['candidatura_criada', 'etapa_alcancada', 'candidatura_reprovada', 'vaga_encerrada'];
+  const CANAIS_AUTOMACAO_VALIDOS = ['email', 'whatsapp'];
+
+  // Garante os seeds (candidatura_criada/reprovada/vaga_encerrada) antes de
+  // listar — cobre o tenant que nunca disparou nenhuma automação ainda.
+  fastify.get('/people/api/automacoes', { preHandler: fastify.authenticate }, async (request) => {
+    await garantirAutomacoesPadrao(pool, request.user.tenantId);
+    const { rows } = await pool.query(
+      `select a.*, e.nome as etapa_nome from automacoes a
+       left join etapas e on e.id = a.etapa_id
+       where a.tenant_id = $1 order by a.gatilho, e.ordem nulls first, a.canal`,
+      [request.user.tenantId]
+    );
+    return rows;
+  });
+
+  fastify.post('/people/api/automacoes', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { gatilho, etapa_id, canal, nome, assunto, corpo, whatsapp_template, ativo } = request.body || {};
+    if (!GATILHOS_AUTOMACAO_VALIDOS.includes(gatilho)) return reply.code(400).send({ error: 'Gatilho inválido' });
+    if (!CANAIS_AUTOMACAO_VALIDOS.includes(canal)) return reply.code(400).send({ error: 'Canal inválido' });
+    if (!nome || !corpo) return reply.code(400).send({ error: 'nome e corpo são obrigatórios' });
+    if (gatilho === 'etapa_alcancada') {
+      if (!etapa_id) return reply.code(400).send({ error: 'etapa_id é obrigatório para o gatilho etapa_alcancada' });
+      const { rows: etapaRows } = await pool.query('select id from etapas where id = $1 and tenant_id = $2', [etapa_id, request.user.tenantId]);
+      if (!etapaRows[0]) return reply.code(404).send({ error: 'Etapa não encontrada' });
+    } else if (etapa_id) {
+      return reply.code(400).send({ error: 'etapa_id só se aplica ao gatilho etapa_alcancada' });
+    }
+
+    const id = crypto.randomUUID();
+    await pool.query(
+      `insert into automacoes (id, tenant_id, gatilho, etapa_id, canal, nome, ativo, removivel, assunto, corpo, whatsapp_template)
+       values ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10)`,
+      [id, request.user.tenantId, gatilho, etapa_id || null, canal, nome, ativo !== false, assunto || null, corpo, whatsapp_template || null]
+    );
+    return reply.code(201).send({ id });
+  });
+
+  fastify.post('/people/api/automacoes/:id/duplicar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query('select * from automacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    const original = rows[0];
+    if (!original) return reply.code(404).send({ error: 'Automação não encontrada' });
+
+    const id = crypto.randomUUID();
+    await pool.query(
+      `insert into automacoes (id, tenant_id, gatilho, etapa_id, canal, nome, ativo, removivel, assunto, corpo, whatsapp_template)
+       values ($1, $2, $3, $4, $5, $6, true, true, $7, $8, $9)`,
+      [id, request.user.tenantId, original.gatilho, original.etapa_id, original.canal, `${original.nome} (cópia)`, original.assunto, original.corpo, original.whatsapp_template]
+    );
+    return reply.code(201).send({ id });
+  });
+
+  // Automação removivel=false é só visualização (pedido do Bruno: o WhatsApp
+  // de candidatura_criada não pode ser desligado nem editado) — PATCH/DELETE
+  // recusam com 403 em vez de deixar editar parcialmente.
+  fastify.patch('/people/api/automacoes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: atuais } = await pool.query('select removivel from automacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!atuais[0]) return reply.code(404).send({ error: 'Automação não encontrada' });
+    if (!atuais[0].removivel) return reply.code(403).send({ error: 'Esta automação é obrigatória e não pode ser editada' });
+
+    const CAMPOS_EDITAVEIS = ['nome', 'ativo', 'assunto', 'corpo', 'whatsapp_template'];
+    const dados = request.body || {};
+    const campos = Object.keys(dados).filter((c) => CAMPOS_EDITAVEIS.includes(c));
+    if (!campos.length) return reply.code(400).send({ error: 'Nenhum campo válido para atualizar' });
+
+    const sets = campos.map((campo, i) => `${campo} = $${i + 3}`).join(', ');
+    const valores = campos.map((campo) => dados[campo]);
+    await pool.query(
+      `update automacoes set ${sets}, atualizado_em = now() where id = $1 and tenant_id = $2`,
+      [request.params.id, request.user.tenantId, ...valores]
+    );
+    return { ok: true };
+  });
+
+  fastify.delete('/people/api/automacoes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query('select removivel from automacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rows[0]) return reply.code(404).send({ error: 'Automação não encontrada' });
+    if (!rows[0].removivel) return reply.code(403).send({ error: 'Esta automação é obrigatória e não pode ser excluída' });
+
+    await pool.query('delete from automacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    return { ok: true };
+  });
+
   // Payload único com tudo que o quadro precisa pra montar o grid raia×coluna —
   // filtro por vaga/etapa fica client-side (volume pequeno, evita ida e volta
   // a cada clique no filtro).
@@ -1205,15 +1348,24 @@ async function build() {
     const { etapa_id } = request.body || {};
     const { rows } = await pool.query(
       `update candidaturas c set etapa_id = $1
-       from vagas v
-       where c.vaga_id = v.id and c.id = $2 and v.tenant_id = $3
-       returning c.id, c.tenant_id`,
+       from vagas v, candidatos p
+       where c.vaga_id = v.id and c.candidato_id = p.id and c.id = $2 and v.tenant_id = $3
+       returning c.id, c.tenant_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
       [etapa_id || null, request.params.id, request.user.tenantId]
     );
-    if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    const candidatura = rows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Candidatura não encontrada' });
     await registrarEvento(pool, {
-      tenantId: request.user.tenantId, candidaturaId: rows[0].id, tipo: 'etapa_alterada', para: etapa_id || 'Nova', atorEmail: request.user.email,
+      tenantId: request.user.tenantId, candidaturaId: candidatura.id, tipo: 'etapa_alterada', para: etapa_id || 'Nova', atorEmail: request.user.email,
     });
+    if (etapa_id) {
+      const { rows: etapaRows } = await pool.query('select nome from etapas where id = $1', [etapa_id]);
+      await dispararAutomacoes(pool, {
+        tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: etapa_id, etapaNome: etapaRows[0] ? etapaRows[0].nome : '',
+        candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
+        vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
+      });
+    }
     return { ok: true };
   });
 
