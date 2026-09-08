@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Automações</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){var m={escuro:'dark',claro:'light',dark:'dark',light:'light'};document.documentElement.setAttribute('data-theme',m[localStorage.getItem('people_tema')]||'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/people/shell.css">
+<style>
+  .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+  .filtros select { height:36px; }
+  td.col-nome { font-weight:600; color:var(--text); }
+  td.col-contexto { color:var(--muted-strong); font-size:13px; }
+  .badge-canal { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--muted-strong); }
+  .badge-obrigatoria { font-size:11px; font-weight:600; padding:3px 8px; border-radius:var(--radius-full); background:var(--border); color:var(--muted-strong); }
+  .toggle-automacao { width:36px; height:20px; border-radius:999px; background:var(--border-strong); border:none; position:relative; cursor:pointer; padding:0; }
+  .toggle-automacao .bolinha { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
+  .toggle-automacao[aria-checked="true"] { background:var(--accent); }
+  .toggle-automacao[aria-checked="true"] .bolinha { left:18px; }
+  .toggle-automacao:disabled { opacity:.5; cursor:not-allowed; }
+  .acoes-tabela { display:flex; gap:12px; }
+  .acoes-tabela button { background:none; border:none; padding:0; color:var(--accent); font-size:12.5px; font-weight:600; cursor:pointer; width:auto; height:auto; }
+  .acoes-tabela button.perigo { color:var(--danger); }
+  .campo-automacao { margin-bottom:12px; }
+  .campo-automacao label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:4px; }
+  .campo-automacao textarea { min-height:110px; resize:vertical; font-family:inherit; }
+  .campo-automacao .ajuda { font-size:12px; color:var(--muted); margin-top:4px; }
+  .estado-vazio-automacoes { padding:40px 20px; text-align:center; color:var(--muted); }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/people/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img" src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">People</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <a class="menu-perfil-item" href="/people/configuracoes.html">
+          <span data-icon="settings" data-size="16"></span><span class="rotulo">Configurações</span>
+        </a>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <div class="sidebar-wrap">
+      <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Seleção</div>
+        <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
+        <a class="menu-item" href="/people/vagas.html"><span data-icon="briefcase"></span><span class="rotulo">Vagas</span></a>
+        <a class="menu-item" href="/people/candidatos.html"><span data-icon="users"></span><span class="rotulo">Candidatos</span></a>
+        <a class="menu-item" href="/people/avaliacoes.html"><span data-icon="brain"></span><span class="rotulo">Avaliações</span></a>
+      </nav>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Gestão</div>
+        <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
+        <a class="menu-item" href="/people/automacoes.html"><span data-icon="zap"></span><span class="rotulo">Automações</span></a>
+        <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
+      </nav>
+      </aside>
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+    </div>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Automações</h1></div>
+          <p class="descricao-pagina">Mensagens automáticas (e-mail/WhatsApp) disparadas no fluxo da vaga.</p>
+        </div>
+        <button class="btn" id="btn-nova-automacao" type="button">+ Nova automação</button>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="filtros">
+          <select id="filtro-gatilho">
+            <option value="">Todos os gatilhos</option>
+            <option value="candidatura_criada">Candidatura recebida</option>
+            <option value="etapa_alcancada">Candidatura chega numa etapa</option>
+            <option value="candidatura_reprovada">Candidatura reprovada</option>
+            <option value="vaga_encerrada">Vaga encerrada</option>
+          </select>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Gatilho</th>
+              <th>Canal</th>
+              <th>Ativa</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tabela-automacoes"></tbody>
+        </table>
+        <div class="estado-vazio-automacoes" id="estado-vazio" hidden>Nenhuma automação encontrada.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/people/shell.js"></script>
+  <script>
+    const GATILHO_LABEL = {
+      candidatura_criada: 'Candidatura recebida',
+      etapa_alcancada: 'Chega numa etapa',
+      candidatura_reprovada: 'Candidatura reprovada',
+      vaga_encerrada: 'Vaga encerrada',
+    };
+    const CANAL_LABEL = { email: 'E-mail', whatsapp: 'WhatsApp' };
+    const CANAL_ICONE = { email: 'file-text', whatsapp: 'message-circle' };
+
+    let automacoes = [];
+    let etapas = [];
+    let filtroGatilho = '';
+
+    async function carregar() {
+      const [resAuto, resEtapas] = await Promise.all([
+        apiFetch('/people/api/automacoes'),
+        apiFetch('/people/api/etapas'),
+      ]);
+      automacoes = await resAuto.json();
+      etapas = await resEtapas.json();
+      renderizarTabela();
+    }
+
+    function contextoLabel(a) {
+      if (a.gatilho !== 'etapa_alcancada') return GATILHO_LABEL[a.gatilho] || a.gatilho;
+      return `${GATILHO_LABEL.etapa_alcancada}: ${a.etapa_nome || '(etapa removida)'}`;
+    }
+
+    function renderizarTabela() {
+      const itens = automacoes.filter((a) => !filtroGatilho || a.gatilho === filtroGatilho);
+      const tbody = document.getElementById('tabela-automacoes');
+      document.getElementById('estado-vazio').hidden = itens.length > 0;
+      tbody.innerHTML = itens.map((a) => `
+        <tr>
+          <td class="col-nome">${a.nome}</td>
+          <td class="col-contexto">${contextoLabel(a)}</td>
+          <td><span class="badge-canal">${icon(CANAL_ICONE[a.canal], 14)} ${CANAL_LABEL[a.canal]}</span></td>
+          <td>
+            ${a.removivel
+              ? `<button type="button" class="toggle-automacao" data-toggle="${a.id}" role="switch" aria-checked="${a.ativo}"><span class="bolinha"></span></button>`
+              : '<span class="badge-obrigatoria">Obrigatória — sempre ativa</span>'}
+          </td>
+          <td>
+            <div class="acoes-tabela">
+              <button type="button" data-ver="${a.id}">${a.removivel ? 'Editar' : 'Ver'}</button>
+              <button type="button" data-duplicar="${a.id}">Duplicar</button>
+              ${a.removivel ? `<button type="button" class="perigo" data-excluir="${a.id}">Excluir</button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('[data-toggle]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const a = automacoes.find((x) => x.id === btn.dataset.toggle);
+          await apiFetch(`/people/api/automacoes/${a.id}`, { method: 'PATCH', body: JSON.stringify({ ativo: !a.ativo }) });
+          await carregar();
+        });
+      });
+      tbody.querySelectorAll('[data-ver]').forEach((btn) => {
+        btn.addEventListener('click', () => abrirFormulario(automacoes.find((x) => x.id === btn.dataset.ver)));
+      });
+      tbody.querySelectorAll('[data-duplicar]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/people/api/automacoes/${btn.dataset.duplicar}/duplicar`, { method: 'POST' });
+          await carregar();
+        });
+      });
+      tbody.querySelectorAll('[data-excluir]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/people/api/automacoes/${btn.dataset.excluir}`, { method: 'DELETE' });
+          await carregar();
+        });
+      });
+    }
+
+    document.getElementById('filtro-gatilho').addEventListener('change', (e) => {
+      filtroGatilho = e.target.value;
+      renderizarTabela();
+    });
+
+    // automacao=null => criação (pede gatilho/etapa/canal). Editar/ver só
+    // permite gatilho='etapa_alcancada' na criação escolher a etapa — os
+    // outros 3 gatilhos já nascem seedados (ver lib/automacoes.js), então só
+    // faz sentido criar do zero uma automação de etapa.
+    function abrirFormulario(automacao) {
+      const somenteLeitura = !!(automacao && !automacao.removivel);
+      const gatilhoInicial = automacao ? automacao.gatilho : 'etapa_alcancada';
+      const overlay = abrirModal(
+        `<h3>${automacao ? (somenteLeitura ? 'Ver automação' : 'Editar automação') : 'Nova automação'}</h3>`,
+        `
+          ${somenteLeitura ? '<p class="modal-texto">Automação obrigatória — não pode ser desativada nem editada.</p>' : ''}
+          ${!automacao ? `
+          <div class="campo-automacao">
+            <label>Quando disparar</label>
+            <select id="form-gatilho">
+              <option value="etapa_alcancada">Quando a candidatura chega numa etapa</option>
+              <option value="candidatura_reprovada">Quando a candidatura é reprovada</option>
+              <option value="vaga_encerrada">Quando a vaga é encerrada</option>
+            </select>
+          </div>
+          <div class="campo-automacao" id="wrap-etapa">
+            <label>Etapa</label>
+            <select id="form-etapa">${etapas.map((e) => `<option value="${e.id}">${e.nome}</option>`).join('') || '<option value="">Nenhuma etapa cadastrada — crie uma no Quadro primeiro</option>'}</select>
+          </div>
+          <div class="campo-automacao">
+            <label>Canal</label>
+            <select id="form-canal">
+              <option value="email">E-mail</option>
+              <option value="whatsapp">WhatsApp</option>
+            </select>
+          </div>` : `<p class="modal-texto">${contextoLabel(automacao)}</p>`}
+          <div class="campo-automacao">
+            <label>Nome (só pra identificar na lista)</label>
+            <input type="text" id="form-nome" value="${automacao ? automacao.nome.replace(/"/g, '&quot;') : ''}" ${somenteLeitura ? 'disabled' : ''}>
+          </div>
+          <div class="campo-automacao" id="wrap-assunto" ${(automacao && automacao.canal === 'whatsapp') ? 'hidden' : ''}>
+            <label>Assunto do e-mail</label>
+            <input type="text" id="form-assunto" value="${automacao && automacao.assunto ? automacao.assunto.replace(/"/g, '&quot;') : ''}" ${somenteLeitura ? 'disabled' : ''}>
+          </div>
+          <div class="campo-automacao">
+            <label>Mensagem</label>
+            <textarea id="form-corpo" ${somenteLeitura ? 'disabled' : ''}>${automacao ? automacao.corpo : ''}</textarea>
+            <div class="ajuda">Placeholders disponíveis: {{nome}}, {{vaga}}, {{empresa}}, {{etapa}}${gatilhoInicial === 'candidatura_criada' ? ', {{link_avaliacao}}' : ''}</div>
+          </div>
+          <div class="campo-automacao" id="wrap-template" ${(automacao && automacao.canal === 'email') ? 'hidden' : ''}>
+            <label>Nome do template aprovado na Meta (WhatsApp)</label>
+            <input type="text" id="form-template" value="${automacao && automacao.whatsapp_template ? automacao.whatsapp_template : ''}" placeholder="ex.: candidatura_recebida_pt" ${somenteLeitura ? 'disabled' : ''}>
+            <div class="ajuda">Sem template aprovado aqui, o envio fica em modo de teste (só loga, não manda de verdade).</div>
+          </div>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="btn-cancelar-form">Cancelar</button>
+            ${!somenteLeitura ? '<button type="button" class="btn" id="btn-salvar-form">Salvar</button>' : ''}
+          </div>
+        `,
+        'modal-card-larga'
+      );
+
+      document.getElementById('btn-cancelar-form').addEventListener('click', fecharModal);
+
+      const selectGatilho = document.getElementById('form-gatilho');
+      const wrapEtapa = document.getElementById('wrap-etapa');
+      if (selectGatilho) {
+        selectGatilho.addEventListener('change', () => {
+          wrapEtapa.hidden = selectGatilho.value !== 'etapa_alcancada';
+        });
+      }
+      const selectCanal = document.getElementById('form-canal');
+      if (selectCanal) {
+        selectCanal.addEventListener('change', () => {
+          document.getElementById('wrap-assunto').hidden = selectCanal.value === 'whatsapp';
+          document.getElementById('wrap-template').hidden = selectCanal.value === 'email';
+        });
+      }
+
+      const btnSalvar = document.getElementById('btn-salvar-form');
+      if (btnSalvar) {
+        btnSalvar.addEventListener('click', async () => {
+          const nome = document.getElementById('form-nome').value.trim();
+          const corpo = document.getElementById('form-corpo').value.trim();
+          if (!nome || !corpo) { avisar('Erro', 'Nome e mensagem são obrigatórios'); return; }
+          const canal = automacao ? automacao.canal : selectCanal.value;
+          const payload = {
+            nome, corpo,
+            assunto: canal === 'email' ? document.getElementById('form-assunto').value.trim() : null,
+            whatsapp_template: canal === 'whatsapp' ? document.getElementById('form-template').value.trim() : null,
+          };
+          btnSalvar.disabled = true;
+          if (automacao) {
+            await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+          } else {
+            const gatilho = selectGatilho.value;
+            if (gatilho === 'etapa_alcancada' && !document.getElementById('form-etapa').value) {
+              avisar('Erro', 'Escolha uma etapa'); btnSalvar.disabled = false; return;
+            }
+            await apiFetch('/people/api/automacoes', {
+              method: 'POST',
+              body: JSON.stringify({
+                ...payload, gatilho, canal,
+                etapa_id: gatilho === 'etapa_alcancada' ? document.getElementById('form-etapa').value : null,
+              }),
+            });
+          }
+          fecharModal();
+          await carregar();
+        });
+      }
+    }
+
+    document.getElementById('btn-nova-automacao').addEventListener('click', () => abrirFormulario(null));
+
+    carregar();
+  </script>
+</body>
+</html>

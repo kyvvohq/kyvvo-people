@@ -42,6 +42,25 @@
   .coluna-header input.editar-nome { width:100%; background:transparent; border:1px solid var(--accent); border-radius:6px; padding:2px 6px; font-size:13px; color:var(--text); }
   .coluna-header button { background:transparent; color:var(--muted); width:auto; height:auto; margin:0; padding:2px 6px; font-size:12px; border-radius:6px; }
   .coluna-header button:hover { background:var(--surface-muted); color:var(--text); }
+  .coluna-header .btn-automacao.tem-automacao { color:var(--accent); }
+  .coluna-header .btn-automacao svg { display:block; }
+
+  .automacao-item { border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:10px; }
+  .automacao-item-topo { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .automacao-canal { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--muted-strong); }
+  .automacao-nome { font-size:13.5px; font-weight:600; color:var(--text); margin-bottom:8px; }
+  .automacao-acoes { display:flex; gap:14px; }
+  .automacao-acoes .btn-link { background:none; border:none; padding:0; color:var(--accent); font-size:12.5px; font-weight:600; cursor:pointer; width:auto; height:auto; }
+  .automacao-acoes .btn-link.perigo { color:var(--danger); }
+  .badge-obrigatoria { font-size:11px; font-weight:600; padding:3px 8px; border-radius:var(--radius-full); background:var(--border); color:var(--muted-strong); }
+  .toggle-automacao { width:36px; height:20px; border-radius:999px; background:var(--border-strong); border:none; position:relative; cursor:pointer; padding:0; }
+  .toggle-automacao .bolinha { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
+  .toggle-automacao[aria-checked="true"] { background:var(--accent); }
+  .toggle-automacao[aria-checked="true"] .bolinha { left:18px; }
+  .campo-automacao { margin-bottom:12px; }
+  .campo-automacao label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:4px; }
+  .campo-automacao textarea { min-height:110px; resize:vertical; font-family:inherit; }
+  .campo-automacao .ajuda { font-size:12px; color:var(--muted); margin-top:4px; }
   .coluna-add { display:flex; align-items:center; min-width:180px; }
   .coluna-add input { font-size:13px; height:38px; padding:0 10px; }
 
@@ -105,6 +124,7 @@
         <div class="grupo-titulo">Gestão</div>
         <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
         <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
+        <a class="menu-item" href="/people/automacoes.html"><span data-icon="zap"></span><span class="rotulo">Automações</span></a>
         <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
       </nav>
       </aside>
@@ -140,6 +160,7 @@
   <script src="/people/shell.js"></script>
   <script>
     let dados = { vagas: [], etapas: [], candidaturas: [] };
+    let automacoes = [];
     const filtroVagas = new Set();
     const filtroEtapas = new Set();
     const TIPO_ARRASTO_COLUNA = 'application/x-etapa-id';
@@ -155,8 +176,12 @@
     ];
 
     async function carregar() {
-      const res = await apiFetch('/people/api/kanban');
-      dados = await res.json();
+      const [resKanban, resAutomacoes] = await Promise.all([
+        apiFetch('/people/api/kanban'),
+        apiFetch('/people/api/automacoes'),
+      ]);
+      dados = await resKanban.json();
+      automacoes = await resAutomacoes.json();
       montarFiltros();
       renderizarQuadro();
     }
@@ -230,12 +255,22 @@
 
       let html = '<div></div>';
       colunas.forEach((col) => {
+        const gatilhoAutomacoes = col.fixa
+          ? automacoes.filter((a) => a.gatilho === 'candidatura_criada')
+          : automacoes.filter((a) => a.gatilho === 'etapa_alcancada' && a.etapa_id === col.id);
+        const temAtiva = gatilhoAutomacoes.some((a) => a.ativo);
+        const btnAutomacao = `
+          <button type="button" class="btn-automacao${temAtiva ? ' tem-automacao' : ''}"
+            data-automacao-etapa="${col.id || ''}" data-automacao-nome="${col.fixa ? 'Nova' : col.nome}"
+            title="Automações desta etapa">${icon('zap', 14)}</button>
+        `;
         if (col.fixa) {
-          html += `<div class="coluna-header fixa">Nova</div>`;
+          html += `<div class="coluna-header fixa"><span class="nome-etapa">Nova</span>${btnAutomacao}</div>`;
         } else {
           html += `
             <div class="coluna-header arrastavel" draggable="true" data-etapa="${col.id}">
               <span class="nome-etapa" data-editar="${col.id}">${col.nome}</span>
+              ${btnAutomacao}
               <button type="button" data-apagar="${col.id}" data-nome="${col.nome}" title="Apagar etapa">✕</button>
             </div>
           `;
@@ -287,6 +322,165 @@
         carregar();
       });
       return overlay;
+    }
+
+    // --- Automações (⚡ no cabeçalho de cada coluna) ---
+    const CANAL_LABEL = { email: 'E-mail', whatsapp: 'WhatsApp' };
+    const CANAL_ICONE = { email: 'file-text', whatsapp: 'message-circle' };
+
+    // etapaId null = coluna fixa "Nova" (gatilho candidatura_criada); senão,
+    // etapa_alcancada pra aquela etapa.
+    function abrirModalAutomacoesEtapa(etapaId, etapaNome) {
+      const contexto = etapaId
+        ? { gatilho: 'etapa_alcancada', etapaId, titulo: `Automações — ${etapaNome}` }
+        : { gatilho: 'candidatura_criada', etapaId: null, titulo: 'Automações — Candidatura recebida' };
+      renderModalListaAutomacoes(contexto);
+    }
+
+    function itensDoContexto(contexto) {
+      return automacoes.filter((a) => a.gatilho === contexto.gatilho && (a.etapa_id || null) === contexto.etapaId);
+    }
+
+    function itemAutomacaoHtml(a) {
+      return `
+        <div class="automacao-item">
+          <div class="automacao-item-topo">
+            <span class="automacao-canal">${icon(CANAL_ICONE[a.canal], 14)} ${CANAL_LABEL[a.canal]}</span>
+            ${a.removivel
+              ? `<button type="button" class="toggle-automacao" data-toggle-automacao="${a.id}" role="switch" aria-checked="${a.ativo}"><span class="bolinha"></span></button>`
+              : '<span class="badge-obrigatoria">Obrigatória</span>'}
+          </div>
+          <div class="automacao-nome">${a.nome}</div>
+          <div class="automacao-acoes">
+            <button type="button" class="btn-link" data-ver-automacao="${a.id}">${a.removivel ? 'Editar' : 'Ver'}</button>
+            <button type="button" class="btn-link" data-duplicar-automacao="${a.id}">Duplicar</button>
+            ${a.removivel ? `<button type="button" class="btn-link perigo" data-excluir-automacao="${a.id}">Excluir</button>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderModalListaAutomacoes(contexto) {
+      const itens = itensDoContexto(contexto);
+      const podeCriar = contexto.gatilho === 'etapa_alcancada';
+      const overlay = abrirModal(
+        `<h3>${contexto.titulo}</h3>`,
+        `
+          <div id="lista-automacoes">${itens.length ? itens.map(itemAutomacaoHtml).join('') : '<p class="modal-texto">Nenhuma automação aqui ainda.</p>'}</div>
+          ${podeCriar ? '<div class="modal-acoes"><button type="button" class="btn-secundario" id="btn-nova-automacao">+ Nova automação</button></div>' : ''}
+        `,
+        'modal-card-larga'
+      );
+
+      overlay.querySelectorAll('[data-toggle-automacao]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const automacao = automacoes.find((a) => a.id === btn.dataset.toggleAutomacao);
+          await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify({ ativo: !automacao.ativo }) });
+          await carregar();
+          renderModalListaAutomacoes(contexto);
+        });
+      });
+      overlay.querySelectorAll('[data-ver-automacao]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          renderModalFormAutomacao(contexto, automacoes.find((a) => a.id === btn.dataset.verAutomacao));
+        });
+      });
+      overlay.querySelectorAll('[data-duplicar-automacao]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/people/api/automacoes/${btn.dataset.duplicarAutomacao}/duplicar`, { method: 'POST' });
+          await carregar();
+          renderModalListaAutomacoes(contexto);
+        });
+      });
+      overlay.querySelectorAll('[data-excluir-automacao]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/people/api/automacoes/${btn.dataset.excluirAutomacao}`, { method: 'DELETE' });
+          await carregar();
+          renderModalListaAutomacoes(contexto);
+        });
+      });
+      const btnNova = overlay.querySelector('#btn-nova-automacao');
+      if (btnNova) btnNova.addEventListener('click', () => renderModalFormAutomacao(contexto, null));
+    }
+
+    // automacao=null => criação. somenteLeitura (obrigatória, removivel=false)
+    // não mostra botão Salvar, todos os campos ficam disabled.
+    function renderModalFormAutomacao(contexto, automacao) {
+      const somenteLeitura = !!(automacao && !automacao.removivel);
+      const canalAtual = automacao ? automacao.canal : 'email';
+      const overlay = abrirModal(
+        `<h3>${automacao ? (somenteLeitura ? 'Ver automação' : 'Editar automação') : 'Nova automação'}</h3>`,
+        `
+          ${somenteLeitura ? '<p class="modal-texto">Automação obrigatória — não pode ser desativada nem editada.</p>' : ''}
+          <div class="campo-automacao">
+            <label>Nome (só pra identificar na lista)</label>
+            <input type="text" id="form-nome" value="${automacao ? automacao.nome.replace(/"/g, '&quot;') : ''}" ${somenteLeitura ? 'disabled' : ''}>
+          </div>
+          ${!automacao ? `
+          <div class="campo-automacao">
+            <label>Canal</label>
+            <select id="form-canal">
+              <option value="email">E-mail</option>
+              <option value="whatsapp">WhatsApp</option>
+            </select>
+          </div>` : ''}
+          <div class="campo-automacao" id="wrap-assunto" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
+            <label>Assunto do e-mail</label>
+            <input type="text" id="form-assunto" value="${automacao && automacao.assunto ? automacao.assunto.replace(/"/g, '&quot;') : ''}" ${somenteLeitura ? 'disabled' : ''}>
+          </div>
+          <div class="campo-automacao">
+            <label>Mensagem</label>
+            <textarea id="form-corpo" ${somenteLeitura ? 'disabled' : ''}>${automacao ? automacao.corpo : ''}</textarea>
+            <div class="ajuda">Placeholders disponíveis: {{nome}}, {{vaga}}, {{empresa}}, {{etapa}}${contexto.gatilho === 'candidatura_criada' ? ', {{link_avaliacao}}' : ''}</div>
+          </div>
+          <div class="campo-automacao" id="wrap-template" ${canalAtual === 'email' ? 'hidden' : ''}>
+            <label>Nome do template aprovado na Meta (WhatsApp)</label>
+            <input type="text" id="form-template" value="${automacao && automacao.whatsapp_template ? automacao.whatsapp_template : ''}" placeholder="ex.: candidatura_recebida_pt" ${somenteLeitura ? 'disabled' : ''}>
+            <div class="ajuda">Sem template aprovado aqui, o envio fica em modo de teste (só loga, não manda de verdade).</div>
+          </div>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="btn-voltar-automacao">Voltar</button>
+            ${!somenteLeitura ? '<button type="button" class="btn" id="btn-salvar-automacao">Salvar</button>' : ''}
+          </div>
+        `,
+        'modal-card-larga'
+      );
+
+      document.getElementById('btn-voltar-automacao').addEventListener('click', () => renderModalListaAutomacoes(contexto));
+
+      const selectCanal = document.getElementById('form-canal');
+      if (selectCanal) {
+        selectCanal.addEventListener('change', () => {
+          document.getElementById('wrap-assunto').hidden = selectCanal.value === 'whatsapp';
+          document.getElementById('wrap-template').hidden = selectCanal.value === 'email';
+        });
+      }
+
+      const btnSalvar = document.getElementById('btn-salvar-automacao');
+      if (btnSalvar) {
+        btnSalvar.addEventListener('click', async () => {
+          const nome = document.getElementById('form-nome').value.trim();
+          const corpo = document.getElementById('form-corpo').value.trim();
+          if (!nome || !corpo) { avisar('Erro', 'Nome e mensagem são obrigatórios'); return; }
+          const canal = automacao ? automacao.canal : selectCanal.value;
+          const payload = {
+            nome, corpo,
+            assunto: canal === 'email' ? document.getElementById('form-assunto').value.trim() : null,
+            whatsapp_template: canal === 'whatsapp' ? document.getElementById('form-template').value.trim() : null,
+          };
+          btnSalvar.disabled = true;
+          if (automacao) {
+            await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+          } else {
+            await apiFetch('/people/api/automacoes', {
+              method: 'POST',
+              body: JSON.stringify({ ...payload, gatilho: contexto.gatilho, etapa_id: contexto.etapaId, canal }),
+            });
+          }
+          await carregar();
+          renderModalListaAutomacoes(contexto);
+        });
+      }
     }
 
     function ligarEventosGrid() {
@@ -357,6 +551,13 @@
 
       document.querySelectorAll('[data-apagar]').forEach((btn) => {
         btn.addEventListener('click', () => confirmarApagarEtapa(btn.dataset.apagar, btn.dataset.nome));
+      });
+
+      document.querySelectorAll('[data-automacao-etapa]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          abrirModalAutomacoesEtapa(btn.dataset.automacaoEtapa || null, btn.dataset.automacaoNome);
+        });
       });
 
       document.querySelectorAll('[data-editar]').forEach((span) => {
