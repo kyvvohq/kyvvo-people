@@ -58,8 +58,12 @@ jobs:
               lib/planos.js, lib/email.js (infra/pagamento/e-mail — mudança lá
               é PR humano com a label revisado:infra).
 
-            Rode `npm test` antes e depois da sua mudança. Abra um pull request
-            com "Closes #${{ github.event.issue.number }}" na descrição.
+            Rode `npm test` antes e depois da sua mudança.
+
+            OBRIGATÓRIO no fim: faça commit, push da sua branch e **abra a PR
+            você mesmo** com
+            `gh pr create --base master --head <sua-branch> --title "<título>" --body "<resumo>\n\nCloses #${{ github.event.issue.number }}"`.
+            A tarefa não está concluída sem a PR aberta.
           claude_args: |
             --max-turns 60
-            --allowedTools Read,Glob,Grep,Edit,Write,Bash
+            --allowedTools Read,Glob,Grep,Edit,Write,Bash,Bash(gh pr create:*)
