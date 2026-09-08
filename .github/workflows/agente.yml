@@ -33,8 +33,10 @@ jobs:
       # .npmrc versionado tem precedência e expande ${NPM_PACKAGES_TOKEN} —
       # precisa dos dois no env, senão o token some e o npm.pkg.github.com
       # devolve E401.
+      # `npm install` (não `ci`): o package-lock.json versionado não tem os
+      # pacotes @kyvvohq/*. Voltar pra `npm ci` quando o lock fresco entrar.
       - name: Instalar dependências
-        run: npm ci
+        run: npm install --no-audit --no-fund --no-package-lock
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
           NPM_PACKAGES_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
