@@ -41,13 +41,8 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@kyvvohq"
 
-      # É `npm install` e não `npm ci` de propósito: o package-lock.json
-      # versionado foi gerado antes dos pacotes @kyvvohq/* e não os contém
-      # (o container em prod sempre rodou `npm install`). `npm ci` quebra com
-      # "Missing: @kyvvohq/... from lock file". Voltar para `npm ci` quando o
-      # lock fresco entrar (workflow "Regenerar package-lock").
       - name: Instalar dependências
-        run: npm install --no-audit --no-fund --no-package-lock
+        run: npm ci
 
       # Roda o runner real (@kyvvohq/db-migrate via lib/db.js) contra o Postgres
       # efêmero — aplica db/*.sql do zero e valida que lib/db.js resolve.
