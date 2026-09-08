@@ -434,9 +434,10 @@
             <div class="ajuda">Placeholders disponíveis: {{nome}}, {{vaga}}, {{empresa}}, {{etapa}}${contexto.gatilho === 'candidatura_criada' ? ', {{link_avaliacao}}' : ''}</div>
           </div>
           <div class="campo-automacao" id="wrap-template" ${canalAtual === 'email' ? 'hidden' : ''}>
-            <label>Nome do template aprovado na Meta (WhatsApp)</label>
+            <label>Template aprovado na Meta (WhatsApp)</label>
+            <select id="form-template-select" hidden></select>
             <input type="text" id="form-template" value="${automacao && automacao.whatsapp_template ? automacao.whatsapp_template : ''}" placeholder="ex.: candidatura_recebida_pt" ${somenteLeitura ? 'disabled' : ''}>
-            <div class="ajuda">Sem template aprovado aqui, o envio fica em modo de teste (só loga, não manda de verdade).</div>
+            <div class="ajuda" id="ajuda-template">Sem template aprovado aqui, o envio fica em modo de teste (só loga, não manda de verdade).</div>
           </div>
           <div class="modal-acoes">
             <button type="button" class="btn-secundario" id="btn-voltar-automacao">Voltar</button>
@@ -448,11 +449,18 @@
 
       document.getElementById('btn-voltar-automacao').addEventListener('click', () => renderModalListaAutomacoes(contexto));
 
+      let templatesCarregados = false;
+      if (canalAtual === 'whatsapp') montarSeletorTemplate(automacao ? automacao.whatsapp_template : '', somenteLeitura).then(() => { templatesCarregados = true; });
+
       const selectCanal = document.getElementById('form-canal');
       if (selectCanal) {
         selectCanal.addEventListener('change', () => {
           document.getElementById('wrap-assunto').hidden = selectCanal.value === 'whatsapp';
           document.getElementById('wrap-template').hidden = selectCanal.value === 'email';
+          if (selectCanal.value === 'whatsapp' && !templatesCarregados) {
+            templatesCarregados = true;
+            montarSeletorTemplate('', false);
+          }
         });
       }
 
@@ -466,7 +474,7 @@
           const payload = {
             nome, corpo,
             assunto: canal === 'email' ? document.getElementById('form-assunto').value.trim() : null,
-            whatsapp_template: canal === 'whatsapp' ? document.getElementById('form-template').value.trim() : null,
+            whatsapp_template: canal === 'whatsapp' ? valorTemplateEscolhido() : null,
           };
           btnSalvar.disabled = true;
           if (automacao) {
@@ -480,6 +488,42 @@
           await carregar();
           renderModalListaAutomacoes(contexto);
         });
+      }
+    }
+
+    // Lê o campo do select (quando a lista da Meta carregou e uma opção real
+    // está escolhida) ou o input manual (lista vazia, ou "Digitar manualmente"
+    // escolhido) — qual dos dois vale depende de qual está visível.
+    function valorTemplateEscolhido() {
+      const select = document.getElementById('form-template-select');
+      const input = document.getElementById('form-template');
+      if (!select.hidden && select.value !== '__manual__') return select.value;
+      return input.value.trim();
+    }
+
+    // Busca os templates da WABA da Kyvvo People e troca o campo de texto
+    // livre por um <select> — lista vazia (sem credencial da Meta ainda, ou
+    // erro) mantém o campo manual como está.
+    async function montarSeletorTemplate(valorAtual, somenteLeitura) {
+      const select = document.getElementById('form-template-select');
+      const input = document.getElementById('form-template');
+      try {
+        const res = await apiFetch('/people/api/automacoes/templates-whatsapp');
+        const templates = await res.json();
+        if (!Array.isArray(templates) || !templates.length) return;
+
+        select.innerHTML = templates.map((t) => `
+          <option value="${t.nome}">${t.nome} — ${t.status}${t.tem_botao_url ? '' : ' (sem botão de link!)'}</option>
+        `).join('') + '<option value="__manual__">Digitar nome manualmente…</option>';
+
+        const bateComAlgum = templates.some((t) => t.nome === valorAtual);
+        select.value = bateComAlgum ? valorAtual : (valorAtual ? '__manual__' : templates[0].nome);
+        select.hidden = false;
+        input.hidden = select.value === '__manual__' ? false : true;
+        if (somenteLeitura) select.disabled = true;
+        select.addEventListener('change', () => { input.hidden = select.value !== '__manual__'; });
+      } catch (err) {
+        // Sem lista da Meta (offline, sem credencial) — segue no campo manual.
       }
     }
 

@@ -50,6 +50,13 @@ só faz `request.jwtVerify()`, sem lookup em banco.
 - `asaas.js` — wrapper fino de `@kyvvohq/asaas` (pagamento).
 - `db.js` — `pool` (pg) + `migrar()` sobre `@kyvvohq/db-migrate`.
 - `email.js` — Resend (`RESEND_API_KEY`); inerte sem a credencial.
+- `whatsapp.js` — Meta Cloud API (`META_WHATSAPP_TOKEN`, `META_PHONE_NUMBER_ID`,
+  `META_WABA_ID`); inerte sem as credenciais. Envio é sempre por template
+  aprovado (mensagem proativa, nunca dentro da janela de 24h), nunca texto
+  livre.
+- `automacoes.js` — automações de e-mail/WhatsApp por gatilho do fluxo de vaga
+  (`db/019_automacoes.sql`). Seeds automáticos por tenant, ver comentário no
+  topo do arquivo.
 
 ## Banco
 

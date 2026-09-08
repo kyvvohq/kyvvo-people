@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { renderizar, SEEDS } = require('../lib/automacoes');
+const { renderizar, extrairTokenDoLink, SEEDS } = require('../lib/automacoes');
 
 test('renderizar: substitui todos os placeholders presentes', () => {
   const resultado = renderizar('Olá, {{nome}}! Vaga: {{vaga}}.', { nome: 'Ana', vaga: 'Dev Backend' });
@@ -39,4 +39,17 @@ test('SEEDS: todo seed tem gatilho, canal, nome e corpo', () => {
 
 test('SEEDS: nenhum gatilho é etapa_alcancada (não há como saber a etapa de antemão)', () => {
   assert.ok(!SEEDS.some((s) => s.gatilho === 'etapa_alcancada'));
+});
+
+test('extrairTokenDoLink: pega o último segmento da URL da avaliação', () => {
+  assert.equal(extrairTokenDoLink('https://people.kyvvo.com.br/people/avaliacao/abc-123'), 'abc-123');
+});
+
+test('extrairTokenDoLink: ignora barra final', () => {
+  assert.equal(extrairTokenDoLink('https://people.kyvvo.com.br/people/avaliacao/abc-123/'), 'abc-123');
+});
+
+test('extrairTokenDoLink: nulo/vazio devolve null', () => {
+  assert.equal(extrairTokenDoLink(null), null);
+  assert.equal(extrairTokenDoLink(''), null);
 });
