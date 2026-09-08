@@ -1,0 +1,64 @@
+name: Tarefa para agente
+description: Tarefa pequena e fechada para o agente de IA implementar via PR.
+title: "[agente] "
+labels: ["tarefa"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use para trabalho pequeno, com critério de aceite testável. Depois de
+        abrir, **aplique uma label `agent:*`** para disparar o workflow — a
+        label define o que o agente pode tocar.
+
+        Nada que mexa em caminho protegido (`.github/workflows/`, `db/`,
+        `.npmrc`, `package.json`, `Dockerfile`, `lib/db.js`, `lib/asaas.js`,
+        `lib/planos.js`, `lib/email.js`) vai por aqui — isso é PR humano com a
+        label `revisado:infra`.
+  - type: dropdown
+    id: categoria
+    attributes:
+      label: Categoria
+      description: Qual label `agent:*` vai ser aplicada.
+      options:
+        - "agent:tests — só test/"
+        - "agent:app — lib/, public/, index.js (fora libs de infra/pagamento)"
+    validations:
+      required: true
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: O que precisa existir ao final. Uma ou duas frases.
+    validations:
+      required: true
+  - type: textarea
+    id: aceite
+    attributes:
+      label: Critério de aceite
+      description: Lista verificável. De preferência "teste X passa", "tela Y mostra Z".
+      placeholder: |
+        - [ ] npm test passa com o novo caso em test/inferencia.test.js
+        - [ ] caso de borda: perfil sem respostas suficientes cai em "indefinido"
+    validations:
+      required: true
+  - type: textarea
+    id: arquivos
+    attributes:
+      label: Arquivos / áreas prováveis
+      description: Onde você acha que a mudança mora. Ajuda o agente a não vagar.
+    validations:
+      required: false
+  - type: textarea
+    id: fora
+    attributes:
+      label: Fora de escopo
+      description: O que explicitamente NÃO deve mudar nesta tarefa.
+    validations:
+      required: false
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto / links
+      description: Screenshots, PRs relacionadas, trechos de log.
+    validations:
+      required: false
