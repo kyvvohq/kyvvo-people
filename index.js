@@ -16,6 +16,7 @@ const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
 const { garantirAutomacoesPadrao, dispararAutomacoes } = require('./lib/automacoes');
+const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
 
@@ -1246,6 +1247,14 @@ async function build() {
 
   // Garante os seeds (candidatura_criada/reprovada/vaga_encerrada) antes de
   // listar — cobre o tenant que nunca disparou nenhuma automação ainda.
+  // Templates de WhatsApp direto da Meta (WABA da Kyvvo People) pro
+  // recrutador escolher num <select> em vez de digitar o nome na mão — sem
+  // META_WHATSAPP_TOKEN/META_WABA_ID configurados devolve lista vazia
+  // ([]), o front cai pro campo de texto manual.
+  fastify.get('/people/api/automacoes/templates-whatsapp', { preHandler: fastify.authenticate }, async () => {
+    return listarTemplates();
+  });
+
   fastify.get('/people/api/automacoes', { preHandler: fastify.authenticate }, async (request) => {
     await garantirAutomacoesPadrao(pool, request.user.tenantId);
     const { rows } = await pool.query(
