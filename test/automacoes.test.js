@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, parametroBotaoParaTemplate,
-  resolverPorCanal, SEEDS,
+  resolverPorCanal, detectarOptOut, SEEDS,
 } = require('../lib/automacoes');
 
 test('renderizar: substitui todos os placeholders presentes', () => {
@@ -172,4 +172,31 @@ test('resolverPorCanal: sem automação específica, mantém a geral', () => {
 
 test('resolverPorCanal: sem nenhuma automação, devolve lista vazia', () => {
   assert.deepEqual(resolverPorCanal([]), []);
+});
+
+// Fase 5: webhook de opt-out automático (o candidato responde pedindo pra
+// não receber mais). Match exato da mensagem inteira, não substring — pra
+// não confundir "vou parar de procurar emprego" com um pedido de verdade.
+test('detectarOptOut: reconhece as palavras-chave, case/acento-insensível', () => {
+  assert.equal(detectarOptOut('PARAR'), true);
+  assert.equal(detectarOptOut('pare'), true);
+  assert.equal(detectarOptOut('  Cancelar  '), true);
+  assert.equal(detectarOptOut('SAIR'), true);
+  assert.equal(detectarOptOut('Stop'), true);
+  assert.equal(detectarOptOut('cancélar'), true); // acento não deveria existir aqui, mas não quebra
+});
+
+test('detectarOptOut: não confunde frase que contém a palavra com o pedido em si', () => {
+  assert.equal(detectarOptOut('vou parar de procurar emprego'), false);
+  assert.equal(detectarOptOut('quero cancelar minha inscrição na vaga X'), false);
+});
+
+test('detectarOptOut: mensagem normal não aciona', () => {
+  assert.equal(detectarOptOut('Olá, gostaria de saber mais sobre a vaga'), false);
+});
+
+test('detectarOptOut: vazio/nulo não aciona nem lança', () => {
+  assert.equal(detectarOptOut(''), false);
+  assert.equal(detectarOptOut(null), false);
+  assert.equal(detectarOptOut(undefined), false);
 });

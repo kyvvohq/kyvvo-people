@@ -14,8 +14,9 @@ const { enviarLinkAvaliacao } = require('./lib/email');
 const { gerarRelatorioPdf } = require('./lib/pdf');
 const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
+const { paraE164 } = require('./lib/telefone');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
-const { garantirAutomacoesPadrao, dispararAutomacoes } = require('./lib/automacoes');
+const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut } = require('./lib/automacoes');
 const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
@@ -496,6 +497,52 @@ async function build() {
       [subscriptionId, novoStatus]
     );
     return { ok: true };
+  });
+
+  // Fase 5 do plano de travas de WhatsApp (2026-09-09) — o People nunca
+  // tinha recebido mensagem antes, só mandava. Handshake (GET) idêntico ao
+  // que o kyvvo-studio já usa (routes/webhook-whatsapp.js) — token contra
+  // META_VERIFY_TOKEN, resposta é o challenge cru.
+  fastify.get('/people/webhooks/whatsapp', async (request, reply) => {
+    const query = request.query || {};
+    const valido = query['hub.mode'] === 'subscribe'
+      && !!process.env.META_VERIFY_TOKEN
+      && query['hub.verify_token'] === process.env.META_VERIFY_TOKEN;
+    if (!valido) return reply.code(403).send('Forbidden');
+    return reply.code(200).type('text/plain').send(query['hub.challenge'] || '');
+  });
+
+  // Só faz uma coisa: detecta pedido de opt-out ("PARAR" etc.) e marca o
+  // candidato. Nunca responde nada de volta (diferente do bot do Studio) —
+  // não é conversacional, é regra fixa. O People tem UM número só,
+  // compartilhado por todo tenant — não dá pra saber de qual candidatura o
+  // candidato tá falando quando responde, então o opt-out é global (todo
+  // tenant), não por tenant — ver detectarOptOut em lib/automacoes.js.
+  // Sempre 200 pra Meta, mesmo em erro — evita a Meta desativar o webhook
+  // por falha repetida (mesmo padrão do Studio: nunca perde o evento
+  // silenciosamente, mas também nunca deixa o processamento derrubar a
+  // resposta ao webhook).
+  fastify.post('/people/webhooks/whatsapp', async (request, reply) => {
+    try {
+      const body = request.body || {};
+      const change = (((body.entry || [])[0] || {}).changes || [])[0];
+      const value = change ? change.value : null;
+      const msg = value && (value.messages || [])[0];
+      if (msg && msg.type === 'text' && detectarOptOut((msg.text || {}).body)) {
+        const telefone = paraE164(msg.from);
+        if (telefone) {
+          const { rowCount } = await pool.query(
+            `update candidatos set whatsapp_opt_out = true, whatsapp_opt_out_em = now()
+             where telefone_e164 = $1 and whatsapp_opt_out = false`,
+            [telefone]
+          );
+          if (rowCount) request.log.info(`[whatsapp-webhook] opt-out automático registrado pra ${telefone} (${rowCount} candidato(s))`);
+        }
+      }
+    } catch (err) {
+      request.log.error(`[whatsapp-webhook] Falha ao processar: ${err.message}`);
+    }
+    return reply.code(200).send({ ok: true });
   });
 
   // --- Portal da psicóloga (autenticado) ---
