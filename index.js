@@ -1302,16 +1302,20 @@ async function build() {
     return reply.code(201).send({ id });
   });
 
-  // Automação removivel=false é só visualização (pedido do Bruno: o WhatsApp
-  // de candidatura_criada não pode ser desligado nem editado) — PATCH/DELETE
-  // recusam com 403 em vez de deixar editar parcialmente.
+  // Automação removivel=false não pode ser desligada nem excluída (pedido do
+  // Bruno: o WhatsApp de candidatura_criada é obrigatório), mas o CONTEÚDO
+  // continua editável — por exemplo trocar qual template aprovado ela usa.
+  // DELETE segue recusando de vez (abaixo); PATCH só recusa `ativo: false`.
   fastify.patch('/people/api/automacoes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows: atuais } = await pool.query('select removivel from automacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
     if (!atuais[0]) return reply.code(404).send({ error: 'Automação não encontrada' });
-    if (!atuais[0].removivel) return reply.code(403).send({ error: 'Esta automação é obrigatória e não pode ser editada' });
+
+    const dados = request.body || {};
+    if (!atuais[0].removivel && dados.ativo === false) {
+      return reply.code(403).send({ error: 'Esta automação é obrigatória e não pode ser desativada' });
+    }
 
     const CAMPOS_EDITAVEIS = ['nome', 'ativo', 'assunto', 'corpo', 'whatsapp_template'];
-    const dados = request.body || {};
     const campos = Object.keys(dados).filter((c) => CAMPOS_EDITAVEIS.includes(c));
     if (!campos.length) return reply.code(400).send({ error: 'Nenhum campo válido para atualizar' });
 

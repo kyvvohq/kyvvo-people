@@ -61,6 +61,9 @@
   .campo-automacao label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:4px; }
   .campo-automacao textarea { min-height:110px; resize:vertical; font-family:inherit; }
   .campo-automacao .ajuda { font-size:12px; color:var(--muted); margin-top:4px; }
+  .preview-whatsapp { margin-top:10px; background:#e5ddd5; border-radius:10px; padding:16px; }
+  .preview-whatsapp .bolha { background:#dcf8c6; border-radius:8px 8px 8px 2px; padding:10px 12px; font-size:13.5px; line-height:1.5; color:#111b21; max-width:280px; white-space:pre-wrap; box-shadow:0 1px 1px rgba(0,0,0,.1); }
+  .preview-whatsapp .bolha-botao { margin-top:2px; max-width:280px; background:#dcf8c6; border-top:1px solid rgba(0,0,0,.08); border-radius:0 0 8px 2px; padding:8px 12px; font-size:13px; color:#00a5f4; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
   .coluna-add { display:flex; align-items:center; min-width:180px; }
   .coluna-add input { font-size:13px; height:38px; padding:0 10px; }
 
@@ -352,7 +355,7 @@
           </div>
           <div class="automacao-nome">${a.nome}</div>
           <div class="automacao-acoes">
-            <button type="button" class="btn-link" data-ver-automacao="${a.id}">${a.removivel ? 'Editar' : 'Ver'}</button>
+            <button type="button" class="btn-link" data-ver-automacao="${a.id}">Editar</button>
             <button type="button" class="btn-link" data-duplicar-automacao="${a.id}">Duplicar</button>
             ${a.removivel ? `<button type="button" class="btn-link perigo" data-excluir-automacao="${a.id}">Excluir</button>` : ''}
           </div>
@@ -403,18 +406,29 @@
       if (btnNova) btnNova.addEventListener('click', () => renderModalFormAutomacao(contexto, null));
     }
 
-    // automacao=null => criação. somenteLeitura (obrigatória, removivel=false)
-    // não mostra botão Salvar, todos os campos ficam disabled.
+    // Só pra referência dentro do texto (Placeholders disponíveis:) e pra
+    // preencher a prévia do WhatsApp com um exemplo — mesma ordem de
+    // lib/automacoes.js (PARAMETROS_CORPO_TEMPLATE), documentado lá.
+    const EXEMPLO_PARAMETROS_CORPO = {
+      candidatura_criada: ['Maria Silva', 'Desenvolvedora Backend'],
+      etapa_alcancada: ['Maria Silva', 'Desenvolvedora Backend', 'Entrevista'],
+      candidatura_reprovada: ['Maria Silva', 'Desenvolvedora Backend'],
+      vaga_encerrada: ['Maria Silva', 'Desenvolvedora Backend'],
+    };
+
+    // automacao=null => criação. `obrigatoria` (removivel=false) só trava
+    // ativar/desativar e excluir (nas rotas/lista) — o conteúdo (inclusive
+    // trocar o template do WhatsApp) continua editável aqui.
     function renderModalFormAutomacao(contexto, automacao) {
-      const somenteLeitura = !!(automacao && !automacao.removivel);
+      const obrigatoria = !!(automacao && !automacao.removivel);
       const canalAtual = automacao ? automacao.canal : 'email';
       const overlay = abrirModal(
-        `<h3>${automacao ? (somenteLeitura ? 'Ver automação' : 'Editar automação') : 'Nova automação'}</h3>`,
+        `<h3>${automacao ? 'Editar automação' : 'Nova automação'}</h3>`,
         `
-          ${somenteLeitura ? '<p class="modal-texto">Automação obrigatória — não pode ser desativada nem editada.</p>' : ''}
+          ${obrigatoria ? '<p class="modal-texto">Automação obrigatória — não pode ser desativada nem excluída, mas você pode editar o conteúdo e trocar o template.</p>' : ''}
           <div class="campo-automacao">
             <label>Nome (só pra identificar na lista)</label>
-            <input type="text" id="form-nome" value="${automacao ? automacao.nome.replace(/"/g, '&quot;') : ''}" ${somenteLeitura ? 'disabled' : ''}>
+            <input type="text" id="form-nome" value="${automacao ? automacao.nome.replace(/"/g, '&quot;') : ''}">
           </div>
           ${!automacao ? `
           <div class="campo-automacao">
@@ -426,22 +440,26 @@
           </div>` : ''}
           <div class="campo-automacao" id="wrap-assunto" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
             <label>Assunto do e-mail</label>
-            <input type="text" id="form-assunto" value="${automacao && automacao.assunto ? automacao.assunto.replace(/"/g, '&quot;') : ''}" ${somenteLeitura ? 'disabled' : ''}>
+            <input type="text" id="form-assunto" value="${automacao && automacao.assunto ? automacao.assunto.replace(/"/g, '&quot;') : ''}">
           </div>
           <div class="campo-automacao">
             <label>Mensagem</label>
-            <textarea id="form-corpo" ${somenteLeitura ? 'disabled' : ''}>${automacao ? automacao.corpo : ''}</textarea>
+            <textarea id="form-corpo">${automacao ? automacao.corpo : ''}</textarea>
             <div class="ajuda">Placeholders disponíveis: {{nome}}, {{vaga}}, {{empresa}}, {{etapa}}${contexto.gatilho === 'candidatura_criada' ? ', {{link_avaliacao}}' : ''}</div>
           </div>
           <div class="campo-automacao" id="wrap-template" ${canalAtual === 'email' ? 'hidden' : ''}>
             <label>Template aprovado na Meta (WhatsApp)</label>
             <select id="form-template-select" hidden></select>
-            <input type="text" id="form-template" value="${automacao && automacao.whatsapp_template ? automacao.whatsapp_template : ''}" placeholder="ex.: candidatura_recebida_pt" ${somenteLeitura ? 'disabled' : ''}>
+            <input type="text" id="form-template" value="${automacao && automacao.whatsapp_template ? automacao.whatsapp_template : ''}" placeholder="ex.: candidatura_recebida_pt">
             <div class="ajuda" id="ajuda-template">Sem template aprovado aqui, o envio fica em modo de teste (só loga, não manda de verdade).</div>
+            <div class="preview-whatsapp" id="preview-whatsapp" hidden>
+              <div class="bolha" id="preview-whatsapp-corpo"></div>
+              <div class="bolha-botao" id="preview-whatsapp-botao" hidden></div>
+            </div>
           </div>
           <div class="modal-acoes">
             <button type="button" class="btn-secundario" id="btn-voltar-automacao">Voltar</button>
-            ${!somenteLeitura ? '<button type="button" class="btn" id="btn-salvar-automacao">Salvar</button>' : ''}
+            <button type="button" class="btn" id="btn-salvar-automacao">Salvar</button>
           </div>
         `,
         'modal-card-larga'
@@ -450,7 +468,7 @@
       document.getElementById('btn-voltar-automacao').addEventListener('click', () => renderModalListaAutomacoes(contexto));
 
       let templatesCarregados = false;
-      if (canalAtual === 'whatsapp') montarSeletorTemplate(automacao ? automacao.whatsapp_template : '', somenteLeitura).then(() => { templatesCarregados = true; });
+      if (canalAtual === 'whatsapp') montarSeletorTemplate(automacao ? automacao.whatsapp_template : '', contexto.gatilho).then(() => { templatesCarregados = true; });
 
       const selectCanal = document.getElementById('form-canal');
       if (selectCanal) {
@@ -459,36 +477,34 @@
           document.getElementById('wrap-template').hidden = selectCanal.value === 'email';
           if (selectCanal.value === 'whatsapp' && !templatesCarregados) {
             templatesCarregados = true;
-            montarSeletorTemplate('', false);
+            montarSeletorTemplate('', contexto.gatilho);
           }
         });
       }
 
       const btnSalvar = document.getElementById('btn-salvar-automacao');
-      if (btnSalvar) {
-        btnSalvar.addEventListener('click', async () => {
-          const nome = document.getElementById('form-nome').value.trim();
-          const corpo = document.getElementById('form-corpo').value.trim();
-          if (!nome || !corpo) { avisar('Erro', 'Nome e mensagem são obrigatórios'); return; }
-          const canal = automacao ? automacao.canal : selectCanal.value;
-          const payload = {
-            nome, corpo,
-            assunto: canal === 'email' ? document.getElementById('form-assunto').value.trim() : null,
-            whatsapp_template: canal === 'whatsapp' ? valorTemplateEscolhido() : null,
-          };
-          btnSalvar.disabled = true;
-          if (automacao) {
-            await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
-          } else {
-            await apiFetch('/people/api/automacoes', {
-              method: 'POST',
-              body: JSON.stringify({ ...payload, gatilho: contexto.gatilho, etapa_id: contexto.etapaId, canal }),
-            });
-          }
-          await carregar();
-          renderModalListaAutomacoes(contexto);
-        });
-      }
+      btnSalvar.addEventListener('click', async () => {
+        const nome = document.getElementById('form-nome').value.trim();
+        const corpo = document.getElementById('form-corpo').value.trim();
+        if (!nome || !corpo) { avisar('Erro', 'Nome e mensagem são obrigatórios'); return; }
+        const canal = automacao ? automacao.canal : selectCanal.value;
+        const payload = {
+          nome, corpo,
+          assunto: canal === 'email' ? document.getElementById('form-assunto').value.trim() : null,
+          whatsapp_template: canal === 'whatsapp' ? valorTemplateEscolhido() : null,
+        };
+        btnSalvar.disabled = true;
+        if (automacao) {
+          await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        } else {
+          await apiFetch('/people/api/automacoes', {
+            method: 'POST',
+            body: JSON.stringify({ ...payload, gatilho: contexto.gatilho, etapa_id: contexto.etapaId, canal }),
+          });
+        }
+        await carregar();
+        renderModalListaAutomacoes(contexto);
+      });
     }
 
     // Lê o campo do select (quando a lista da Meta carregou e uma opção real
@@ -501,10 +517,30 @@
       return input.value.trim();
     }
 
+    // Prévia no estilo balão do WhatsApp: pega o corpo aprovado do template
+    // selecionado, troca {{1}}/{{2}}... por valores de exemplo (mesma ordem
+    // documentada em lib/automacoes.js) e mostra o botão de link, se houver.
+    function atualizarPreviewWhatsapp(template, gatilho) {
+      const preview = document.getElementById('preview-whatsapp');
+      if (!template || !template.corpo) { preview.hidden = true; return; }
+
+      const exemplos = EXEMPLO_PARAMETROS_CORPO[gatilho] || [];
+      let corpoPreenchido = template.corpo;
+      exemplos.forEach((valor, i) => {
+        corpoPreenchido = corpoPreenchido.replace(new RegExp(`\\{\\{${i + 1}\\}\\}`, 'g'), valor);
+      });
+
+      document.getElementById('preview-whatsapp-corpo').textContent = corpoPreenchido;
+      const botao = document.getElementById('preview-whatsapp-botao');
+      botao.hidden = !template.tem_botao_url;
+      if (template.tem_botao_url) botao.innerHTML = `${icon('file-text', 14)} ${template.botao_texto || 'Abrir link'}`;
+      preview.hidden = false;
+    }
+
     // Busca os templates da WABA da Kyvvo People e troca o campo de texto
     // livre por um <select> — lista vazia (sem credencial da Meta ainda, ou
     // erro) mantém o campo manual como está.
-    async function montarSeletorTemplate(valorAtual, somenteLeitura) {
+    async function montarSeletorTemplate(valorAtual, gatilho) {
       const select = document.getElementById('form-template-select');
       const input = document.getElementById('form-template');
       try {
@@ -519,9 +555,12 @@
         const bateComAlgum = templates.some((t) => t.nome === valorAtual);
         select.value = bateComAlgum ? valorAtual : (valorAtual ? '__manual__' : templates[0].nome);
         select.hidden = false;
-        input.hidden = select.value === '__manual__' ? false : true;
-        if (somenteLeitura) select.disabled = true;
-        select.addEventListener('change', () => { input.hidden = select.value !== '__manual__'; });
+        input.hidden = select.value !== '__manual__' ? true : false;
+        atualizarPreviewWhatsapp(templates.find((t) => t.nome === select.value), gatilho);
+        select.addEventListener('change', () => {
+          input.hidden = select.value !== '__manual__' ? true : false;
+          atualizarPreviewWhatsapp(templates.find((t) => t.nome === select.value), gatilho);
+        });
       } catch (err) {
         // Sem lista da Meta (offline, sem credencial) — segue no campo manual.
       }
