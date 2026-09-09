@@ -22,6 +22,17 @@ const planosPeople = require('./lib/planos');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
+// Link da avaliação a partir do token — usado tanto pro convite manual
+// (enviar-avaliacao) quanto pelas automações de WhatsApp/e-mail (o token
+// vem de avaliacoes.token via candidaturas.avaliacao_id). Sem token (pessoa
+// nunca teve avaliação criada), devolve null — automação de WhatsApp cujo
+// template exige link de botão simplesmente não manda o parâmetro do botão.
+const linkAvaliacaoDe = (token) => (token ? `${PUBLIC_URL}/people/avaliacao/${token}` : null);
+async function buscarTokenAvaliacao(avaliacaoId) {
+  if (!avaliacaoId) return null;
+  const { rows } = await pool.query('select token from avaliacoes where id = $1', [avaliacaoId]);
+  return rows[0] ? rows[0].token : null;
+}
 // Identidade/sessão saiu do painel do Studio pro serviço kyvvo-platform
 // (corte P3). Default = endereço interno na rede do compose (sem hairpin
 // pela internet). O login do People passa a não depender do painel do Studio
@@ -785,14 +796,21 @@ async function build() {
 
     if (dados.status === 'encerrada' && statusAnterior !== 'encerrada') {
       const vaga = { nome: dados.nome || atualRows[0].nome, empresa: dados.empresa !== undefined ? dados.empresa : atualRows[0].empresa };
+      // avaliacoes.token só serve pra montar o link (linkAvaliacaoDe) — uma
+      // automação de WhatsApp aqui pode ter escolhido um template com botão
+      // de link, mesmo esse não sendo o gatilho "original" desse botão.
       const { rows: candidatosEmAberto } = await pool.query(
-        `select p.nome, p.email, p.telefone_e164
+        `select p.nome, p.email, p.telefone_e164, av.token as avaliacao_token
          from candidaturas c join candidatos p on p.id = c.candidato_id
+         left join avaliacoes av on av.id = c.avaliacao_id
          where c.vaga_id = $1 and c.status != 'reprovada'`,
         [request.params.id]
       );
       for (const candidato of candidatosEmAberto) {
-        await dispararAutomacoes(pool, { tenantId: request.user.tenantId, gatilho: 'vaga_encerrada', candidato, vaga });
+        await dispararAutomacoes(pool, {
+          tenantId: request.user.tenantId, gatilho: 'vaga_encerrada', candidato, vaga,
+          linkAvaliacao: linkAvaliacaoDe(candidato.avaliacao_token),
+        });
       }
     }
     return { ok: true };
@@ -885,7 +903,7 @@ async function build() {
       `update candidaturas c set status = 'reprovada', motivo_reprovacao = $3
        from vagas v, candidatos p
        where c.vaga_id = v.id and c.candidato_id = p.id and c.id = $1 and v.tenant_id = $2
-       returning c.id, c.tenant_id, c.status as status_anterior, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
+       returning c.id, c.tenant_id, c.status as status_anterior, c.avaliacao_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
       [request.params.id, request.user.tenantId, motivo || null]
     );
     const candidatura = rows[0];
@@ -894,10 +912,12 @@ async function build() {
       tenantId: request.user.tenantId, candidaturaId: candidatura.id, tipo: 'candidatura_reprovada',
       de: candidatura.status_anterior, para: 'reprovada', atorEmail: request.user.email, payload: motivo ? { motivo } : null,
     });
+    const tokenAvaliacao = await buscarTokenAvaliacao(candidatura.avaliacao_id);
     await dispararAutomacoes(pool, {
       tenantId: request.user.tenantId, gatilho: 'candidatura_reprovada',
       candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
       vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
+      linkAvaliacao: linkAvaliacaoDe(tokenAvaliacao),
     });
     return { ok: true };
   });
@@ -908,7 +928,7 @@ async function build() {
   // `semProximaEtapa: true` (não é erro) pro front oferecer cadastrar uma.
   fastify.patch('/people/api/candidaturas/:id/avancar-etapa', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows: candidaturaRows } = await pool.query(
-      `select c.id, c.etapa_id, c.vaga_id, p.id as candidato_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa
+      `select c.id, c.etapa_id, c.vaga_id, c.avaliacao_id, p.id as candidato_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa
        from candidaturas c join vagas v on v.id = c.vaga_id join candidatos p on p.id = c.candidato_id
        where c.id = $1 and v.tenant_id = $2`,
       [request.params.id, request.user.tenantId]
@@ -932,10 +952,12 @@ async function build() {
       tenantId: request.user.tenantId, candidaturaId: candidatura.id, tipo: 'etapa_alterada',
       de: etapaAnteriorNome, para: proxima.nome, atorEmail: request.user.email,
     });
+    const tokenAvaliacao = await buscarTokenAvaliacao(candidatura.avaliacao_id);
     await dispararAutomacoes(pool, {
       tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: proxima.id, etapaNome: proxima.nome,
       candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
       vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
+      linkAvaliacao: linkAvaliacaoDe(tokenAvaliacao),
     });
     return { ok: true, etapa: proxima };
   });
@@ -1102,7 +1124,7 @@ async function build() {
       await dispararAutomacoes(pool, {
         tenantId, gatilho: 'candidatura_criada',
         candidato: pessoa, vaga: vagaInfo,
-        linkAvaliacao: tokenParaLink ? `${PUBLIC_URL}/people/avaliacao/${tokenParaLink}` : null,
+        linkAvaliacao: linkAvaliacaoDe(tokenParaLink),
       });
     }
     return { candidatura, pessoa, reaproveitada: false };
@@ -1363,7 +1385,7 @@ async function build() {
       `update candidaturas c set etapa_id = $1
        from vagas v, candidatos p
        where c.vaga_id = v.id and c.candidato_id = p.id and c.id = $2 and v.tenant_id = $3
-       returning c.id, c.tenant_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
+       returning c.id, c.tenant_id, c.avaliacao_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
       [etapa_id || null, request.params.id, request.user.tenantId]
     );
     const candidatura = rows[0];
@@ -1373,10 +1395,12 @@ async function build() {
     });
     if (etapa_id) {
       const { rows: etapaRows } = await pool.query('select nome from etapas where id = $1', [etapa_id]);
+      const tokenAvaliacao = await buscarTokenAvaliacao(candidatura.avaliacao_id);
       await dispararAutomacoes(pool, {
         tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: etapa_id, etapaNome: etapaRows[0] ? etapaRows[0].nome : '',
         candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
         vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
+        linkAvaliacao: linkAvaliacaoDe(tokenAvaliacao),
       });
     }
     return { ok: true };
