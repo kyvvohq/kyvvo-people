@@ -548,10 +548,16 @@
       const preview = document.getElementById('preview-whatsapp');
       if (!template || !template.corpo) { preview.hidden = true; return; }
 
+      // Os templates aprovados usam parâmetro NOMEADO no corpo ({{nome}},
+      // {{vaga}}...), não posicional ({{1}}, {{2}}) — troca pelo nome real
+      // que a Meta devolveu (template.parametros_corpo), na mesma ordem dos
+      // valores de exemplo. Template antigo/posicional (sem nome) cai pra
+      // {{1}}, {{2}} mesmo.
       const exemplos = EXEMPLO_PARAMETROS_CORPO[gatilho] || [];
       let corpoPreenchido = template.corpo;
-      exemplos.forEach((valor, i) => {
-        corpoPreenchido = corpoPreenchido.replace(new RegExp(`\\{\\{${i + 1}\\}\\}`, 'g'), valor);
+      (template.parametros_corpo || []).forEach((nomeParam, i) => {
+        const chave = template.parametros_nomeados ? nomeParam : String(i + 1);
+        corpoPreenchido = corpoPreenchido.replace(new RegExp(`\\{\\{${chave}\\}\\}`, 'g'), exemplos[i] || '');
       });
 
       document.getElementById('preview-whatsapp-corpo').textContent = corpoPreenchido;

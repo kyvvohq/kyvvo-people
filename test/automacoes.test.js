@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { renderizar, extrairTokenDoLink, escolherMelhorTemplate, SEEDS } = require('../lib/automacoes');
+const { renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, SEEDS } = require('../lib/automacoes');
 
 test('renderizar: substitui todos os placeholders presentes', () => {
   const resultado = renderizar('Olá, {{nome}}! Vaga: {{vaga}}.', { nome: 'Ana', vaga: 'Dev Backend' });
@@ -78,4 +78,39 @@ test('escolherMelhorTemplate: sem nenhum aprovado, cai pro primeiro da lista', (
 
 test('escolherMelhorTemplate: lista vazia devolve null', () => {
   assert.equal(escolherMelhorTemplate([]), null);
+});
+
+// Achado em produção (2026-09-09): a Meta devolve 400 "(#132000) Number of
+// parameters does not match" quando se manda parâmetro posicional pra um
+// template com parâmetro NOMEADO no corpo — mesmo com a contagem certa.
+test('montarParametrosWhatsapp: template nomeado usa os nomes reais da Meta, não posição', () => {
+  const dados = { nome: 'Ana', vaga: 'Dev Backend', etapa: 'Entrevista', link_avaliacao: 'https://x/people/avaliacao/tok-1' };
+  const templateInfo = { parametros_corpo: ['nome', 'vaga'], parametros_nomeados: true, tem_botao_url: true };
+  const { parametrosCorpo, parametroBotao } = montarParametrosWhatsapp('etapa_alcancada', dados, templateInfo);
+  assert.deepEqual(parametrosCorpo, [
+    { nome: 'nome', nomeado: true, valor: 'Ana' },
+    { nome: 'vaga', nomeado: true, valor: 'Dev Backend' },
+  ]);
+  assert.equal(parametroBotao, 'tok-1');
+});
+
+test('montarParametrosWhatsapp: alias vaga_titulo -> dados.vaga', () => {
+  const dados = { nome: 'Ana', vaga: 'Dev Backend', link_avaliacao: null };
+  const templateInfo = { parametros_corpo: ['nome', 'vaga_titulo'], parametros_nomeados: true, tem_botao_url: false };
+  const { parametrosCorpo } = montarParametrosWhatsapp('candidatura_criada', dados, templateInfo);
+  assert.equal(parametrosCorpo[1].valor, 'Dev Backend');
+});
+
+test('montarParametrosWhatsapp: sem template (lista da Meta vazia) cai no fallback posicional hardcoded', () => {
+  const dados = { nome: 'Ana', vaga: 'Dev Backend', etapa: '' };
+  const { parametrosCorpo, parametroBotao } = montarParametrosWhatsapp('candidatura_reprovada', dados, undefined);
+  assert.deepEqual(parametrosCorpo, [{ valor: 'Ana', nomeado: false }, { valor: 'Dev Backend', nomeado: false }]);
+  assert.equal(parametroBotao, null);
+});
+
+test('montarParametrosWhatsapp: template sem botão não manda parametroBotao mesmo com link disponível', () => {
+  const dados = { nome: 'Ana', vaga: 'Dev', link_avaliacao: 'https://x/people/avaliacao/tok-2' };
+  const templateInfo = { parametros_corpo: ['nome', 'vaga'], parametros_nomeados: true, tem_botao_url: false };
+  const { parametroBotao } = montarParametrosWhatsapp('candidatura_reprovada', dados, templateInfo);
+  assert.equal(parametroBotao, null);
 });
