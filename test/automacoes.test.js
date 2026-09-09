@@ -1,7 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, parametroBotaoParaTemplate, SEEDS,
+  renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, parametroBotaoParaTemplate,
+  resolverPorCanal, SEEDS,
 } = require('../lib/automacoes');
 
 test('renderizar: substitui todos os placeholders presentes', () => {
@@ -151,4 +152,24 @@ test('parametroBotaoParaTemplate: sem prefixo do template (fallback), devolve s�
 
 test('parametroBotaoParaTemplate: sem link, devolve null', () => {
   assert.equal(parametroBotaoParaTemplate(null, 'https://x/'), null);
+});
+
+// Automação por vaga (2026-09-09): a específica de uma vaga sobrepõe a
+// geral, mas só no canal onde ela existir.
+test('resolverPorCanal: automação com vaga_id sobrepõe a geral do mesmo canal', () => {
+  const geralEmail = { canal: 'email', vaga_id: null, id: 'geral-email' };
+  const geralWhats = { canal: 'whatsapp', vaga_id: null, id: 'geral-whats' };
+  const especificaWhats = { canal: 'whatsapp', vaga_id: 'vaga-1', id: 'especifica-whats' };
+  const resultado = resolverPorCanal([geralEmail, geralWhats, especificaWhats]);
+  assert.equal(resultado.find((a) => a.canal === 'email').id, 'geral-email');
+  assert.equal(resultado.find((a) => a.canal === 'whatsapp').id, 'especifica-whats');
+});
+
+test('resolverPorCanal: sem automação específica, mantém a geral', () => {
+  const geral = { canal: 'whatsapp', vaga_id: null, id: 'geral' };
+  assert.equal(resolverPorCanal([geral])[0].id, 'geral');
+});
+
+test('resolverPorCanal: sem nenhuma automação, devolve lista vazia', () => {
+  assert.deepEqual(resolverPorCanal([]), []);
 });
