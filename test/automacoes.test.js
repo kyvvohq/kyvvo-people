@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { renderizar, extrairTokenDoLink, SEEDS } = require('../lib/automacoes');
+const { renderizar, extrairTokenDoLink, escolherMelhorTemplate, SEEDS } = require('../lib/automacoes');
 
 test('renderizar: substitui todos os placeholders presentes', () => {
   const resultado = renderizar('Olá, {{nome}}! Vaga: {{vaga}}.', { nome: 'Ana', vaga: 'Dev Backend' });
@@ -52,4 +52,30 @@ test('extrairTokenDoLink: ignora barra final', () => {
 test('extrairTokenDoLink: nulo/vazio devolve null', () => {
   assert.equal(extrairTokenDoLink(null), null);
   assert.equal(extrairTokenDoLink(''), null);
+});
+
+test('escolherMelhorTemplate: prefere aprovado com botão de link', () => {
+  const templates = [
+    { nome: 'a', status: 'APPROVED', tem_botao_url: false },
+    { nome: 'b', status: 'APPROVED', tem_botao_url: true },
+    { nome: 'c', status: 'PENDING', tem_botao_url: true },
+  ];
+  assert.equal(escolherMelhorTemplate(templates).nome, 'b');
+});
+
+test('escolherMelhorTemplate: sem botão, cai pro primeiro aprovado', () => {
+  const templates = [
+    { nome: 'a', status: 'APPROVED', tem_botao_url: false },
+    { nome: 'b', status: 'PENDING', tem_botao_url: true },
+  ];
+  assert.equal(escolherMelhorTemplate(templates).nome, 'a');
+});
+
+test('escolherMelhorTemplate: sem nenhum aprovado, cai pro primeiro da lista', () => {
+  const templates = [{ nome: 'a', status: 'PENDING', tem_botao_url: false }];
+  assert.equal(escolherMelhorTemplate(templates).nome, 'a');
+});
+
+test('escolherMelhorTemplate: lista vazia devolve null', () => {
+  assert.equal(escolherMelhorTemplate([]), null);
 });
