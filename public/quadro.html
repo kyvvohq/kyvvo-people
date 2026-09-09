@@ -340,8 +340,12 @@
       renderModalListaAutomacoes(contexto);
     }
 
+    // Quadro geral = só automações SEM vaga (vaga_id null) — as específicas
+    // de uma vaga só aparecem/editam dentro da tela daquela vaga
+    // (vagas.html), não aqui, pra não confundir "isso vale pra todo mundo"
+    // com "isso é só dessa vaga".
     function itensDoContexto(contexto) {
-      return automacoes.filter((a) => a.gatilho === contexto.gatilho && (a.etapa_id || null) === contexto.etapaId);
+      return automacoes.filter((a) => a.gatilho === contexto.gatilho && (a.etapa_id || null) === contexto.etapaId && !a.vaga_id);
     }
 
     function itemAutomacaoHtml(a) {

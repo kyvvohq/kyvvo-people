@@ -800,7 +800,7 @@ async function build() {
       // automação de WhatsApp aqui pode ter escolhido um template com botão
       // de link, mesmo esse não sendo o gatilho "original" desse botão.
       const { rows: candidatosEmAberto } = await pool.query(
-        `select p.nome, p.email, p.telefone_e164, av.token as avaliacao_token
+        `select p.nome, p.email, p.telefone_e164, p.whatsapp_opt_out, av.token as avaliacao_token
          from candidaturas c join candidatos p on p.id = c.candidato_id
          left join avaliacoes av on av.id = c.avaliacao_id
          where c.vaga_id = $1 and c.status != 'reprovada'`,
@@ -849,7 +849,7 @@ async function build() {
 
   fastify.get('/people/api/candidaturas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query(
-      `select c.id, c.candidato_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.linkedin, p.anonimizado_em,
+      `select c.id, c.candidato_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.linkedin, p.anonimizado_em, p.whatsapp_opt_out,
               c.status, c.etapa_id, c.vaga_id, c.avaliacao_id, c.score, c.pesos_snapshot,
               c.motivo_reprovacao, c.origem, c.curriculo_nome, c.curriculo_tipo, c.criado_em, v.nome as vaga_nome
        from candidaturas c
@@ -903,7 +903,7 @@ async function build() {
       `update candidaturas c set status = 'reprovada', motivo_reprovacao = $3
        from vagas v, candidatos p
        where c.vaga_id = v.id and c.candidato_id = p.id and c.id = $1 and v.tenant_id = $2
-       returning c.id, c.tenant_id, c.status as status_anterior, c.avaliacao_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
+       returning c.id, c.tenant_id, c.status as status_anterior, c.avaliacao_id, p.nome, p.email, p.telefone_e164, p.whatsapp_opt_out, v.nome as vaga_nome, v.empresa as vaga_empresa`,
       [request.params.id, request.user.tenantId, motivo || null]
     );
     const candidatura = rows[0];
@@ -915,7 +915,7 @@ async function build() {
     const tokenAvaliacao = await buscarTokenAvaliacao(candidatura.avaliacao_id);
     await dispararAutomacoes(pool, {
       tenantId: request.user.tenantId, gatilho: 'candidatura_reprovada',
-      candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
+      candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164, whatsapp_opt_out: candidatura.whatsapp_opt_out },
       vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
       linkAvaliacao: linkAvaliacaoDe(tokenAvaliacao),
     });
@@ -928,7 +928,7 @@ async function build() {
   // `semProximaEtapa: true` (não é erro) pro front oferecer cadastrar uma.
   fastify.patch('/people/api/candidaturas/:id/avancar-etapa', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows: candidaturaRows } = await pool.query(
-      `select c.id, c.etapa_id, c.vaga_id, c.avaliacao_id, p.id as candidato_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa
+      `select c.id, c.etapa_id, c.vaga_id, c.avaliacao_id, p.id as candidato_id, p.nome, p.email, p.telefone_e164, p.whatsapp_opt_out, v.nome as vaga_nome, v.empresa as vaga_empresa
        from candidaturas c join vagas v on v.id = c.vaga_id join candidatos p on p.id = c.candidato_id
        where c.id = $1 and v.tenant_id = $2`,
       [request.params.id, request.user.tenantId]
@@ -954,8 +954,8 @@ async function build() {
     });
     const tokenAvaliacao = await buscarTokenAvaliacao(candidatura.avaliacao_id);
     await dispararAutomacoes(pool, {
-      tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: proxima.id, etapaNome: proxima.nome,
-      candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
+      tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: proxima.id, etapaNome: proxima.nome, vagaId: candidatura.vaga_id,
+      candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164, whatsapp_opt_out: candidatura.whatsapp_opt_out },
       vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
       linkAvaliacao: linkAvaliacaoDe(tokenAvaliacao),
     });
@@ -1050,6 +1050,23 @@ async function build() {
       [request.params.id, request.user.tenantId, original.nome, original.email, original.telefone_e164, original.linkedin]
     );
     return { ok: true };
+  });
+
+  // Opt-out manual — o recrutador marca quando o candidato pede pra não
+  // receber mais WhatsApp por outro canal (ligação, e-mail). Detecção
+  // automática por palavra-chave (responder "PARAR" etc.) é via webhook,
+  // ver fase 5 do plano de automações. Uma vez marcado, dispararAutomacoes
+  // nunca manda WhatsApp pra esse candidato de novo (lib/automacoes.js) —
+  // e-mail continua normal, o opt-out é só do canal WhatsApp.
+  fastify.patch('/people/api/candidatos/:id/whatsapp-opt-out', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const optOut = (request.body || {}).opt_out !== false; // default true (marcar) se o corpo vier vazio
+    const { rows } = await pool.query(
+      `update candidatos set whatsapp_opt_out = $1, whatsapp_opt_out_em = case when $1 then now() else null end
+       where id = $2 and tenant_id = $3 returning id`,
+      [optOut, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Candidato não encontrado' });
+    return { ok: true, whatsapp_opt_out: optOut };
   });
 
   // Cria (ou devolve, se já existir) a candidatura de uma pessoa numa vaga —
@@ -1280,16 +1297,20 @@ async function build() {
   fastify.get('/people/api/automacoes', { preHandler: fastify.authenticate }, async (request) => {
     await garantirAutomacoesPadrao(pool, request.user.tenantId);
     const { rows } = await pool.query(
-      `select a.*, e.nome as etapa_nome from automacoes a
+      `select a.*, e.nome as etapa_nome, v.nome as vaga_nome from automacoes a
        left join etapas e on e.id = a.etapa_id
+       left join vagas v on v.id = a.vaga_id
        where a.tenant_id = $1 order by a.gatilho, e.ordem nulls first, a.canal`,
       [request.user.tenantId]
     );
     return rows;
   });
 
+  // vaga_id (opcional, só com gatilho=etapa_alcancada): automação específica
+  // daquela vaga, sobrepõe a geral (vaga_id nulo) da mesma etapa+canal — ver
+  // lib/automacoes.js (dispararAutomacoes/resolverPorCanal).
   fastify.post('/people/api/automacoes', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { gatilho, etapa_id, canal, nome, assunto, corpo, whatsapp_template, ativo } = request.body || {};
+    const { gatilho, etapa_id, vaga_id, canal, nome, assunto, corpo, whatsapp_template, ativo } = request.body || {};
     if (!GATILHOS_AUTOMACAO_VALIDOS.includes(gatilho)) return reply.code(400).send({ error: 'Gatilho inválido' });
     if (!CANAIS_AUTOMACAO_VALIDOS.includes(canal)) return reply.code(400).send({ error: 'Canal inválido' });
     if (!nome || !corpo) return reply.code(400).send({ error: 'nome e corpo são obrigatórios' });
@@ -1297,15 +1318,19 @@ async function build() {
       if (!etapa_id) return reply.code(400).send({ error: 'etapa_id é obrigatório para o gatilho etapa_alcancada' });
       const { rows: etapaRows } = await pool.query('select id from etapas where id = $1 and tenant_id = $2', [etapa_id, request.user.tenantId]);
       if (!etapaRows[0]) return reply.code(404).send({ error: 'Etapa não encontrada' });
-    } else if (etapa_id) {
-      return reply.code(400).send({ error: 'etapa_id só se aplica ao gatilho etapa_alcancada' });
+      if (vaga_id) {
+        const { rows: vagaRows } = await pool.query('select id from vagas where id = $1 and tenant_id = $2', [vaga_id, request.user.tenantId]);
+        if (!vagaRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+      }
+    } else if (etapa_id || vaga_id) {
+      return reply.code(400).send({ error: 'etapa_id/vaga_id só se aplicam ao gatilho etapa_alcancada' });
     }
 
     const id = crypto.randomUUID();
     await pool.query(
-      `insert into automacoes (id, tenant_id, gatilho, etapa_id, canal, nome, ativo, removivel, assunto, corpo, whatsapp_template)
-       values ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10)`,
-      [id, request.user.tenantId, gatilho, etapa_id || null, canal, nome, ativo !== false, assunto || null, corpo, whatsapp_template || null]
+      `insert into automacoes (id, tenant_id, gatilho, etapa_id, vaga_id, canal, nome, ativo, removivel, assunto, corpo, whatsapp_template)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, $10, $11)`,
+      [id, request.user.tenantId, gatilho, etapa_id || null, vaga_id || null, canal, nome, ativo !== false, assunto || null, corpo, whatsapp_template || null]
     );
     return reply.code(201).send({ id });
   });
@@ -1317,9 +1342,9 @@ async function build() {
 
     const id = crypto.randomUUID();
     await pool.query(
-      `insert into automacoes (id, tenant_id, gatilho, etapa_id, canal, nome, ativo, removivel, assunto, corpo, whatsapp_template)
-       values ($1, $2, $3, $4, $5, $6, true, true, $7, $8, $9)`,
-      [id, request.user.tenantId, original.gatilho, original.etapa_id, original.canal, `${original.nome} (cópia)`, original.assunto, original.corpo, original.whatsapp_template]
+      `insert into automacoes (id, tenant_id, gatilho, etapa_id, vaga_id, canal, nome, ativo, removivel, assunto, corpo, whatsapp_template)
+       values ($1, $2, $3, $4, $5, $6, $7, true, true, $8, $9, $10)`,
+      [id, request.user.tenantId, original.gatilho, original.etapa_id, original.vaga_id, original.canal, `${original.nome} (cópia)`, original.assunto, original.corpo, original.whatsapp_template]
     );
     return reply.code(201).send({ id });
   });
@@ -1385,7 +1410,7 @@ async function build() {
       `update candidaturas c set etapa_id = $1
        from vagas v, candidatos p
        where c.vaga_id = v.id and c.candidato_id = p.id and c.id = $2 and v.tenant_id = $3
-       returning c.id, c.tenant_id, c.avaliacao_id, p.nome, p.email, p.telefone_e164, v.nome as vaga_nome, v.empresa as vaga_empresa`,
+       returning c.id, c.tenant_id, c.vaga_id, c.avaliacao_id, p.nome, p.email, p.telefone_e164, p.whatsapp_opt_out, v.nome as vaga_nome, v.empresa as vaga_empresa`,
       [etapa_id || null, request.params.id, request.user.tenantId]
     );
     const candidatura = rows[0];
@@ -1397,8 +1422,8 @@ async function build() {
       const { rows: etapaRows } = await pool.query('select nome from etapas where id = $1', [etapa_id]);
       const tokenAvaliacao = await buscarTokenAvaliacao(candidatura.avaliacao_id);
       await dispararAutomacoes(pool, {
-        tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: etapa_id, etapaNome: etapaRows[0] ? etapaRows[0].nome : '',
-        candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164 },
+        tenantId: request.user.tenantId, gatilho: 'etapa_alcancada', etapaId: etapa_id, etapaNome: etapaRows[0] ? etapaRows[0].nome : '', vagaId: candidatura.vaga_id,
+        candidato: { nome: candidatura.nome, email: candidatura.email, telefone_e164: candidatura.telefone_e164, whatsapp_opt_out: candidatura.whatsapp_opt_out },
         vaga: { nome: candidatura.vaga_nome, empresa: candidatura.vaga_empresa },
         linkAvaliacao: linkAvaliacaoDe(tokenAvaliacao),
       });

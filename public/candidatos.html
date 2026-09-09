@@ -288,11 +288,12 @@
               ${c.vaga_nome} · <span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span> · Etapa: ${nomeEtapa(c.etapa_id)}
               ${c.score ? ` · Score: <strong>${c.score.geral}</strong>` : ''}
               <a class="acao" href="#" id="btn-editar-score" style="margin-left:6px">${c.score ? 'Editar score' : 'Lançar score'}</a><br>
-              ${c.whatsapp} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}<br>
+              ${c.whatsapp}${c.whatsapp_opt_out ? ' <span class="badge neutro" title="Pediu pra não receber mais WhatsApp">Opt-out</span>' : ''} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}<br>
               <a class="acao" href="#" id="btn-banco-talentos">Adicionar a outra vaga</a>
               ${c.anonimizado_em
                 ? '<a class="acao" href="#" id="btn-reverter-anonimizar">Reverter mascaramento</a>'
                 : '<a class="acao" href="#" id="btn-anonimizar" style="color:var(--danger)">Anonimizar</a>'}
+              <a class="acao" href="#" id="btn-toggle-opt-out"${c.whatsapp_opt_out ? '' : ' style="color:var(--danger)"'}>${c.whatsapp_opt_out ? 'Reativar WhatsApp' : 'Não contatar via WhatsApp'}</a>
               ${irmas.length > 1 ? `
                 <div style="margin-top:6px">Outras candidaturas: ${irmas.map((x) => `<a href="#" class="acao candidatura-irma" data-id="${x.id}" style="margin-right:10px${x.id === c.id ? ';font-weight:700;color:var(--text);pointer-events:none' : ''}">${x.vaga_nome}${x.vaga_status === 'encerrada' ? ' (encerrada)' : ''}</a>`).join('')}</div>
               ` : ''}
@@ -321,6 +322,14 @@
       if (btnAnonimizar) btnAnonimizar.addEventListener('click', (e) => { e.preventDefault(); confirmarAnonimizar(c); });
       const btnReverter = document.getElementById('btn-reverter-anonimizar');
       if (btnReverter) btnReverter.addEventListener('click', (e) => { e.preventDefault(); reverterAnonimizar(c); });
+      document.getElementById('btn-toggle-opt-out').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await apiFetch(`/people/api/candidatos/${c.candidato_id}/whatsapp-opt-out`, {
+          method: 'PATCH',
+          body: JSON.stringify({ opt_out: !c.whatsapp_opt_out }),
+        });
+        renderizarDetalhe();
+      });
       detalheEl.querySelectorAll('.candidatura-irma').forEach((el) => {
         el.addEventListener('click', (e) => { e.preventDefault(); if (el.dataset.id !== c.id) selecionar(el.dataset.id); });
       });

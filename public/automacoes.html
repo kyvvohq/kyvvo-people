@@ -159,7 +159,8 @@
 
     function contextoLabel(a) {
       if (a.gatilho !== 'etapa_alcancada') return GATILHO_LABEL[a.gatilho] || a.gatilho;
-      return `${GATILHO_LABEL.etapa_alcancada}: ${a.etapa_nome || '(etapa removida)'}`;
+      const base = `${GATILHO_LABEL.etapa_alcancada}: ${a.etapa_nome || '(etapa removida)'}`;
+      return a.vaga_id ? `${base} — só na vaga "${a.vaga_nome || '(vaga removida)'}"` : base;
     }
 
     function renderizarTabela() {
