@@ -500,9 +500,14 @@ async function build() {
   });
 
   // Fase 5 do plano de travas de WhatsApp (2026-09-09) — o People nunca
-  // tinha recebido mensagem antes, só mandava. Handshake (GET) idêntico ao
-  // que o kyvvo-studio já usa (routes/webhook-whatsapp.js) — token contra
-  // META_VERIFY_TOKEN, resposta é o challenge cru.
+  // tinha recebido mensagem antes, só mandava. Achado logo depois: a Meta só
+  // permite UMA URL de callback por App, e o App é um só pra Kyvvo inteira —
+  // não dá pra registrar essa URL direto na Meta sem substituir a do Studio
+  // (que já usa o webhook pro bot). Solução: o kyvvo-platform vira o único
+  // destino cadastrado na Meta e reencaminha pra cá por phone_number_id (ver
+  // kyvvo-platform/routes/webhook-whatsapp.js). Por isso o GET (handshake da
+  // Meta) não é mais necessário aqui — mantido inerte, sem custo, caso o
+  // roteamento precise mudar de novo no futuro.
   fastify.get('/people/webhooks/whatsapp', async (request, reply) => {
     const query = request.query || {};
     const valido = query['hub.mode'] === 'subscribe'
@@ -518,11 +523,15 @@ async function build() {
   // compartilhado por todo tenant — não dá pra saber de qual candidatura o
   // candidato tá falando quando responde, então o opt-out é global (todo
   // tenant), não por tenant — ver detectarOptOut em lib/automacoes.js.
-  // Sempre 200 pra Meta, mesmo em erro — evita a Meta desativar o webhook
-  // por falha repetida (mesmo padrão do Studio: nunca perde o evento
-  // silenciosamente, mas também nunca deixa o processamento derrubar a
-  // resposta ao webhook).
+  // Sempre 200 pra Meta (via platform), mesmo em erro — evita a Meta
+  // desativar o webhook por falha repetida (mesmo padrão do Studio: nunca
+  // perde o evento silenciosamente, mas também nunca deixa o processamento
+  // derrubar a resposta). Exige o segredo do encaminhamento do platform —
+  // deixou de ser um endpoint aberto pra Meta direto.
   fastify.post('/people/webhooks/whatsapp', async (request, reply) => {
+    if (!process.env.WEBHOOK_INTERNAL_SECRET || request.headers['x-webhook-internal-secret'] !== process.env.WEBHOOK_INTERNAL_SECRET) {
+      return reply.code(401).send({ error: 'Segredo interno inválido' });
+    }
     try {
       const body = request.body || {};
       const change = (((body.entry || [])[0] || {}).changes || [])[0];
