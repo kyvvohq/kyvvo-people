@@ -16,7 +16,7 @@ const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
 const { paraE164 } = require('./lib/telefone');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
-const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut } = require('./lib/automacoes');
+const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut, processarFilaWhatsapp } = require('./lib/automacoes');
 const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
@@ -1648,10 +1648,30 @@ async function build() {
   return fastify;
 }
 
+// Fase 4 do plano de travas de WhatsApp: o People nunca teve processo em
+// background — em vez de um container/worker novo, um setInterval dentro
+// do próprio processo já resolve (volume baixo, não precisa de fila
+// distribuída de verdade). Roda só quando o processo sobe de verdade
+// (start(), nunca em teste — build() sozinho, usado pelos testes, não
+// registra isso). Best-effort: uma falha na rodada não derruba o processo,
+// só loga e tenta de novo na próxima.
+const INTERVALO_FILA_WHATSAPP_MS = 5 * 60 * 1000; // 5 min
+function iniciarWorkerFilaWhatsapp() {
+  setInterval(async () => {
+    try {
+      const resultado = await processarFilaWhatsapp(pool);
+      if (resultado.processados) console.log(`[fila-whatsapp] ${resultado.processados} mensagem(ns) enviada(s) da fila`);
+    } catch (err) {
+      console.error(`[fila-whatsapp] Falha ao processar fila: ${err.message}`);
+    }
+  }, INTERVALO_FILA_WHATSAPP_MS);
+}
+
 async function start() {
   await migrar();
   const fastify = await build();
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
+  iniciarWorkerFilaWhatsapp();
 }
 
 if (require.main === module) {
