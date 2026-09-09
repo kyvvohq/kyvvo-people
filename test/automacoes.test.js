@@ -1,6 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, SEEDS } = require('../lib/automacoes');
+const {
+  renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, parametroBotaoParaTemplate, SEEDS,
+} = require('../lib/automacoes');
 
 test('renderizar: substitui todos os placeholders presentes', () => {
   const resultado = renderizar('Olá, {{nome}}! Vaga: {{vaga}}.', { nome: 'Ana', vaga: 'Dev Backend' });
@@ -113,4 +115,40 @@ test('montarParametrosWhatsapp: template sem botão não manda parametroBotao me
   const templateInfo = { parametros_corpo: ['nome', 'vaga'], parametros_nomeados: true, tem_botao_url: false };
   const { parametroBotao } = montarParametrosWhatsapp('candidatura_reprovada', dados, templateInfo);
   assert.equal(parametroBotao, null);
+});
+
+// Achado em produção (2026-09-09): dos 3 templates do Bruno, dois têm o
+// botão com base ".../people/avaliacao/{{1}}" (só o token completa) e um
+// tem base só no domínio raiz ".../{{1}}" (precisa do caminho inteiro) —
+// mandar sempre só o token quebrava o link nesse terceiro.
+test('parametroBotaoParaTemplate: base do botão já termina em /avaliacao/ -> só o token', () => {
+  const valor = parametroBotaoParaTemplate(
+    'https://people.kyvvo.com.br/people/avaliacao/abc-123',
+    'https://www.people.kyvvo.com.br/people/avaliacao/'
+  );
+  assert.equal(valor, 'abc-123');
+});
+
+test('parametroBotaoParaTemplate: base do botão é a raiz do domínio -> caminho inteiro', () => {
+  const valor = parametroBotaoParaTemplate(
+    'https://people.kyvvo.com.br/people/avaliacao/abc-123',
+    'https://www.people.kyvvo.com.br/'
+  );
+  assert.equal(valor, 'people/avaliacao/abc-123');
+});
+
+test('parametroBotaoParaTemplate: funciona mesmo com host diferente (www vs sem www)', () => {
+  const valor = parametroBotaoParaTemplate(
+    'https://people.kyvvo.com.br/people/avaliacao/xyz',
+    'https://www.people.kyvvo.com.br/people/avaliacao/'
+  );
+  assert.equal(valor, 'xyz');
+});
+
+test('parametroBotaoParaTemplate: sem prefixo do template (fallback), devolve só o token', () => {
+  assert.equal(parametroBotaoParaTemplate('https://people.kyvvo.com.br/people/avaliacao/abc', null), 'abc');
+});
+
+test('parametroBotaoParaTemplate: sem link, devolve null', () => {
+  assert.equal(parametroBotaoParaTemplate(null, 'https://x/'), null);
 });
