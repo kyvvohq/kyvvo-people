@@ -87,6 +87,16 @@ document.querySelectorAll('.menu-item[href]').forEach((item) => {
   if (item.getAttribute('href') === window.location.pathname) item.classList.add('active');
 });
 
+// --- Submenu expansível (ex: Configurações > Geral / Plano e Cobrança) ---
+document.querySelectorAll('.menu-item-toggle').forEach((btn) => {
+  btn.addEventListener('click', () => btn.closest('.menu-item-grupo').classList.toggle('expandido'));
+});
+// Abre e destaca o grupo automaticamente quando a página atual é um dos filhos.
+document.querySelectorAll('.menu-submenu .menu-item.active').forEach((item) => {
+  const grupo = item.closest('.menu-item-grupo');
+  if (grupo) grupo.classList.add('expandido', 'tem-filho-ativo');
+});
+
 // --- Tema claro/escuro ---
 // Aplicado o mais cedo possível por um snippet inline no <head> de cada
 // página (evita flash do tema errado); aqui só sincronizamos os controles

@@ -154,8 +154,17 @@ async function build() {
   // cliente. `cycle` já sai no formato que a API da Asaas espera.
   const MULTIPLICADOR_CICLO = { mensal: 1, anual: 10 };
   const CICLO_ASAAS = { mensal: 'MONTHLY', anual: 'YEARLY' };
-  function montarResumoPagamento(a) {
+  // Histórico (aba "Histórico" de Plano e Cobrança) vem direto da Asaas, sem
+  // tabela própria — mesmo padrão do Studio (server/panel/lib/pagamentos.js):
+  // plano_nome/ciclo usam o plano ATUAL da assinatura pra toda linha, já que
+  // a Asaas não guarda o plano Kyvvo por cobrança histórica (trocar de plano
+  // reaproveita a mesma subscription).
+  async function montarResumoPagamento(a, planoNome) {
     if (!a) return null;
+    const historico = await asaas.listarUltimasCobrancas(a.asaas_subscription_id).catch((erro) => {
+      console.error(`[pagamentos] falha ao listar cobranças da subscription ${a.asaas_subscription_id}: ${erro.message}`);
+      return [];
+    });
     return {
       plano: a.plano,
       ciclo: a.ciclo,
@@ -167,13 +176,26 @@ async function build() {
       tem_assinatura: Boolean(a.asaas_subscription_id),
       cancelado_em: a.cancelado_em,
       acesso_ate: a.acesso_ate,
+      historico: historico.map((p) => ({
+        data: p.dueDate,
+        plano_nome: planoNome || null,
+        valor: p.value,
+        ciclo: a.ciclo === 'anual' ? 'Anual' : 'Mensal',
+        status: p.status,
+        meio: p.billingType,
+      })),
     };
   }
 
   fastify.get('/people/api/pagamentos', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [request.user.tenantId]);
     if (!rows[0]) return reply.code(404).send({ error: 'Assinatura não encontrada' });
-    return montarResumoPagamento(rows[0]);
+    let planoNome = null;
+    if (rows[0].plano) {
+      const planoInfo = await planosPeople.buscarPlano(KYVVO_APP_URL, rows[0].plano).catch(() => null);
+      planoNome = planoInfo ? planoInfo.nome : null;
+    }
+    return montarResumoPagamento(rows[0], planoNome);
   });
 
   fastify.get('/people/api/pagamentos/planos', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -372,7 +394,7 @@ async function build() {
       ]
     );
 
-    return montarResumoPagamento(atualizado[0]);
+    return await montarResumoPagamento(atualizado[0], planoInfo.nome);
   });
 
   fastify.patch('/people/api/pagamentos/plano', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -413,7 +435,7 @@ async function build() {
       'update assinaturas set plano = $2, ciclo = $3, atualizado_em = now() where tenant_id = $1 returning *',
       [tenantId, planoInfo.chave, ciclo]
     );
-    return montarResumoPagamento(atualizado[0]);
+    return await montarResumoPagamento(atualizado[0], planoInfo.nome);
   });
 
   fastify.delete('/people/api/pagamentos/assinatura', { preHandler: fastify.authenticate }, async (request, reply) => {
