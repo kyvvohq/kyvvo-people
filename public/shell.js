@@ -245,3 +245,45 @@ if (!window.location.pathname.endsWith('/plano-cobranca.html')) {
     if (main) main.prepend(banner);
   }).catch(() => {});
 }
+
+// --- Mensagens/anúncios do admin da Kyvvo (Produtos > People > Mensagens,
+// ou "Kyvvo inteira") — mesmo raciocínio de injeção via JS do banner de
+// assinatura acima, pra não duplicar HTML em cada tela. Dispensável (ao
+// contrário do banner de assinatura, que é sobre algo pendente de resolver)
+// — guarda os ids fechados no localStorage, sobrevive a navegação/reload.
+function escapeHtmlMensagemAdmin(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+function idsMensagensAdminDispensadas() {
+  try {
+    return JSON.parse(localStorage.getItem('people_mensagens_dispensadas') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+function dispensarMensagemAdmin(id) {
+  const atuais = idsMensagensAdminDispensadas();
+  if (!atuais.includes(id)) atuais.push(id);
+  localStorage.setItem('people_mensagens_dispensadas', JSON.stringify(atuais));
+  const item = document.querySelector(`[data-mensagem-admin-id="${id}"]`);
+  if (item) item.remove();
+}
+apiFetch('/people/api/mensagens-ativas').then(async (res) => {
+  if (!res.ok) return;
+  const dados = await res.json();
+  const dispensadas = new Set(idsMensagensAdminDispensadas());
+  const visiveis = (dados.mensagens || []).filter((m) => !dispensadas.has(m.id));
+  if (!visiveis.length) return;
+  const main = document.querySelector('.painel-main');
+  if (!main) return;
+  visiveis.reverse().forEach((m) => {
+    const item = document.createElement('div');
+    item.className = `mensagem-admin-item mensagem-admin-${m.severidade}`;
+    item.dataset.mensagemAdminId = m.id;
+    item.innerHTML = `<span>${escapeHtmlMensagemAdmin(m.texto)}</span><button type="button" class="mensagem-admin-fechar" aria-label="Fechar aviso">×</button>`;
+    item.querySelector('.mensagem-admin-fechar').addEventListener('click', () => dispensarMensagemAdmin(m.id));
+    main.prepend(item);
+  });
+}).catch(() => {});

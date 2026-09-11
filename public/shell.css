@@ -99,6 +99,19 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
   padding:12px 16px; font-size:13.5px; color:var(--text); }
 .banner-assinatura a { color:var(--accent-strong); font-weight:600; text-decoration:none; white-space:nowrap; }
 
+/* Mensagens/anúncios publicados pelo admin da Kyvvo (Produtos > People >
+   Mensagens, ou "Kyvvo inteira") — ver shell.js#carregarMensagensAdmin.
+   Mesmo layout do banner-assinatura, cor por severidade (mesma convenção de
+   .badge.aviso/.badge.perigo já usada no resto do painel). */
+.mensagem-admin-item { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  border-radius:var(--radius-md); padding:12px 16px; font-size:13.5px; margin-bottom:var(--space-3); }
+.mensagem-admin-info { background:var(--accent-tint); color:var(--accent-strong); border:1px solid var(--accent); }
+.mensagem-admin-aviso { background:var(--warning-bg); color:var(--warning-text); border:1px solid var(--warning); }
+.mensagem-admin-erro { background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger); }
+.mensagem-admin-fechar { flex-shrink:0; width:auto; margin:0; background:none; border:none; color:inherit;
+  font-size:18px; line-height:1; cursor:pointer; padding:0 4px; opacity:0.75; }
+.mensagem-admin-fechar:hover { opacity:1; }
+
 @media(max-width:860px) {
   .topo-app { padding:0 var(--space-3); }
   .topo-perfil-gatilho .nome { display:none; }
