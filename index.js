@@ -20,6 +20,7 @@ const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut, processarF
 const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
+const { buscarMensagensAtivas } = require('./lib/mensagens-admin');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
@@ -269,6 +270,14 @@ async function build() {
       })),
     };
   }
+
+  // Avisos/anúncios do admin da Kyvvo (Produtos > People > Mensagens, ou
+  // "Kyvvo inteira") — ver lib/mensagens-admin.js. Autenticada (não é dado
+  // sensível, só não faz sentido mostrar antes do login).
+  fastify.get('/people/api/mensagens-ativas', { preHandler: fastify.authenticate }, async () => {
+    const mensagens = await buscarMensagensAtivas();
+    return { mensagens };
+  });
 
   fastify.get('/people/api/pagamentos', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query('select * from assinaturas where tenant_id = $1', [request.user.tenantId]);
