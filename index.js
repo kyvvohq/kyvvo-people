@@ -52,13 +52,43 @@ async function build() {
 
   fastify.register(fastifyJwt, { secret: process.env.PEOPLE_JWT_SECRET });
 
+  // Rotas de pagamento continuam liberadas mesmo sem assinatura fechada —
+  // senão ninguém conseguiria pagar pra sair do bloqueio abaixo.
+  const ROTAS_LIVRES_SEM_ASSINATURA = new Set([
+    'POST /people/api/pagamentos/cadastrar',
+    'PATCH /people/api/pagamentos/plano',
+    'DELETE /people/api/pagamentos/assinatura',
+  ]);
+
   // Mesmo padrão do `authenticateAdmin` do painel principal (server/panel/index.js):
   // secret próprio, sem lookup em banco por request — adequado pra 1 usuário fixo.
   fastify.decorate('authenticate', async (request, reply) => {
     try {
       await request.jwtVerify();
     } catch {
-      reply.code(401).send({ error: 'Não autenticado' });
+      return reply.code(401).send({ error: 'Não autenticado' });
+    }
+
+    // Bloqueio por assinatura não fechada (pedido do Bruno, 2026-09-11): quem
+    // nunca pagou não pode fazer NADA no produto até confirmar o pagamento —
+    // diferente do Studio, que libera acesso "limitado" (GET sempre passa,
+    // só escrita é bloqueada) durante trial/inadimplência. Aqui a leitura
+    // também segue liberada (mesmo princípio "dados reais, sem esconder
+    // nada" do Studio) porque um tenant recém-cadastrado não tem dado
+    // nenhum mesmo — só a ESCRITA precisa do bloqueio de verdade.
+    if (request.method === 'GET') return;
+    const rotaAtual = `${request.method} ${request.routeOptions.url}`;
+    if (ROTAS_LIVRES_SEM_ASSINATURA.has(rotaAtual)) return;
+
+    const { rows } = await pool.query('select status from assinaturas where tenant_id = $1', [request.user.tenantId]);
+    const status = rows[0] ? rows[0].status : 'sem_assinatura';
+    if (status === 'sem_assinatura' || status === 'pendente') {
+      return reply.code(403).send({
+        error: status === 'pendente'
+          ? 'Assinatura em confirmação — assim que o pagamento for aprovado, seu acesso libera automaticamente.'
+          : 'Finalize sua assinatura para usar o Kyvvo People. Acesse Configurações > Plano e Cobrança.',
+        bloqueio: status,
+      });
     }
   });
 
@@ -135,6 +165,59 @@ async function build() {
 
     const token = fastify.jwt.sign({ tenantId, email, nome }, { expiresIn: '12h' });
     return { token, nome };
+  });
+
+  // Cadastro self-service (landing > Criar conta). A criação de conta/tenant
+  // é responsabilidade do kyvvo-platform (mesmo serviço que o Studio usa,
+  // ver POST /api/auth/register lá) — aqui só repassamos com produto:'people'
+  // (ativa o módulo people, sem trial, nunca os módulos do Studio) e, com a
+  // conta criada, replicamos o resto do que o login já faz: linha de
+  // assinatura + JWT interno de 12h. Sem essa etapa a conta existiria no
+  // platform mas o front não teria sessão pra usar.
+  fastify.post('/people/api/register', async (request, reply) => {
+    let platformRes;
+    try {
+      platformRes = await fetch(`${PLATFORM_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...request.body, produto: 'people' }),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (err) {
+      request.log.error(`Falha ao registrar no kyvvo-platform: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível criar sua conta agora. Tente novamente em instantes.' });
+    }
+    const dados = await platformRes.json().catch(() => ({}));
+    if (!platformRes.ok) return reply.code(platformRes.status).send(dados);
+
+    // O token do platform (RS256) já carrega tenantId no payload — decodifica
+    // sem verificar assinatura (confiamos na resposta HTTPS do próprio
+    // serviço que acabamos de chamar, mesmo princípio de confiança do login
+    // logo acima). Não usamos esse token diretamente: o People sempre emite
+    // o seu próprio (12h, PEOPLE_JWT_SECRET), igual ao login.
+    let tenantId;
+    try {
+      tenantId = JSON.parse(Buffer.from(dados.token.split('.')[1], 'base64url').toString('utf8')).tenantId;
+    } catch (err) {
+      request.log.error(`Conta criada no platform mas não consegui ler o tenantId do token: ${err.message}`);
+      return reply.code(502).send({ error: 'Conta criada, mas não foi possível iniciar sua sessão. Faça login manualmente.' });
+    }
+
+    await pool.query('insert into assinaturas (tenant_id) values ($1) on conflict (tenant_id) do nothing', [tenantId]);
+    const token = fastify.jwt.sign({ tenantId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
+    return reply.code(201).send({ token, nome: dados.nome });
+  });
+
+  // Catálogo de planos pra tela pública de cadastro (sem sessão ainda) —
+  // mesmos dados de /people/api/pagamentos/planos (autenticada), só sem o
+  // preHandler.
+  fastify.get('/people/api/planos', async (request, reply) => {
+    try {
+      return await planosPeople.buscarPlanos(KYVVO_APP_URL);
+    } catch (err) {
+      request.log.error(`Falha ao buscar planos do People: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível carregar os planos agora. Tente novamente em instantes.' });
+    }
   });
 
   // --- Pagamentos / Asaas (seção 10 da especificação) ---

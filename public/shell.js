@@ -220,3 +220,28 @@ function avisar(titulo, mensagem) {
   );
   document.getElementById('btn-ok-aviso').addEventListener('click', fecharModal);
 }
+
+// --- Aviso de assinatura não fechada ainda (backend bloqueia toda escrita
+// nesse estado, ver index.js#authenticate) — banner injetado via JS em vez
+// de markup em cada página, pra não duplicar HTML nas 8 telas autenticadas.
+// "Até fechar a licença" (não dispensável de vez): sem a lógica de
+// sessionStorage do Studio — aqui o aviso é sobre algo que ainda falta
+// fazer, não um estado degradado que a pessoa já está ciente, então
+// reaparece em toda navegação até resolver.
+const BANNER_ASSINATURA_MENSAGEM = {
+  sem_assinatura: 'Finalize sua assinatura para começar a usar o Kyvvo People.',
+  pendente: 'Assinatura em confirmação — assim que o pagamento for aprovado, seu acesso libera automaticamente.',
+};
+if (!window.location.pathname.endsWith('/plano-cobranca.html')) {
+  apiFetch('/people/api/pagamentos').then(async (res) => {
+    if (!res.ok) return;
+    const dados = await res.json();
+    const mensagem = BANNER_ASSINATURA_MENSAGEM[dados.status];
+    if (!mensagem) return;
+    const banner = document.createElement('div');
+    banner.className = 'banner-assinatura';
+    banner.innerHTML = `<span>${mensagem}</span><a href="/people/plano-cobranca.html">Ir para Plano e Cobrança →</a>`;
+    const main = document.querySelector('.painel-main');
+    if (main) main.prepend(banner);
+  }).catch(() => {});
+}
