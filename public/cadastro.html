@@ -20,6 +20,7 @@
   .logo .nome { font-size:16px; font-weight:700; }
   h1 { font-size:19px; margin:16px 0 4px; }
   .sub { font-size:13px; color:#6B7086; margin:0 0 4px; }
+  .plano-selecionado[hidden] { display:none; }
   .plano-selecionado { display:flex; align-items:center; justify-content:space-between; gap:10px; background:#F3F0FF;
     border:1px solid #DCD3FF; border-radius:10px; padding:10px 12px; margin:14px 0 0; font-size:13px; }
   .plano-selecionado strong { display:block; font-size:13.5px; }
@@ -140,7 +141,10 @@
     const slugDaUrl = new URLSearchParams(window.location.search).get('plano');
     if (slugDaUrl) {
       fetch('/people/api/planos').then((res) => (res.ok ? res.json() : [])).then((planos) => {
-        const plano = planos.find((p) => p.chave === slugDaUrl || p.slug === slugDaUrl);
+        // /people/api/planos só expõe `chave` (com underscore, ex: people_start),
+        // não `slug` — os links da landing usam o slug com hífen (people-start,
+        // igual ao que o platform aceita em plano_slug). Normaliza pra comparar.
+        const plano = planos.find((p) => p.chave === slugDaUrl || p.chave === slugDaUrl.replace(/-/g, '_'));
         if (!plano) return;
         document.getElementById('plano-nome').textContent = plano.nome;
         document.getElementById('plano-preco').textContent = `R$ ${Number(plano.preco_mensal).toFixed(2).replace('.', ',')}/mês`;
