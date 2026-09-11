@@ -12,21 +12,6 @@
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/people/shell.css">
-<style>
-  .visualizacao-toggle { display:inline-flex; gap:4px; background:var(--surface-muted); border-radius:var(--radius-md); padding:4px; margin-bottom:16px; }
-  .visualizacao-toggle button { background:transparent; color:var(--muted-strong); border:none; border-radius:8px;
-    padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; height:auto; margin:0; }
-  .visualizacao-toggle button.ativo { background:var(--card); color:var(--text); box-shadow:0 1px 2px rgba(15,17,26,.08); }
-  .planos-preview { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; margin:16px 0; }
-  .plano-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; display:flex; flex-direction:column; }
-  .plano-card.atual { border-color:var(--accent); background:var(--accent-tint); }
-  .plano-card .nome { font-weight:700; font-size:13.5px; color:var(--text); margin-bottom:4px; }
-  .plano-card .preco { font-family:var(--font-display); font-size:20px; color:var(--text); margin-bottom:6px; }
-  .plano-card .detalhe { font-size:12px; color:var(--muted); margin-top:3px; }
-  .plano-card button { margin-top:12px; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
-  @media(max-width:520px) { .grid2 { grid-template-columns:1fr; } }
-</style>
 </head>
 <body>
   <header class="topo-app">
@@ -78,7 +63,13 @@
         <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
         <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
         <a class="menu-item" href="/people/automacoes.html"><span data-icon="zap"></span><span class="rotulo">Automações</span></a>
-        <a class="menu-item" href="/people/configuracoes.html"><span data-icon="settings"></span><span class="rotulo">Configurações</span></a>
+        <div class="menu-item-grupo">
+          <button type="button" class="menu-item menu-item-toggle"><span data-icon="settings"></span><span class="rotulo">Configurações</span><span class="chevron" data-icon="chevron-down" data-size="14"></span></button>
+          <div class="menu-submenu">
+            <a class="menu-item" href="/people/configuracoes.html"><span class="rotulo">Geral</span></a>
+            <a class="menu-item" href="/people/plano-cobranca.html"><span class="rotulo">Plano e Cobrança</span></a>
+          </div>
+        </div>
       </nav>
       </aside>
       <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
@@ -89,21 +80,10 @@
         <div class="textos"><div class="linha-titulo"><h1>Configurações</h1></div></div>
       </div>
 
-      <div class="visualizacao-toggle" id="config-tabs">
-        <button type="button" data-tab="geral" class="ativo">Geral</button>
-        <button type="button" data-tab="cobranca">Cobrança</button>
-      </div>
-
-      <div id="tab-geral">
-        <div class="estado-vazio">
-          <div class="tile" data-icon="settings" data-size="26"></div>
-          <h3>Em breve</h3>
-          <p>Preferências da conta chegam em breve por aqui.</p>
-        </div>
-      </div>
-
-      <div id="tab-cobranca" hidden>
-        <div class="card" style="padding:24px" id="cobranca-conteudo">Carregando...</div>
+      <div class="estado-vazio">
+        <div class="tile" data-icon="settings" data-size="26"></div>
+        <h3>Em breve</h3>
+        <p>Preferências da conta chegam em breve por aqui.</p>
       </div>
     </div>
   </div>
@@ -112,283 +92,5 @@
 
   <script src="/ds/components.js"></script>
   <script src="/people/shell.js"></script>
-  <script>
-    const STATUS_ASSINATURA_CLASSE = { sem_assinatura: 'neutro', pendente: 'aviso', ativo: 'sucesso', inadimplente: 'aviso', suspenso: 'perigo', cancelado: 'neutro' };
-    const STATUS_ASSINATURA_LABEL = { sem_assinatura: 'Sem assinatura', pendente: 'Aguardando confirmação do pagamento', ativo: 'Ativa', inadimplente: 'Pagamento em atraso', suspenso: 'Suspensa', cancelado: 'Cancelada' };
-
-    let pagamento = null;
-    let planos = [];
-    let cobrancaCarregada = false;
-    let cicloSelecionado = 'mensal';
-
-    function formatarData(iso) {
-      if (!iso) return '—';
-      return new Date(`${iso}T00:00:00`).toLocaleDateString('pt-BR');
-    }
-    function formatarPreco(v) {
-      return `R$ ${Number(v).toFixed(2).replace('.', ',')}`;
-    }
-
-    async function carregarCobranca() {
-      const container = document.getElementById('cobranca-conteudo');
-      container.textContent = 'Carregando...';
-      const [resPagamento, resPlanos] = await Promise.all([
-        apiFetch('/people/api/pagamentos'),
-        apiFetch('/people/api/pagamentos/planos'),
-      ]);
-      if (!resPagamento.ok) { container.textContent = 'Não foi possível carregar sua assinatura agora.'; return; }
-      pagamento = await resPagamento.json();
-      cicloSelecionado = pagamento.ciclo === 'anual' ? 'anual' : 'mensal';
-      planos = resPlanos.ok ? await resPlanos.json() : [];
-      cobrancaCarregada = true;
-      renderizarCobranca();
-    }
-
-    function renderizarCobranca() {
-      const container = document.getElementById('cobranca-conteudo');
-      const planoAtual = planos.find((p) => p.chave === pagamento.plano);
-
-      container.innerHTML = `
-        <h3 style="margin:0 0 10px;font-family:var(--font-display);font-size:16px;color:var(--text)">Assinatura e cobrança</h3>
-        <p style="font-size:13.5px;color:var(--muted-strong);line-height:1.7;margin:0 0 4px">
-          Status: <span class="badge ${STATUS_ASSINATURA_CLASSE[pagamento.status]}">${STATUS_ASSINATURA_LABEL[pagamento.status]}</span><br>
-          Plano atual: <strong>${planoAtual ? planoAtual.nome : 'Nenhum ainda'}</strong>${planoAtual ? ` (${pagamento.ciclo === 'anual' ? 'anual' : 'mensal'})` : ''}
-          ${pagamento.asaas_meio_pagamento ? ` · ${pagamento.asaas_meio_pagamento === 'cartao' ? `Cartão final ${pagamento.asaas_cartao_final}` : 'Pix'}` : ''}
-        </p>
-        ${pagamento.status === 'pendente' ? `
-          <p style="font-size:13px;color:var(--warning-text,#B54708);background:var(--accent-tint);border-radius:var(--radius-md);padding:10px 12px;margin:8px 0 0">
-            ${pagamento.asaas_meio_pagamento === 'cartao'
-              ? 'Cartão em processamento — assim que a Asaas confirmar a cobrança, o plano vira ativo automaticamente.'
-              : 'Falta pagar o Pix pra ativar o plano — confira o e-mail que a Asaas te enviou com o QR code/código copia-e-cola.'}
-          </p>
-        ` : ''}
-
-        <h4 style="margin:20px 0 4px;font-size:13px;color:var(--text)">Planos</h4>
-        <div class="visualizacao-toggle" id="ciclo-toggle" style="margin-bottom:12px">
-          <button type="button" data-ciclo="mensal" class="${cicloSelecionado === 'mensal' ? 'ativo' : ''}">Mensal</button>
-          <button type="button" data-ciclo="anual" class="${cicloSelecionado === 'anual' ? 'ativo' : ''}">Anual <span style="opacity:.75">— 2 meses grátis</span></button>
-        </div>
-        <div class="planos-preview">
-          ${planos.map(renderizarPlanoCard).join('')}
-          <div class="plano-card">
-            <div class="nome">Business</div>
-            <div class="preco">Sob consulta</div>
-            <div class="detalhe">Vagas ilimitadas, WhatsApp próprio</div>
-            <a class="btn btn-secundario" href="https://wa.me/553484285182" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Fale conosco</a>
-          </div>
-        </div>
-        <p style="font-size:12px;color:var(--muted);margin:8px 0 0">
-          Avaliações, candidatos, relatórios e resumos por IA são ilimitados em todos os planos. Cartão ou Pix. Anual cobra o valor de 10 parcelas mensais de uma vez.
-        </p>
-
-        ${pagamento.tem_assinatura && pagamento.status !== 'cancelado' ? `
-          <button class="btn-secundario" id="btn-cancelar-assinatura" style="margin-top:16px;color:var(--danger)">Cancelar assinatura</button>
-        ` : ''}
-        ${pagamento.status === 'cancelado' && pagamento.acesso_ate ? `
-          <p style="font-size:12px;color:var(--muted);margin-top:12px">Cancelada — acesso ao plano pago continua até ${formatarData(pagamento.acesso_ate)}.</p>
-        ` : ''}
-      `;
-
-      document.querySelectorAll('#ciclo-toggle button').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          cicloSelecionado = btn.dataset.ciclo;
-          renderizarCobranca();
-        });
-      });
-      container.querySelectorAll('[data-assinar]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const chave = btn.dataset.assinar;
-          if (pagamento.tem_assinatura) confirmarTrocaPlano(chave, cicloSelecionado);
-          else abrirModalPagamento(chave, cicloSelecionado);
-        });
-      });
-      const btnCancelar = document.getElementById('btn-cancelar-assinatura');
-      if (btnCancelar) btnCancelar.addEventListener('click', confirmarCancelarAssinatura);
-    }
-
-    function renderizarPlanoCard(p) {
-      const mesmoPlano = p.chave === pagamento.plano;
-      const atual = mesmoPlano && cicloSelecionado === pagamento.ciclo;
-      const trocaSoDeCiclo = mesmoPlano && !atual && pagamento.tem_assinatura;
-      const limites = p.limites || {};
-      const precoMensal = Number(p.preco_mensal);
-      const precoExibido = cicloSelecionado === 'anual' ? precoMensal * 10 : precoMensal;
-      const sufixoPreco = cicloSelecionado === 'anual' ? '/ano' : '/mês';
-      let rotulo = 'Assinar';
-      if (atual) rotulo = 'Plano atual';
-      else if (trocaSoDeCiclo) rotulo = cicloSelecionado === 'anual' ? 'Mudar pra anual' : 'Mudar pra mensal';
-      else if (pagamento.tem_assinatura) rotulo = 'Trocar pra este';
-      return `
-        <div class="plano-card${atual ? ' atual' : ''}">
-          <div class="nome">${p.nome}</div>
-          <div class="preco">${formatarPreco(precoExibido)}<span style="font-size:12px;color:var(--muted)">${sufixoPreco}</span></div>
-          ${cicloSelecionado === 'anual' ? `<div class="detalhe">equivalente a ${formatarPreco(precoMensal)}/mês, cobrado uma vez por ano</div>` : ''}
-          <div class="detalhe">${limites.vagas_ativas ?? 'Ilimitadas'} vagas ativas simultâneas</div>
-          <div class="detalhe">${limites.candidatos_notificados_mes ?? 'Sem limite'} candidatos notificados/mês</div>
-          <button class="btn${atual ? ' btn-secundario' : ''}" data-assinar="${p.chave}" ${atual ? 'disabled' : ''}>${rotulo}</button>
-        </div>
-      `;
-    }
-
-    function confirmarTrocaPlano(chave, ciclo) {
-      const plano = planos.find((p) => p.chave === chave);
-      const precoMensal = Number(plano.preco_mensal);
-      const precoExibido = ciclo === 'anual' ? precoMensal * 10 : precoMensal;
-      const sufixoPreco = ciclo === 'anual' ? '/ano' : '/mês';
-      abrirModal(
-        '<h3>Trocar de plano?</h3>',
-        `
-          <p class="modal-texto">Muda pra "${plano.nome}" (${formatarPreco(precoExibido)}${sufixoPreco}, cobrança ${ciclo === 'anual' ? 'anual' : 'mensal'}). O novo valor só vale a partir da próxima cobrança — sem cálculo proporcional.</p>
-          <div class="modal-acoes">
-            <button type="button" class="btn-secundario" id="cancelar-troca-plano">Cancelar</button>
-            <button type="button" class="btn" id="confirmar-troca-plano">Trocar</button>
-          </div>
-        `
-      );
-      document.getElementById('cancelar-troca-plano').addEventListener('click', fecharModal);
-      document.getElementById('confirmar-troca-plano').addEventListener('click', async () => {
-        const res = await apiFetch('/people/api/pagamentos/plano', { method: 'PATCH', body: JSON.stringify({ plano: chave, ciclo }) });
-        const data = await res.json();
-        fecharModal();
-        if (!res.ok) { avisar('Erro', data.error || 'Falha ao trocar de plano'); return; }
-        pagamento = data;
-        renderizarCobranca();
-        avisar('Plano alterado', `Agora você está no plano ${plano.nome} (${ciclo === 'anual' ? 'anual' : 'mensal'}).`);
-      });
-    }
-
-    function confirmarCancelarAssinatura() {
-      abrirModal(
-        '<h3>Cancelar assinatura?</h3>',
-        `
-          <p class="modal-texto">A cobrança recorrente é encerrada na Asaas, mas o acesso ao plano pago continua até o fim do período já pago. Essa ação não pode ser desfeita.</p>
-          <div class="modal-acoes">
-            <button type="button" class="btn-secundario" id="cancelar-cancelar-assinatura">Voltar</button>
-            <button type="button" class="btn-perigo" id="confirmar-cancelar-assinatura">Cancelar assinatura</button>
-          </div>
-        `
-      );
-      document.getElementById('cancelar-cancelar-assinatura').addEventListener('click', fecharModal);
-      document.getElementById('confirmar-cancelar-assinatura').addEventListener('click', async () => {
-        const res = await apiFetch('/people/api/pagamentos/assinatura', { method: 'DELETE' });
-        const data = await res.json();
-        fecharModal();
-        if (!res.ok) { avisar('Erro', data.error || 'Falha ao cancelar assinatura'); return; }
-        await carregarCobranca();
-        avisar('Assinatura cancelada', data.acesso_ate ? `Seu acesso ao plano pago continua até ${formatarData(data.acesso_ate)}.` : 'Sua assinatura foi cancelada.');
-      });
-    }
-
-    function abrirModalPagamento(planoChave, ciclo) {
-      const plano = planos.find((p) => p.chave === planoChave);
-      const precoMensal = Number(plano.preco_mensal);
-      const precoExibido = ciclo === 'anual' ? precoMensal * 10 : precoMensal;
-      const sufixoPreco = ciclo === 'anual' ? '/ano' : '/mês';
-      abrirModal(
-        `<h3>Assinar ${plano.nome}</h3>`,
-        `
-          <form id="form-pagamento">
-            <div class="modal-erro" id="msg-pagamento"></div>
-            <p class="campo-ajuda">${formatarPreco(precoExibido)}${sufixoPreco}${ciclo === 'anual' ? ` (equivalente a ${formatarPreco(precoMensal)}/mês)` : ''}. Cobrado a partir de hoje.</p>
-
-            <label>Forma de pagamento</label>
-            <div class="grid2" style="margin-bottom:10px">
-              <label><input type="radio" name="pg-meio" value="pix" checked> Pix</label>
-              <label><input type="radio" name="pg-meio" value="cartao"> Cartão de crédito</label>
-            </div>
-
-            <label for="pg-cpf-cnpj">CPF ou CNPJ *</label>
-            <input id="pg-cpf-cnpj" placeholder="Só números" value="${pagamento.cpf_cnpj || ''}">
-
-            <div id="campos-cartao" hidden>
-              <label for="pg-cartao-numero">Número do cartão</label>
-              <input id="pg-cartao-numero" placeholder="0000 0000 0000 0000">
-              <div class="grid2">
-                <div><label for="pg-cartao-nome">Nome impresso no cartão</label><input id="pg-cartao-nome"></div>
-                <div><label for="pg-cartao-cvv">CVV</label><input id="pg-cartao-cvv"></div>
-              </div>
-              <div class="grid2">
-                <div><label for="pg-cartao-mes">Validade — mês</label><input id="pg-cartao-mes" placeholder="MM"></div>
-                <div><label for="pg-cartao-ano">Validade — ano</label><input id="pg-cartao-ano" placeholder="AAAA"></div>
-              </div>
-              <label for="pg-telefone">Telefone do titular do cartão (com DDD)</label>
-              <input id="pg-telefone" placeholder="Só números" value="${pagamento.contato_telefone || ''}">
-              <label>Endereço de cobrança</label>
-              <div class="grid2">
-                <div><input id="pg-cep" placeholder="CEP"></div>
-                <div><input id="pg-numero" placeholder="Número"></div>
-              </div>
-              <input id="pg-logradouro" placeholder="Logradouro" style="margin-top:8px">
-              <div class="grid2" style="margin-top:8px">
-                <div><input id="pg-bairro" placeholder="Bairro"></div>
-                <div><input id="pg-complemento" placeholder="Complemento (opcional)"></div>
-              </div>
-              <div class="grid2" style="margin-top:8px">
-                <div><input id="pg-cidade" placeholder="Cidade"></div>
-                <div><input id="pg-uf" placeholder="UF" maxlength="2"></div>
-              </div>
-            </div>
-
-            <div class="modal-acoes">
-              <button type="button" class="btn-secundario" id="cancelar-pagamento">Cancelar</button>
-              <button type="submit" class="btn">Confirmar</button>
-            </div>
-          </form>
-        `,
-        'modal-card-larga'
-      );
-
-      const camposCartao = document.getElementById('campos-cartao');
-      document.querySelectorAll('input[name="pg-meio"]').forEach((r) => {
-        r.addEventListener('change', (e) => { camposCartao.hidden = e.target.value !== 'cartao'; });
-      });
-
-      document.getElementById('cancelar-pagamento').addEventListener('click', fecharModal);
-      document.getElementById('form-pagamento').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msg = document.getElementById('msg-pagamento');
-        msg.textContent = '';
-        const meio = document.querySelector('input[name="pg-meio"]:checked').value;
-
-        const corpo = { plano: planoChave, meio, ciclo, cpf_cnpj: document.getElementById('pg-cpf-cnpj').value.trim() };
-        if (meio === 'cartao') {
-          corpo.cartao_numero = document.getElementById('pg-cartao-numero').value.trim();
-          corpo.cartao_nome = document.getElementById('pg-cartao-nome').value.trim();
-          corpo.cartao_cvv = document.getElementById('pg-cartao-cvv').value.trim();
-          corpo.cartao_validade_mes = document.getElementById('pg-cartao-mes').value.trim();
-          corpo.cartao_validade_ano = document.getElementById('pg-cartao-ano').value.trim();
-          corpo.telefone = document.getElementById('pg-telefone').value.trim();
-          corpo.endereco = {
-            cep: document.getElementById('pg-cep').value.trim(),
-            numero: document.getElementById('pg-numero').value.trim(),
-            logradouro: document.getElementById('pg-logradouro').value.trim(),
-            complemento: document.getElementById('pg-complemento').value.trim(),
-            bairro: document.getElementById('pg-bairro').value.trim(),
-            cidade: document.getElementById('pg-cidade').value.trim(),
-            uf: document.getElementById('pg-uf').value.trim(),
-          };
-        }
-
-        const btn = e.target.querySelector('button[type=submit]');
-        btn.disabled = true;
-        const res = await apiFetch('/people/api/pagamentos/cadastrar', { method: 'POST', body: JSON.stringify(corpo) });
-        const data = await res.json();
-        if (!res.ok) { msg.textContent = data.error || 'Falha ao processar pagamento'; btn.disabled = false; return; }
-        fecharModal();
-        pagamento = data;
-        renderizarCobranca();
-        avisar('Assinatura confirmada', `Você está no plano ${plano.nome} (${ciclo === 'anual' ? 'anual' : 'mensal'}).`);
-      });
-    }
-
-    document.getElementById('config-tabs').addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-tab]');
-      if (!btn) return;
-      document.querySelectorAll('#config-tabs button').forEach((b) => b.classList.toggle('ativo', b === btn));
-      document.getElementById('tab-geral').hidden = btn.dataset.tab !== 'geral';
-      document.getElementById('tab-cobranca').hidden = btn.dataset.tab !== 'cobranca';
-      if (btn.dataset.tab === 'cobranca' && !cobrancaCarregada) carregarCobranca();
-    });
-  </script>
 </body>
 </html>

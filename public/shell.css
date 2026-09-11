@@ -75,6 +75,17 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .menu-item .contador { height:20px; padding:0 7px; border-radius:var(--radius-full); background:var(--border);
   color:var(--muted-strong); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
 
+/* Item de menu com submenu expansível (ex: Configurações > Geral / Plano e
+   Cobrança) — botão reaproveita a aparência de .menu-item, só troca <a> por
+   <button> (reset de background/border/largura). */
+.menu-item-toggle { background:transparent; border:none; width:100%; text-align:left; cursor:pointer; font-family:var(--font-ui); }
+.menu-item-toggle .chevron { margin-left:auto; color:var(--muted); transition:transform .15s ease; flex-shrink:0; }
+.menu-item-grupo.expandido .menu-item-toggle .chevron { transform:rotate(180deg); }
+.menu-item-grupo.tem-filho-ativo > .menu-item-toggle { color:var(--accent-strong); font-weight:600; }
+.menu-submenu { display:none; flex-direction:column; gap:2px; padding-left:16px; margin-top:2px; }
+.menu-item-grupo.expandido .menu-submenu { display:flex; }
+.menu-submenu .menu-item { height:36px; font-size:13.5px; }
+
 .btn-toggle-sidebar { position:absolute; top:22px; right:-11px; width:22px; height:22px;
   display:flex; align-items:center; justify-content:center; background:var(--card);
   border:1px solid var(--border-strong); border-radius:var(--radius-full); color:var(--muted); font-size:12px;
