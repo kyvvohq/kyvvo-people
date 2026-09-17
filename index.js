@@ -1632,7 +1632,7 @@ async function build() {
   // pedida pelo Bruno em 2026-08-28 — CPF nunca foi necessário pra
   // identificar a pessoa, só servia como segredo de destrave do link).
   fastify.post('/people/api/avaliacao/:token/validar-email', async (request, reply) => {
-    const { email } = request.body || {};
+    const { email, aceite_lgpd } = request.body || {};
     const { rows } = await pool.query(
       `select a.id, a.status, p.email as email_cadastrado
        from avaliacoes a join candidatos p on p.id = a.candidato_id
@@ -1650,7 +1650,17 @@ async function build() {
     }
 
     if (avaliacao.status === 'pendente') {
-      await pool.query("update avaliacoes set status = 'iniciado', iniciado_em = now() where id = $1", [avaliacao.id]);
+      // Handoff v2, Parte 5.3: consentimento explícito antes de iniciar a
+      // Rodada 1, informando que a avaliação é contexto, não critério de
+      // corte. Exigido só na primeira entrada (status pendente) — quem já
+      // consentiu e está só retomando não precisa reconfirmar a cada visita.
+      if (aceite_lgpd !== true) {
+        return reply.code(400).send({ error: 'É necessário aceitar o uso dos dados (LGPD) para iniciar a avaliação' });
+      }
+      await pool.query(
+        "update avaliacoes set status = 'iniciado', iniciado_em = now(), consentimento_lgpd_em = now() where id = $1",
+        [avaliacao.id]
+      );
     }
 
     return { ok: true, caracteristicas: CARACTERISTICAS_PUBLICAS };
@@ -1715,6 +1725,14 @@ async function build() {
     }
     if (avaliacao.status === 'pendente') {
       reply.code(403).send({ error: 'Valide seu e-mail antes de responder' });
+      return null;
+    }
+    // Defesa em profundidade da Regra 5.3 (LGPD): mesmo que o status já
+    // esteja 'iniciado', não deixa responder rodada nenhuma sem consentimento
+    // registrado — cobre qualquer caminho que chegue a 'iniciado' sem passar
+    // pelo gate de validar-email acima.
+    if (!avaliacao.consentimento_lgpd_em) {
+      reply.code(403).send({ error: 'Consentimento LGPD pendente — acesse o link novamente para confirmar' });
       return null;
     }
     return avaliacao;
