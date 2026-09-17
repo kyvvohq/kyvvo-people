@@ -31,6 +31,16 @@ test('SEEDS: candidatura_criada tem e-mail removível e WhatsApp não removível
   assert.equal(whatsapp.removivel, false);
 });
 
+// Handoff v2 (17/09), Regra 0.6/Parte 5.2: confirmação de candidatura E
+// encerramento de vaga são os dois eventos obrigatórios — antes só o
+// primeiro travava o WhatsApp.
+test('SEEDS: vaga_encerrada tem e-mail removível e WhatsApp não removível', () => {
+  const email = SEEDS.find((s) => s.gatilho === 'vaga_encerrada' && s.canal === 'email');
+  const whatsapp = SEEDS.find((s) => s.gatilho === 'vaga_encerrada' && s.canal === 'whatsapp');
+  assert.equal(email.removivel, true);
+  assert.equal(whatsapp.removivel, false);
+});
+
 test('SEEDS: todo seed tem gatilho, canal, nome e corpo', () => {
   for (const seed of SEEDS) {
     assert.ok(seed.gatilho, 'gatilho ausente');
