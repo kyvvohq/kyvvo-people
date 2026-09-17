@@ -18,6 +18,7 @@ const { paraE164 } = require('./lib/telefone');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
 const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut, processarFilaWhatsapp } = require('./lib/automacoes');
 const { validarRequisitosVaga } = require('./lib/vagas');
+const { validarEvidencia, detectarContradicoes } = require('./lib/evidencias');
 const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
@@ -1015,6 +1016,65 @@ async function build() {
     reply.header('Content-Type', candidatura.curriculo_tipo);
     reply.header('Content-Disposition', `inline; filename="${candidatura.curriculo_nome}"`);
     return reply.send(candidatura.curriculo_arquivo);
+  });
+
+  // Evidence ledger (Handoff v2, Parte 5.1) — append-only de propósito:
+  // só GET (listar) e POST (criar) existem aqui, nunca PATCH/DELETE.
+  // Corrigir uma evidência é sempre uma linha NOVA (substitui_evidencia_id
+  // aponta a antiga), nunca um UPDATE por cima — não remova esse invariante
+  // adicionando uma rota de edição/exclusão sem repensar a regra inteira.
+  fastify.get('/people/api/candidaturas/:id/evidencias', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: candidaturaRows } = await pool.query(
+      'select c.id from candidaturas c join vagas v on v.id = c.vaga_id where c.id = $1 and v.tenant_id = $2',
+      [request.params.id, request.user.tenantId]
+    );
+    if (!candidaturaRows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+
+    const { rows } = await pool.query(
+      `select id, requisito_id, fonte, efeito, texto, substitui_evidencia_id, ator_email, criado_em
+       from evidencias where candidatura_id = $1 order by criado_em asc`,
+      [request.params.id]
+    );
+    return { evidencias: rows, requisitos_contraditorios: [...detectarContradicoes(rows)] };
+  });
+
+  fastify.post('/people/api/candidaturas/:id/evidencias', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: candidaturaRows } = await pool.query(
+      'select c.id, c.tenant_id from candidaturas c join vagas v on v.id = c.vaga_id where c.id = $1 and v.tenant_id = $2',
+      [request.params.id, request.user.tenantId]
+    );
+    const candidatura = candidaturaRows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+
+    const corpo = request.body || {};
+    // fonte=entrevista/manual são as únicas lançadas por uma pessoa logada
+    // agora — o ator vem da sessão, nunca de um campo que o cliente manda
+    // (evita alguém se passar por outra pessoa no registro).
+    const dadosParaValidar = {
+      ...corpo,
+      ator_email: ['entrevista', 'manual'].includes(corpo.fonte) ? request.user.email : null,
+    };
+    const { erro, dados } = validarEvidencia(dadosParaValidar);
+    if (erro) return reply.code(400).send({ error: erro });
+
+    // substitui_evidencia_id (se veio) precisa ser uma evidência da MESMA
+    // candidatura — evita um id de outro tenant/candidatura vazando aqui.
+    if (corpo.substitui_evidencia_id) {
+      const { rows: substituidaRows } = await pool.query(
+        'select id from evidencias where id = $1 and candidatura_id = $2',
+        [corpo.substitui_evidencia_id, request.params.id]
+      );
+      if (!substituidaRows[0]) return reply.code(400).send({ error: 'Evidência substituída não encontrada nesta candidatura.' });
+    }
+
+    const id = crypto.randomUUID();
+    await pool.query(
+      `insert into evidencias (id, tenant_id, candidatura_id, requisito_id, fonte, efeito, texto, substitui_evidencia_id, ator_email)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [id, candidatura.tenant_id, request.params.id, corpo.requisito_id || null, dados.fonte, dados.efeito, dados.texto, corpo.substitui_evidencia_id || null, dados.ator_email]
+    );
+    reply.code(201);
+    return { id };
   });
 
   // Reprovar exige ação humana registrada (Art. 20 LGPD) — não existe
