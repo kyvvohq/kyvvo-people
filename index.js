@@ -17,6 +17,7 @@ const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcul
 const { paraE164 } = require('./lib/telefone');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
 const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut, processarFilaWhatsapp } = require('./lib/automacoes');
+const { validarRequisitosVaga } = require('./lib/vagas');
 const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
@@ -824,59 +825,8 @@ async function build() {
   const STATUS_VAGA_VALIDOS = ['rascunho', 'nova', 'em_andamento', 'pausada', 'encerrada'];
   const TIPO_VAGA_VALIDOS = ['CLT', 'PJ', 'Estágio', 'Integral', 'Meio período'];
 
-  // Lista fixa do que o motor de match nunca deve considerar — o
-  // recrutador só pode ADICIONAR itens, nunca remover os defaults
-  // (seção 3.1/9.3 da especificação, evita viés indireto no score).
-  const CAMPOS_EXCLUIDOS_SCORE_DEFAULT = [
-    'idade', 'ano_formatura', 'genero', 'estado_civil', 'nome', 'foto',
-    'endereco_completo', 'gaps_temporais_nao_justificados',
-  ];
-
-  // Valida e normaliza os campos estruturados de match antes de gravar
-  // (mutando `dados` in place) — regras obrigatórias da seção 3.1 da
-  // especificação (2026-08-28): eliminatórios limitados, curva de
-  // experiência sempre presente quando há anos_minimos (aqui gerada
-  // automaticamente como linear — não existe ainda editor de curva no
-  // front, é fundação pro motor de match, não o motor em si), pesos
-  // somando 1.0, campos excluídos do score nunca reduzidos.
-  function validarRequisitosVaga(dados) {
-    if (dados.requisitos_estruturados) {
-      const limites = dados.limites || { max_eliminatorios: 3 };
-      const eliminatorios = dados.requisitos_estruturados.filter((r) => r.nivel_exigido === 'eliminatorio');
-      if (eliminatorios.length > (limites.max_eliminatorios ?? 3)) {
-        return `Máximo de ${limites.max_eliminatorios ?? 3} requisitos eliminatórios (tem ${eliminatorios.length}) — rebaixe o mais fraco pra "importante"`;
-      }
-      dados.requisitos_estruturados = dados.requisitos_estruturados.map((r) => {
-        if (r.categoria === 'experiencia' && r.anos_minimos != null && !r.curva_experiencia) {
-          return {
-            ...r,
-            curva_experiencia: {
-              tipo: 'linear_auto',
-              pontos: [{ anos: 0, score: 0 }, { anos: r.anos_minimos, score: 1 }],
-              penaliza_excesso: false,
-            },
-          };
-        }
-        return r;
-      });
-    }
-    if (dados.pesos) {
-      const soma = Object.values(dados.pesos).reduce((s, v) => s + Number(v || 0), 0);
-      if (soma > 0 && Math.abs(soma - 1) > 0.001) {
-        dados.pesos = Object.fromEntries(
-          Object.entries(dados.pesos).map(([k, v]) => [k, Math.round((Number(v || 0) / soma) * 1000) / 1000])
-        );
-      }
-    }
-    if (dados.campos_excluidos_score) {
-      const extras = dados.campos_excluidos_score.filter((c) => !CAMPOS_EXCLUIDOS_SCORE_DEFAULT.includes(c));
-      dados.campos_excluidos_score = [...CAMPOS_EXCLUIDOS_SCORE_DEFAULT, ...extras];
-    }
-    return null;
-  }
-
   fastify.post('/people/api/vagas', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const dados = request.body || {};
+    let dados = request.body || {};
     if (!dados.nome) return reply.code(400).send({ error: 'Nome da vaga é obrigatório' });
 
     const rascunho = Boolean(dados.rascunho);
@@ -889,8 +839,9 @@ async function build() {
     if (dados.tipo_vaga && !TIPO_VAGA_VALIDOS.includes(dados.tipo_vaga)) {
       return reply.code(400).send({ error: 'Tipo de vaga inválido' });
     }
-    const erroValidacao = validarRequisitosVaga(dados);
+    const { erro: erroValidacao, dados: dadosValidados } = validarRequisitosVaga(dados);
     if (erroValidacao) return reply.code(400).send({ error: erroValidacao });
+    dados = dadosValidados;
 
     const id = crypto.randomUUID();
     const camposOpcionais = ['pesos', 'requisitos_estruturados', 'limites', 'campos_excluidos_score'].filter((c) => dados[c] !== undefined);
@@ -935,7 +886,7 @@ async function build() {
   });
 
   fastify.patch('/people/api/vagas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const dados = request.body || {};
+    let dados = request.body || {};
     const campos = Object.keys(dados).filter((campo) => CAMPOS_VAGA_EDITAVEIS.includes(campo));
     if (!campos.length) {
       return reply.code(400).send({ error: 'Nenhum campo válido para atualizar' });
@@ -946,8 +897,9 @@ async function build() {
     if (dados.tipo_vaga && !TIPO_VAGA_VALIDOS.includes(dados.tipo_vaga)) {
       return reply.code(400).send({ error: 'Tipo de vaga inválido' });
     }
-    const erroValidacao = validarRequisitosVaga(dados);
+    const { erro: erroValidacao, dados: dadosValidados } = validarRequisitosVaga(dados);
     if (erroValidacao) return reply.code(400).send({ error: erroValidacao });
+    dados = dadosValidados;
 
     // Status anterior só importa pra saber se é uma transição real pra
     // "encerrada" (automação de vaga_encerrada não deve repetir a cada PATCH
