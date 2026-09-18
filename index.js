@@ -13,6 +13,8 @@ const { montarResumo } = require('./lib/conteudo');
 const { enviarLinkAvaliacao } = require('./lib/email');
 const { gerarRelatorioPdf } = require('./lib/pdf');
 const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
+const { chamarClaude } = require('./lib/anthropic-service');
+const { montarPromptParsingCurriculo, normalizarCurriculoEstruturado, parsearRespostaParsingCurriculo } = require('./lib/curriculo-parser');
 const { encontrarOuCriarPessoa, avaliacaoReaproveitavel, registrarEvento, calcularScore } = require('./lib/pessoas');
 const { paraE164 } = require('./lib/telefone');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
@@ -974,7 +976,8 @@ async function build() {
     const { rows } = await pool.query(
       `select c.id, c.candidato_id, p.nome, p.email, p.telefone_e164 as whatsapp, p.linkedin, p.anonimizado_em, p.whatsapp_opt_out,
               c.status, c.etapa_id, c.vaga_id, c.avaliacao_id, c.score, c.pesos_snapshot,
-              c.motivo_reprovacao, c.origem, c.curriculo_nome, c.curriculo_tipo, c.criado_em, v.nome as vaga_nome
+              c.motivo_reprovacao, c.origem, c.curriculo_nome, c.curriculo_tipo, c.criado_em, v.nome as vaga_nome,
+              c.curriculo_estruturado, c.curriculo_estruturado_revisado_em, c.curriculo_estruturado_revisado_por
        from candidaturas c
        join candidatos p on p.id = c.candidato_id
        join vagas v on v.id = c.vaga_id
@@ -1016,6 +1019,24 @@ async function build() {
     reply.header('Content-Type', candidatura.curriculo_tipo);
     reply.header('Content-Disposition', `inline; filename="${candidatura.curriculo_nome}"`);
     return reply.send(candidatura.curriculo_arquivo);
+  });
+
+  // #48: recrutador corrige o que a IA extraiu errado (ou preenche à mão
+  // quando a extração falhou/veio vazia) antes de usar esses dados no motor
+  // de aderência. normalizarCurriculoEstruturado é a mesma função usada
+  // pra validar a saída da IA — mesma forma, mesma tolerância a campo
+  // ausente, nunca falha por payload incompleto.
+  fastify.patch('/people/api/candidaturas/:id/curriculo-estruturado', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const estruturado = normalizarCurriculoEstruturado(request.body);
+    const { rows } = await pool.query(
+      `update candidaturas c set curriculo_estruturado = $1, curriculo_estruturado_revisado_em = now(), curriculo_estruturado_revisado_por = $2
+       from vagas v
+       where c.vaga_id = v.id and c.id = $3 and v.tenant_id = $4
+       returning c.id`,
+      [JSON.stringify(estruturado), request.user.email, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+    return { ok: true, curriculo_estruturado: estruturado };
   });
 
   // Evidence ledger (Handoff v2, Parte 5.1) — append-only de propósito:
@@ -1259,6 +1280,31 @@ async function build() {
   // (candidato_id, vaga_id) no banco garante que "clicar duas vezes no
   // link" nunca duplica: a segunda chamada só devolve a candidatura já
   // criada na primeira.
+  // #48: extração de dados estruturados de carreira via Claude Haiku —
+  // sempre best-effort e nunca await'ada por quem chama (roda depois da
+  // candidatura já ter sido criada e devolvida). Regra 0.3: ausência de
+  // evidência é neutra, então qualquer falha (API fora do ar, JSON
+  // malformado, ANTHROPIC_API_KEY não configurada) só loga e deixa
+  // curriculo_estruturado null — o recrutador preenche/corrige na tela do
+  // candidato, como sempre foi possível fazer manualmente.
+  async function extrairEGravarCurriculoEstruturado({ candidaturaId, tenantId, arquivo }) {
+    try {
+      const texto = await extrairTexto(arquivo.buffer, arquivo.tipo, arquivo.nome);
+      if (!texto || !texto.trim()) return;
+      const { system, mensagens } = montarPromptParsingCurriculo(texto);
+      const { texto: respostaBruta } = await chamarClaude({ system, mensagens, maxTokens: 1536 });
+      const estruturado = parsearRespostaParsingCurriculo(respostaBruta, {
+        log: (obj, msg) => fastify.log.warn(obj, msg),
+      });
+      await pool.query(
+        'update candidaturas set curriculo_estruturado = $1 where id = $2 and tenant_id = $3',
+        [JSON.stringify(estruturado), candidaturaId, tenantId]
+      );
+    } catch (err) {
+      fastify.log.error({ err, candidaturaId }, 'Falha ao extrair dados estruturados do currículo (#48)');
+    }
+  }
+
   async function criarOuReutilizarCandidatura({ vagaId, tenantId, candidatoId, nome, email, telefone, linkedin, origem, curriculo, atorEmail }) {
     const pessoa = candidatoId
       ? (await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [candidatoId, tenantId])).rows[0]
@@ -1305,6 +1351,10 @@ async function build() {
       ]
     );
     const candidatura = rows[0];
+    if (curriculo) {
+      extrairEGravarCurriculoEstruturado({ candidaturaId: candidatura.id, tenantId, arquivo: curriculo })
+        .catch((err) => fastify.log.error({ err, candidaturaId: candidatura.id }, 'Falha inesperada no parsing de currículo (#48)'));
+    }
     await registrarEvento(pool, { tenantId, candidaturaId: candidatura.id, tipo: 'candidatura_criada', para: 'nova', atorEmail, payload: { origem } });
     if (avaliacaoExistente) {
       await registrarEvento(pool, { tenantId, candidaturaId: candidatura.id, tipo: 'avaliacao_reaproveitada', payload: { avaliacao_id: avaliacaoExistente.id } });

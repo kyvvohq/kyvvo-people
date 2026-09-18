@@ -310,6 +310,7 @@
         <div class="detalhe-visualizador" id="detalhe-visualizador">
           <div class="detalhe-sem-preview">Carregando currículo...</div>
         </div>
+        ${c.curriculo_nome !== 'sem-arquivo' ? blocoCurriculoEstruturado(c) : ''}
         <div class="detalhe-acoes">
           ${c.curriculo_nome !== 'sem-arquivo' ? '<button class="btn-secundario" id="btn-download-curriculo" type="button">Baixar currículo</button>' : ''}
           <button class="btn-perigo" id="btn-reprovar" type="button"${c.status === 'reprovada' ? ' disabled' : ''}>Reprovar</button>
@@ -323,6 +324,8 @@
       document.getElementById('btn-reprovar').addEventListener('click', () => confirmarReprovar(c));
       document.getElementById('btn-proxima-etapa').addEventListener('click', () => avancarEtapa(c));
       document.getElementById('btn-editar-score').addEventListener('click', (e) => { e.preventDefault(); formularioScore(c); });
+      const btnEditarCurriculo = document.getElementById('btn-editar-curriculo-estruturado');
+      if (btnEditarCurriculo) btnEditarCurriculo.addEventListener('click', (e) => { e.preventDefault(); formularioCurriculoEstruturado(c); });
       document.getElementById('btn-banco-talentos').addEventListener('click', (e) => { e.preventDefault(); formularioBancoDeTalentos(c); });
       const btnAnonimizar = document.getElementById('btn-anonimizar');
       if (btnAnonimizar) btnAnonimizar.addEventListener('click', (e) => { e.preventDefault(); confirmarAnonimizar(c); });
@@ -341,6 +344,100 @@
       });
 
       carregarPreview(c);
+    }
+
+    // #48: resumo somente-leitura dos dados de carreira extraídos do
+    // currículo (via Claude Haiku, no envio da candidatura). Extração é
+    // best-effort e assíncrona — pode ainda não ter rodado, ter falhado, ou
+    // simplesmente não ter achado nada; nesses casos o bloco fica vazio,
+    // nunca é erro (Regra 0.3: ausência de evidência é neutra).
+    function blocoCurriculoEstruturado(c) {
+      const dados = c.curriculo_estruturado;
+      const vazio = !dados || (!dados.experiencias?.length && !dados.ferramentas?.length && !dados.formacao?.length);
+      return `
+        <div class="detalhe-curriculo-estruturado" style="padding:16px 20px; border-top:1px solid var(--border)">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+            <strong style="font-size:13px">Dados extraídos do currículo</strong>
+            <a class="acao" href="#" id="btn-editar-curriculo-estruturado">${vazio ? 'Preencher' : 'Editar'}</a>
+          </div>
+          ${vazio
+            ? '<p class="campo-ajuda">Extração automática ainda não disponível (pode estar em andamento, ter falhado, ou não ter achado nada no arquivo). Isso não bloqueia a candidatura — dá pra preencher à mão.</p>'
+            : `
+              ${dados.experiencias.length ? `<div><strong style="font-size:12px">Experiências</strong><ul style="margin:4px 0 10px; padding-left:18px; font-size:13px">${dados.experiencias.map((e) => `<li>${e.cargo}${e.empresa ? ` — ${e.empresa}` : ''}${e.duracao_meses ? ` (${e.duracao_meses}m)` : ''}</li>`).join('')}</ul></div>` : ''}
+              ${dados.ferramentas.length ? `<div style="margin-bottom:10px"><strong style="font-size:12px">Ferramentas</strong><div>${dados.ferramentas.map((f) => `<span class="badge neutro" style="margin:4px 4px 0 0; display:inline-block">${f}</span>`).join('')}</div></div>` : ''}
+              ${dados.formacao.length ? `<div><strong style="font-size:12px">Formação</strong><ul style="margin:4px 0 0; padding-left:18px; font-size:13px">${dados.formacao.map((f) => `<li>${f.curso}${f.instituicao ? ` — ${f.instituicao}` : ''}</li>`).join('')}</ul></div>` : ''}
+            `}
+          ${c.curriculo_estruturado_revisado_em ? `<p class="campo-ajuda" style="margin-top:8px">Revisado por ${c.curriculo_estruturado_revisado_por} em ${new Date(c.curriculo_estruturado_revisado_em).toLocaleString('pt-BR')}</p>` : ''}
+        </div>
+      `;
+    }
+
+    // Formato de texto simples pra edição — uma experiência/formação por
+    // linha ("Cargo — Empresa (18m)" / "Curso — Instituição"), ferramentas
+    // separadas por vírgula. O servidor tolera qualquer coisa incompleta
+    // (normalizarCurriculoEstruturado), então o parser aqui não precisa ser
+    // rigoroso: melhor esforço, sem travar o recrutador com validação.
+    function textoExperiencias(lista) {
+      return (lista || []).map((e) => {
+        let linha = [e.cargo || '', e.empresa || ''].filter(Boolean).join(' — ');
+        if (e.duracao_meses) linha += ` (${e.duracao_meses}m)`;
+        return linha;
+      }).join('\n');
+    }
+    function parseExperiencias(texto) {
+      return texto.split('\n').map((l) => l.trim()).filter(Boolean).map((linha) => {
+        const matchMeses = linha.match(/\((\d+)\s*m\)\s*$/i);
+        const duracao_meses = matchMeses ? Number(matchMeses[1]) : null;
+        const semMeses = (matchMeses ? linha.slice(0, matchMeses.index) : linha).trim();
+        const [cargo, empresa] = semMeses.split('—').map((p) => (p || '').trim());
+        return { cargo: cargo || '', empresa: empresa || '', duracao_meses };
+      });
+    }
+    function textoFormacao(lista) {
+      return (lista || []).map((f) => [f.curso || '', f.instituicao || ''].filter(Boolean).join(' — ')).join('\n');
+    }
+    function parseFormacao(texto) {
+      return texto.split('\n').map((l) => l.trim()).filter(Boolean).map((linha) => {
+        const [curso, instituicao] = linha.split('—').map((p) => (p || '').trim());
+        return { curso: curso || '', instituicao: instituicao || '' };
+      });
+    }
+
+    function formularioCurriculoEstruturado(c) {
+      const dados = c.curriculo_estruturado || { experiencias: [], ferramentas: [], formacao: [] };
+      abrirModal(
+        '<h3>Dados extraídos do currículo</h3>',
+        `
+          <form id="form-curriculo-estruturado">
+            <p class="campo-ajuda">Uma experiência/formação por linha. Duração em meses é opcional, entre parênteses no fim.</p>
+            <label for="ce-experiencias">Experiências (ex.: "Dev Backend — Acme (18m)")</label>
+            <textarea id="ce-experiencias" rows="4" style="width:100%; box-sizing:border-box; font:inherit">${textoExperiencias(dados.experiencias)}</textarea>
+            <label for="ce-ferramentas" style="margin-top:10px; display:block">Ferramentas (separadas por vírgula)</label>
+            <input id="ce-ferramentas" type="text" style="width:100%; box-sizing:border-box" value="${(dados.ferramentas || []).join(', ')}">
+            <label for="ce-formacao" style="margin-top:10px; display:block">Formação (ex.: "Ciência da Computação — UFMG")</label>
+            <textarea id="ce-formacao" rows="3" style="width:100%; box-sizing:border-box; font:inherit">${textoFormacao(dados.formacao)}</textarea>
+            <div class="modal-erro" id="msg-curriculo-estruturado"></div>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-curriculo-estruturado">Cancelar</button>
+              <button type="submit" class="btn">Salvar</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-curriculo-estruturado').addEventListener('click', fecharModal);
+      document.getElementById('form-curriculo-estruturado').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-curriculo-estruturado');
+        const payload = {
+          experiencias: parseExperiencias(document.getElementById('ce-experiencias').value),
+          ferramentas: document.getElementById('ce-ferramentas').value.split(',').map((f) => f.trim()).filter(Boolean),
+          formacao: parseFormacao(document.getElementById('ce-formacao').value),
+        };
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/curriculo-estruturado`, { method: 'PATCH', body: JSON.stringify(payload) });
+        if (!res.ok) { msg.textContent = 'Falha ao salvar'; return; }
+        fecharModal();
+        renderizarDetalhe();
+      });
     }
 
     function formularioScore(c) {
