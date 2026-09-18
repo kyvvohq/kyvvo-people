@@ -20,6 +20,7 @@ const { paraE164 } = require('./lib/telefone');
 const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascarar');
 const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut, processarFilaWhatsapp } = require('./lib/automacoes');
 const { validarRequisitosVaga } = require('./lib/vagas');
+const { validarEvidencia, detectarContradicoes } = require('./lib/evidencias');
 const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
@@ -1038,6 +1039,65 @@ async function build() {
     return { ok: true, curriculo_estruturado: estruturado };
   });
 
+  // Evidence ledger (Handoff v2, Parte 5.1) — append-only de propósito:
+  // só GET (listar) e POST (criar) existem aqui, nunca PATCH/DELETE.
+  // Corrigir uma evidência é sempre uma linha NOVA (substitui_evidencia_id
+  // aponta a antiga), nunca um UPDATE por cima — não remova esse invariante
+  // adicionando uma rota de edição/exclusão sem repensar a regra inteira.
+  fastify.get('/people/api/candidaturas/:id/evidencias', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: candidaturaRows } = await pool.query(
+      'select c.id from candidaturas c join vagas v on v.id = c.vaga_id where c.id = $1 and v.tenant_id = $2',
+      [request.params.id, request.user.tenantId]
+    );
+    if (!candidaturaRows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+
+    const { rows } = await pool.query(
+      `select id, requisito_id, fonte, efeito, texto, substitui_evidencia_id, ator_email, criado_em
+       from evidencias where candidatura_id = $1 order by criado_em asc`,
+      [request.params.id]
+    );
+    return { evidencias: rows, requisitos_contraditorios: [...detectarContradicoes(rows)] };
+  });
+
+  fastify.post('/people/api/candidaturas/:id/evidencias', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: candidaturaRows } = await pool.query(
+      'select c.id, c.tenant_id from candidaturas c join vagas v on v.id = c.vaga_id where c.id = $1 and v.tenant_id = $2',
+      [request.params.id, request.user.tenantId]
+    );
+    const candidatura = candidaturaRows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+
+    const corpo = request.body || {};
+    // fonte=entrevista/manual são as únicas lançadas por uma pessoa logada
+    // agora — o ator vem da sessão, nunca de um campo que o cliente manda
+    // (evita alguém se passar por outra pessoa no registro).
+    const dadosParaValidar = {
+      ...corpo,
+      ator_email: ['entrevista', 'manual'].includes(corpo.fonte) ? request.user.email : null,
+    };
+    const { erro, dados } = validarEvidencia(dadosParaValidar);
+    if (erro) return reply.code(400).send({ error: erro });
+
+    // substitui_evidencia_id (se veio) precisa ser uma evidência da MESMA
+    // candidatura — evita um id de outro tenant/candidatura vazando aqui.
+    if (corpo.substitui_evidencia_id) {
+      const { rows: substituidaRows } = await pool.query(
+        'select id from evidencias where id = $1 and candidatura_id = $2',
+        [corpo.substitui_evidencia_id, request.params.id]
+      );
+      if (!substituidaRows[0]) return reply.code(400).send({ error: 'Evidência substituída não encontrada nesta candidatura.' });
+    }
+
+    const id = crypto.randomUUID();
+    await pool.query(
+      `insert into evidencias (id, tenant_id, candidatura_id, requisito_id, fonte, efeito, texto, substitui_evidencia_id, ator_email)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [id, candidatura.tenant_id, request.params.id, corpo.requisito_id || null, dados.fonte, dados.efeito, dados.texto, corpo.substitui_evidencia_id || null, dados.ator_email]
+    );
+    reply.code(201);
+    return { id };
+  });
+
   // Reprovar exige ação humana registrada (Art. 20 LGPD) — não existe
   // caminho automático pra esse status em nenhuma rota deste arquivo.
   fastify.patch('/people/api/candidaturas/:id/reprovar', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -1682,7 +1742,7 @@ async function build() {
   // pedida pelo Bruno em 2026-08-28 — CPF nunca foi necessário pra
   // identificar a pessoa, só servia como segredo de destrave do link).
   fastify.post('/people/api/avaliacao/:token/validar-email', async (request, reply) => {
-    const { email } = request.body || {};
+    const { email, aceite_lgpd } = request.body || {};
     const { rows } = await pool.query(
       `select a.id, a.status, p.email as email_cadastrado
        from avaliacoes a join candidatos p on p.id = a.candidato_id
@@ -1700,7 +1760,17 @@ async function build() {
     }
 
     if (avaliacao.status === 'pendente') {
-      await pool.query("update avaliacoes set status = 'iniciado', iniciado_em = now() where id = $1", [avaliacao.id]);
+      // Handoff v2, Parte 5.3: consentimento explícito antes de iniciar a
+      // Rodada 1, informando que a avaliação é contexto, não critério de
+      // corte. Exigido só na primeira entrada (status pendente) — quem já
+      // consentiu e está só retomando não precisa reconfirmar a cada visita.
+      if (aceite_lgpd !== true) {
+        return reply.code(400).send({ error: 'É necessário aceitar o uso dos dados (LGPD) para iniciar a avaliação' });
+      }
+      await pool.query(
+        "update avaliacoes set status = 'iniciado', iniciado_em = now(), consentimento_lgpd_em = now() where id = $1",
+        [avaliacao.id]
+      );
     }
 
     return { ok: true, caracteristicas: CARACTERISTICAS_PUBLICAS };
@@ -1765,6 +1835,14 @@ async function build() {
     }
     if (avaliacao.status === 'pendente') {
       reply.code(403).send({ error: 'Valide seu e-mail antes de responder' });
+      return null;
+    }
+    // Defesa em profundidade da Regra 5.3 (LGPD): mesmo que o status já
+    // esteja 'iniciado', não deixa responder rodada nenhuma sem consentimento
+    // registrado — cobre qualquer caminho que chegue a 'iniciado' sem passar
+    // pelo gate de validar-email acima.
+    if (!avaliacao.consentimento_lgpd_em) {
+      reply.code(403).send({ error: 'Consentimento LGPD pendente — acesse o link novamente para confirmar' });
       return null;
     }
     return avaliacao;

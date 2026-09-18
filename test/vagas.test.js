@@ -96,6 +96,26 @@ test('sem requisitos_estruturados/pesos/campos_excluidos_score, devolve dados co
   assert.equal(dados.nome, 'Dev Backend');
 });
 
+// Handoff v2 — evidence ledger (lib/evidencias.js) referencia
+// requisito_id; sem um id estável por requisito, uma evidência não teria
+// o que apontar (o formulário em public/vagas.html não gera um).
+test('requisito sem id ganha um id estável (UUID)', () => {
+  const { dados } = validarRequisitosVaga({
+    requisitos_estruturados: [{ capacidade: 'Excel', nivel_exigido: 'importante' }],
+  });
+  const id = dados.requisitos_estruturados[0].id;
+  assert.ok(id, 'requisito deveria ganhar um id');
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+});
+
+test('requisito que já tem id mantém o mesmo (evidência antiga não fica órfã)', () => {
+  const idOriginal = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+  const { dados } = validarRequisitosVaga({
+    requisitos_estruturados: [{ id: idOriginal, capacidade: 'Excel', nivel_exigido: 'importante' }],
+  });
+  assert.equal(dados.requisitos_estruturados[0].id, idOriginal);
+});
+
 test('não muta o objeto original recebido', () => {
   const original = { requisitos_estruturados: [{ capacidade: 'X', nivel_exigido: 'importante' }] };
   const copia = JSON.parse(JSON.stringify(original));

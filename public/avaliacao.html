@@ -66,6 +66,10 @@
       <p class="sub">Para começar, confirme o e-mail para o qual este convite foi enviado. O link só pode ser usado uma vez.</p>
       <label class="campo" for="email">E-mail</label>
       <input type="text" id="email" placeholder="seu@email.com" inputmode="email" autocomplete="email">
+      <label class="chip" style="width:100%; box-sizing:border-box; margin-top:14px;">
+        <input type="checkbox" id="aceite-lgpd">
+        <span>Estou ciente de que esta avaliação comportamental é usada como <strong>contexto</strong> pelo recrutador, e não como critério automático de aprovação ou reprovação.</span>
+      </label>
       <div class="erro" id="erro"></div>
       <button id="btn-email">Continuar</button>
     `;
@@ -73,11 +77,16 @@
       const erro = document.getElementById('erro');
       erro.textContent = '';
       const email = document.getElementById('email').value.trim();
+      const aceite_lgpd = document.getElementById('aceite-lgpd').checked;
+      if (!aceite_lgpd) {
+        erro.textContent = 'É necessário aceitar o uso dos dados para continuar.';
+        return;
+      }
       try {
         const res = await fetch(`/people/api/avaliacao/${token}/validar-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, aceite_lgpd }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Não foi possível validar o e-mail');
