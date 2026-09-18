@@ -103,12 +103,9 @@ async function build() {
     prefix: '/people/',
   });
 
-  // Tokens do design system, servidos crus de node_modules (não há bundler).
-  fastify.register(fastifyStatic, {
-    root: path.join(__dirname, 'node_modules', '@kyvvohq', 'design-system'),
-    prefix: '/ds/',
-    decorateReply: false,
-  });
+  // /ds/* NÃO é mais servido por este app: o nginx atende /ds/ direto de
+  // /opt/kyvvo/design-system/ (sincronizado a cada push na main do
+  // kyvvo-design-system — consumo em tempo real, sem npm/lockfile por produto).
 
   fastify.register(fastifyMultipart, {
     limits: { fileSize: 5 * 1024 * 1024, files: 1 },

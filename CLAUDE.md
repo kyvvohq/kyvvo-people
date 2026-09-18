@@ -24,8 +24,9 @@ npm test           # node --test test/*.test.js
 ## Arquitetura
 
 **`index.js`** monta o Fastify, registra `@fastify/{jwt,static,multipart}`,
-serve `public/` em `/people/` e os tokens do design system crus de
-`node_modules/@kyvvohq/design-system` em `/ds/`. Todas as rotas de API vivem
+serve `public/` em `/people/`. O `/ds/` (tokens/componentes do design system) NÃO é
+servido aqui: o nginx atende direto de `/opt/kyvvo/design-system/` (kyvvo-design-system,
+tempo real). Todas as rotas de API vivem
 nesse arquivo (não há `routes/`).
 
 **Auth** (corte P3): o People **não tem tabela de usuário/tenant**. `POST
