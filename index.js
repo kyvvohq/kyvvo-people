@@ -21,6 +21,7 @@ const { mascararNome, mascararEmail, mascararTelefone } = require('./lib/mascara
 const { garantirAutomacoesPadrao, dispararAutomacoes, detectarOptOut, processarFilaWhatsapp } = require('./lib/automacoes');
 const { validarRequisitosVaga } = require('./lib/vagas');
 const { validarEvidencia, detectarContradicoes } = require('./lib/evidencias');
+const { calcularAderenciaCandidatura, calcularPercentisPool } = require('./lib/aderencia');
 const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
@@ -954,6 +955,50 @@ async function build() {
     return rows;
   });
 
+  // #47: score de aderência de TODAS as candidaturas de uma vaga, já
+  // convertido em percentil relativo ao pool — nunca calculado isolado
+  // (Regra 4.4). Único ponto do backend que lê requisitos_estruturados +
+  // evidencias e chama lib/aderencia.js; GET /candidaturas/:id (abaixo)
+  // reaproveita esta mesma função em vez de calcular um score avulso, pra
+  // não abrir um segundo caminho que devolva score sem percentil junto.
+  // Inclui candidaturas reprovadas de propósito (Regra 0.4: nunca esconder
+  // dado) — quem consome decide se quer filtrar.
+  async function calcularAderenciaPool(vagaId, tenantId) {
+    const { rows: vagaRows } = await pool.query('select requisitos_estruturados from vagas where id = $1 and tenant_id = $2', [vagaId, tenantId]);
+    if (!vagaRows[0]) return null;
+    const requisitosEstruturados = vagaRows[0].requisitos_estruturados || [];
+
+    const { rows: candidaturas } = await pool.query(
+      `select c.id, p.nome from candidaturas c join candidatos p on p.id = c.candidato_id where c.vaga_id = $1`,
+      [vagaId]
+    );
+    if (!candidaturas.length) return [];
+
+    const { rows: evidencias } = await pool.query(
+      `select candidatura_id, requisito_id, efeito from evidencias where candidatura_id = any($1::uuid[])`,
+      [candidaturas.map((c) => c.id)]
+    );
+    const evidenciasPorCandidatura = new Map();
+    for (const ev of evidencias) {
+      if (!evidenciasPorCandidatura.has(ev.candidatura_id)) evidenciasPorCandidatura.set(ev.candidatura_id, []);
+      evidenciasPorCandidatura.get(ev.candidatura_id).push(ev);
+    }
+
+    const comScore = candidaturas.map((c) => ({
+      candidaturaId: c.id,
+      nome: c.nome,
+      ...calcularAderenciaCandidatura({ requisitosEstruturados, evidencias: evidenciasPorCandidatura.get(c.id) || [] }),
+    }));
+
+    return calcularPercentisPool(comScore).sort((a, b) => (b.percentil ?? -1) - (a.percentil ?? -1));
+  }
+
+  fastify.get('/people/api/vagas/:id/aderencia', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const resultado = await calcularAderenciaPool(request.params.id, request.user.tenantId);
+    if (resultado == null) return reply.code(404).send({ error: 'Vaga não encontrada' });
+    return { candidaturas: resultado };
+  });
+
   // Lista todas as candidaturas do tenant (todas as vagas juntas) — usada
   // pela tela "Candidatos" (distinta de "Avaliações", que é sobre a
   // avaliação comportamental). Nome/e-mail/whatsapp vêm da PESSOA agora —
@@ -984,8 +1029,14 @@ async function build() {
        where c.id = $1 and v.tenant_id = $2`,
       [request.params.id, request.user.tenantId]
     );
-    if (!rows[0]) return reply.code(404).send({ error: 'Candidatura não encontrada' });
-    return rows[0];
+    const candidatura = rows[0];
+    if (!candidatura) return reply.code(404).send({ error: 'Candidatura não encontrada' });
+
+    // Mesma função da rota de pool (acima) — garante que o score, quando
+    // aparece, sempre vem junto do percentil (Regra 4.4: nunca isolado).
+    const poolAderencia = await calcularAderenciaPool(candidatura.vaga_id, request.user.tenantId);
+    candidatura.aderencia = (poolAderencia || []).find((a) => a.candidaturaId === candidatura.id) || null;
+    return candidatura;
   });
 
   fastify.get('/people/api/candidaturas/:id/curriculo', { preHandler: fastify.authenticate }, async (request, reply) => {
