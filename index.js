@@ -1574,6 +1574,26 @@ async function build() {
     return listarTemplates();
   });
 
+  // Interno — chamado pelo kyvvo-admin (Produtos > WhatsApp > Disparos, US
+  // Bruno: total/realizados/histórico cross-produto Studio+People). Protegido
+  // por segredo compartilhado (ADMIN_INTERNAL_TOKEN, mesmo valor cadastrado
+  // no kyvvo-admin) em vez de expor sem nenhuma auth — defesa em profundidade
+  // além do isolamento de rede Docker/EC2 (nunca exposto publicamente, ver
+  // [[project_kyvvo_exposicao_ip]]). Resolução de tenant_id -> nome fica por
+  // conta de quem chama (People não tem tabela `tenants` local, é referência
+  // solta).
+  fastify.get('/people/admin-interno/whatsapp-disparos', async (request, reply) => {
+    const token = (request.headers['x-admin-internal-token'] || '').trim();
+    if (!process.env.ADMIN_INTERNAL_TOKEN || token !== process.env.ADMIN_INTERNAL_TOKEN) {
+      return reply.code(401).send({ error: 'Não autorizado' });
+    }
+    const { rows } = await pool.query(
+      `select id, tenant_id, telefone_e164, template_nome, gatilho, status, criado_em
+       from whatsapp_disparos order by criado_em desc limit 1000`
+    );
+    return { disparos: rows };
+  });
+
   fastify.get('/people/api/automacoes', { preHandler: fastify.authenticate }, async (request) => {
     await garantirAutomacoesPadrao(pool, request.user.tenantId);
     const { rows } = await pool.query(
