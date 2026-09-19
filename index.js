@@ -1588,14 +1588,22 @@ async function build() {
       return reply.code(401).send({ error: 'Não autorizado' });
     }
     const { tenant_id: tenantId } = request.query || {};
-    const { rows } = await pool.query(
-      `select id, tenant_id, telefone_e164, template_nome, gatilho, status, criado_em
-       from whatsapp_disparos
-       ${tenantId ? 'where tenant_id = $1' : ''}
-       order by criado_em desc limit 1000`,
-      tenantId ? [tenantId] : []
-    );
-    return { disparos: rows };
+    const [{ rows }, planoRows] = await Promise.all([
+      pool.query(
+        `select id, tenant_id, telefone_e164, template_nome, gatilho, status, criado_em
+         from whatsapp_disparos
+         ${tenantId ? 'where tenant_id = $1' : ''}
+         order by criado_em desc limit 1000`,
+        tenantId ? [tenantId] : []
+      ),
+      // Plano da assinatura — só faz sentido/é barato quando o admin já
+      // filtrou por um tenant específico (US: mostrar "X de Y disparos
+      // usados este mês, plano Z" ao selecionar um cliente).
+      tenantId
+        ? pool.query('select plano from assinaturas where tenant_id = $1', [tenantId]).then((r) => r.rows)
+        : Promise.resolve([]),
+    ]);
+    return { disparos: rows, plano_chave: planoRows[0] ? planoRows[0].plano : null };
   });
 
   fastify.get('/people/api/automacoes', { preHandler: fastify.authenticate }, async (request) => {
