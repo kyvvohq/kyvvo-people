@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, parametroBotaoParaTemplate,
-  resolverPorCanal, detectarOptOut, SEEDS,
+  resolverPorCanal, detectarOptOut, SEEDS, registrarDisparo,
 } = require('../lib/automacoes');
 
 test('renderizar: substitui todos os placeholders presentes', () => {
@@ -209,4 +209,27 @@ test('detectarOptOut: vazio/nulo não aciona nem lança', () => {
   assert.equal(detectarOptOut(''), false);
   assert.equal(detectarOptOut(null), false);
   assert.equal(detectarOptOut(undefined), false);
+});
+
+test('registrarDisparo: grava tenant/telefone/template/gatilho/status em whatsapp_disparos', async () => {
+  const chamadas = [];
+  const pool = { query: async (sql, params) => { chamadas.push({ sql, params }); return { rows: [] }; } };
+  await registrarDisparo(pool, { tenantId: 't1', telefoneE164: '+5534999998888', templateNome: 'candidatura_recebida', gatilho: 'candidatura_criada', status: 'enviado' });
+  assert.equal(chamadas.length, 1);
+  assert.match(chamadas[0].sql, /insert into whatsapp_disparos/);
+  const [, tenantId, telefone, template, gatilho, status] = chamadas[0].params;
+  assert.equal(tenantId, 't1');
+  assert.equal(telefone, '+5534999998888');
+  assert.equal(template, 'candidatura_recebida');
+  assert.equal(gatilho, 'candidatura_criada');
+  assert.equal(status, 'enviado');
+});
+
+test('registrarDisparo: template/gatilho ausentes viram null em vez de undefined (constraint do banco não aceita undefined)', async () => {
+  const chamadas = [];
+  const pool = { query: async (sql, params) => { chamadas.push({ sql, params }); return { rows: [] }; } };
+  await registrarDisparo(pool, { tenantId: 't1', telefoneE164: '+5534999998888', status: 'bloqueado_24h' });
+  const [, , , template, gatilho] = chamadas[0].params;
+  assert.equal(template, null);
+  assert.equal(gatilho, null);
 });
