@@ -293,6 +293,7 @@
             <div class="info">
               ${c.vaga_nome} · <span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span> · Etapa: ${nomeEtapa(c.etapa_id)}
               ${c.score ? ` · Score: <strong>${c.score.geral}</strong>` : ''}
+              ${c.aderencia && c.aderencia.percentil != null ? ` · Percentil no pool: <strong>${c.aderencia.percentil}º</strong>` : ''}
               <a class="acao" href="#" id="btn-editar-score" style="margin-left:6px">${c.score ? 'Editar score' : 'Lançar score'}</a><br>
               ${c.whatsapp}${c.whatsapp_opt_out ? ' <span class="badge neutro" title="Pediu pra não receber mais WhatsApp">Opt-out</span>' : ''} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}<br>
               <a class="acao" href="#" id="btn-banco-talentos">Adicionar a outra vaga</a>
@@ -311,6 +312,9 @@
           <div class="detalhe-sem-preview">Carregando currículo...</div>
         </div>
         ${c.curriculo_nome !== 'sem-arquivo' ? blocoCurriculoEstruturado(c) : ''}
+        <div class="detalhe-evidencias" id="detalhe-evidencias">
+          <div class="detalhe-sem-preview">Carregando evidências...</div>
+        </div>
         <div class="detalhe-acoes">
           ${c.curriculo_nome !== 'sem-arquivo' ? '<button class="btn-secundario" id="btn-download-curriculo" type="button">Baixar currículo</button>' : ''}
           <button class="btn-perigo" id="btn-reprovar" type="button"${c.status === 'reprovada' ? ' disabled' : ''}>Reprovar</button>
@@ -344,6 +348,7 @@
       });
 
       carregarPreview(c);
+      carregarEvidencias(c);
     }
 
     // #48: resumo somente-leitura dos dados de carreira extraídos do
@@ -435,6 +440,161 @@
         };
         const res = await apiFetch(`/people/api/candidaturas/${c.id}/curriculo-estruturado`, { method: 'PATCH', body: JSON.stringify(payload) });
         if (!res.ok) { msg.textContent = 'Falha ao salvar'; return; }
+        fecharModal();
+        renderizarDetalhe();
+      });
+    }
+
+    // #50: evidências de entrevista/observações — a UI que alimenta o
+    // motor de aderência (#47) de verdade. Cada evidência vinculada a um
+    // requisito aparece ao lado do score daquele requisito (é a "evidência
+    // que causou a mudança" pedida no critério de aceite); observação geral
+    // (sem requisito) nunca entra em nenhum score, só é listada como
+    // contexto. ator_email nunca vem daqui — o servidor deriva da sessão.
+    const EFEITO_LABEL = { corrobora: 'Corrobora', contradiz: 'Contradiz', parcial: 'Parcial', contexto: 'Contexto' };
+    const SINAL_ELIMINATORIO_LABEL = { sem_evidencia: 'Sem evidência', atende: 'Atende', nao_atende: 'Não atende', conflitante: 'Conflitante' };
+
+    async function carregarEvidencias(c) {
+      const el = document.getElementById('detalhe-evidencias');
+      if (!el) return;
+      try {
+        const [vagaRes, evidRes] = await Promise.all([
+          apiFetch(`/people/api/vagas/${c.vaga_id}`),
+          apiFetch(`/people/api/candidaturas/${c.id}/evidencias`),
+        ]);
+        if (!vagaRes.ok || !evidRes.ok) throw new Error();
+        const vaga = await vagaRes.json();
+        const evidData = await evidRes.json();
+        if (idSelecionado !== c.id) return; // usuário já trocou de candidato enquanto isso carregava
+        el.innerHTML = renderEvidencias(c, vaga, evidData);
+        const btnGeral = document.getElementById('btn-nova-evidencia');
+        if (btnGeral) btnGeral.addEventListener('click', (e) => { e.preventDefault(); formularioEvidencia(c, vaga, null); });
+        el.querySelectorAll('[data-requisito]').forEach((link) => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            formularioEvidencia(c, vaga, { requisitoId: link.dataset.requisito, capacidade: link.dataset.capacidade });
+          });
+        });
+      } catch {
+        el.innerHTML = '<div class="detalhe-sem-preview">Não foi possível carregar as evidências.</div>';
+      }
+    }
+
+    function linhaEvidencia(ev) {
+      const dataFmt = new Date(ev.criado_em).toLocaleString('pt-BR');
+      return `<li><span class="badge neutro">${EFEITO_LABEL[ev.efeito] || ev.efeito}</span> ${ev.texto}
+        <span class="campo-ajuda" style="display:inline">— ${ev.fonte}${ev.ator_email ? ` · ${ev.ator_email}` : ''} · ${dataFmt}</span></li>`;
+    }
+
+    function renderEvidencias(c, vaga, evidData) {
+      const requisitos = vaga.requisitos_estruturados || [];
+      const porRequisito = Object.fromEntries(((c.aderencia && c.aderencia.porRequisito) || []).map((r) => [r.requisitoId, r]));
+      const sinaisEliminatorio = Object.fromEntries(((c.aderencia && c.aderencia.eliminatorios) || []).map((r) => [r.requisitoId, r]));
+      const contraditorios = new Set(evidData.requisitos_contraditorios || []);
+      const evidenciasPorRequisito = {};
+      const observacoesGerais = [];
+      for (const ev of evidData.evidencias || []) {
+        if (ev.requisito_id) {
+          (evidenciasPorRequisito[ev.requisito_id] = evidenciasPorRequisito[ev.requisito_id] || []).push(ev);
+        } else {
+          observacoesGerais.push(ev);
+        }
+      }
+
+      const linhasRequisito = requisitos.map((r) => {
+        const evs = evidenciasPorRequisito[r.id] || [];
+        const ehContraditorio = contraditorios.has(r.id);
+        let marcador;
+        let classeBadge = 'neutro';
+        if (r.nivel_exigido === 'eliminatorio') {
+          const sinal = sinaisEliminatorio[r.id] ? sinaisEliminatorio[r.id].sinal : 'sem_evidencia';
+          marcador = SINAL_ELIMINATORIO_LABEL[sinal];
+          classeBadge = sinal === 'atende' ? 'sucesso' : sinal === 'nao_atende' ? 'perigo' : sinal === 'conflitante' ? 'aviso' : 'neutro';
+        } else {
+          const info = porRequisito[r.id];
+          marcador = info && info.score != null ? `${Math.round(info.score * 100)}%` : 'Sem evidência';
+          classeBadge = info && info.score != null ? (info.score >= 0.7 ? 'sucesso' : info.score >= 0.4 ? 'aviso' : 'perigo') : 'neutro';
+        }
+        return `
+          <div class="evidencia-requisito${ehContraditorio ? ' contraditorio' : ''}" style="padding:10px 0; border-top:1px solid var(--border)">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+              <strong style="font-size:13px">${r.capacidade}</strong>
+              <span class="badge neutro">${r.nivel_exigido}</span>
+              <span class="badge ${classeBadge}">${marcador}${ehContraditorio ? ' · contradição' : ''}</span>
+              <a class="acao" href="#" data-requisito="${r.id}" data-capacidade="${r.capacidade}" style="margin-left:auto">+ evidência</a>
+            </div>
+            ${evs.length ? `<ul class="evidencia-lista" style="margin:6px 0 0; padding-left:18px; font-size:13px">${evs.map(linhaEvidencia).join('')}</ul>` : '<p class="campo-ajuda">Nenhuma evidência registrada ainda — ausência não penaliza.</p>'}
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="detalhe-evidencias-conteudo" style="padding:16px 20px; border-top:1px solid var(--border)">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+            <strong style="font-size:13px">Evidências e aderência por requisito</strong>
+            <a class="acao" href="#" id="btn-nova-evidencia">+ Observação geral</a>
+          </div>
+          ${requisitos.length ? linhasRequisito : '<p class="campo-ajuda">Esta vaga não tem requisitos estruturados definidos.</p>'}
+          ${observacoesGerais.length ? `
+            <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border)">
+              <strong style="font-size:12px">Observações gerais (contexto — nunca muda um score)</strong>
+              <ul class="evidencia-lista" style="margin:6px 0 0; padding-left:18px; font-size:13px">${observacoesGerais.map(linhaEvidencia).join('')}</ul>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function formularioEvidencia(c, vaga, requisitoPreSelecionado) {
+      const requisitos = vaga.requisitos_estruturados || [];
+      const opcoesRequisito = requisitos.map((r) => `<option value="${r.id}"${requisitoPreSelecionado && requisitoPreSelecionado.requisitoId === r.id ? ' selected' : ''}>${r.capacidade} (${r.nivel_exigido})</option>`).join('');
+      abrirModal(
+        `<h3>Nova evidência${requisitoPreSelecionado ? ` — ${requisitoPreSelecionado.capacidade}` : ''}</h3>`,
+        `
+          <form id="form-evidencia">
+            <label for="ev-requisito">Requisito</label>
+            <select id="ev-requisito">
+              <option value="">Observação geral (não muda score nenhum)</option>
+              ${opcoesRequisito}
+            </select>
+            <label for="ev-fonte" style="margin-top:10px; display:block">Origem</label>
+            <select id="ev-fonte">
+              <option value="entrevista">Entrevista</option>
+              <option value="manual">Anotação manual</option>
+            </select>
+            <label for="ev-efeito" style="margin-top:10px; display:block">Efeito</label>
+            <select id="ev-efeito">
+              <option value="corrobora">Corrobora o requisito</option>
+              <option value="parcial">Atende parcialmente</option>
+              <option value="contradiz">Contradiz o requisito</option>
+              <option value="contexto">Só contexto (não muda o score)</option>
+            </select>
+            <label for="ev-texto" style="margin-top:10px; display:block">O que foi observado</label>
+            <textarea id="ev-texto" rows="3" style="width:100%; box-sizing:border-box; font:inherit" required></textarea>
+            <div class="modal-erro" id="msg-evidencia"></div>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-evidencia">Cancelar</button>
+              <button type="submit" class="btn">Registrar</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-evidencia').addEventListener('click', fecharModal);
+      document.getElementById('form-evidencia').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-evidencia');
+        const payload = {
+          requisito_id: document.getElementById('ev-requisito').value || null,
+          fonte: document.getElementById('ev-fonte').value,
+          efeito: document.getElementById('ev-efeito').value,
+          texto: document.getElementById('ev-texto').value,
+        };
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/evidencias`, { method: 'POST', body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          msg.textContent = dados.error || 'Falha ao registrar evidência';
+          return;
+        }
         fecharModal();
         renderizarDetalhe();
       });
