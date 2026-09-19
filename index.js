@@ -1587,9 +1587,13 @@ async function build() {
     if (!process.env.ADMIN_INTERNAL_TOKEN || token !== process.env.ADMIN_INTERNAL_TOKEN) {
       return reply.code(401).send({ error: 'Não autorizado' });
     }
+    const { tenant_id: tenantId } = request.query || {};
     const { rows } = await pool.query(
       `select id, tenant_id, telefone_e164, template_nome, gatilho, status, criado_em
-       from whatsapp_disparos order by criado_em desc limit 1000`
+       from whatsapp_disparos
+       ${tenantId ? 'where tenant_id = $1' : ''}
+       order by criado_em desc limit 1000`,
+      tenantId ? [tenantId] : []
     );
     return { disparos: rows };
   });
