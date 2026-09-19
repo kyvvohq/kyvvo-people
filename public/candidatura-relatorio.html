@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Relatório de leitura integral</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid #E7EAF2; background:#fff; }
+  .logo { display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; }
+  .logo .marca-k { width:28px; height:28px; border-radius:8px; background:#0F111A; color:#fff;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .logo .nome { font-size:15px; font-weight:700; }
+  a.voltar { color:#6B7385; text-decoration:none; font-size:13px; }
+  a.voltar:hover { color:#0F111A; }
+  main { max-width:760px; margin:0 auto; padding:32px; }
+  .card { background:#fff; border:1px solid #E7EAF2; border-radius:16px; padding:24px; margin-bottom:24px; }
+  h1 { font-family:'Space Grotesk',sans-serif; }
+  h2 { font-size:12px; color:#6B7385; margin:0 0 16px; text-transform:uppercase; letter-spacing:.06em; }
+
+  .topo { text-align:center; margin-bottom:28px; }
+  .topo h1 { font-size:22px; margin:0 0 6px; }
+  .topo .sub { color:#6B7385; font-size:13px; }
+  .percentil { display:inline-flex; flex-direction:column; align-items:center; gap:2px; margin-top:16px; background:#F1EEFF;
+    border-radius:16px; padding:16px 28px; }
+  .percentil .num { font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; color:#4E33C4; }
+  .percentil .label { font-size:11px; color:#6B7385; text-transform:uppercase; letter-spacing:.04em; }
+  .aviso-percentil { font-size:12px; color:#6B7385; margin-top:8px; max-width:440px; margin-left:auto; margin-right:auto; }
+
+  .badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; display:inline-block; }
+  .badge.sucesso { background:#12B76A1A; color:#0C7A47; }
+  .badge.aviso { background:#F790091F; color:#B54708; }
+  .badge.perigo { background:#F044381A; color:#B42318; }
+  .badge.neutro { background:#F1F3F8; color:#6B7385; }
+
+  .item-requisito { padding:14px 0; border-top:1px solid #E7EAF2; }
+  .item-requisito:first-child { border-top:none; padding-top:0; }
+  .item-requisito .cab { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .item-requisito .cab strong { font-size:13.5px; }
+  .item-requisito ul.evidencias { margin:6px 0 0; padding-left:18px; font-size:12.5px; line-height:1.7; color:#2B3040; }
+  .item-requisito .origem { color:#6B7385; }
+
+  .contradicao-box { background:#F044381A; border-radius:12px; padding:14px 16px; margin-top:10px; }
+  .contradicao-box h4 { font-size:11px; color:#B42318; text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px; }
+
+  .vazio { color:#6B7385; font-size:13px; padding:8px 0; }
+
+  .rel-secao ul { margin:0; padding-left:18px; font-size:13px; line-height:1.8; color:#2B3040; }
+  .rel-secao h3 { font-size:12px; margin:0 0 8px; }
+  .rel-secao.fortes h3 { color:#12B76A; }
+  .rel-secao.atencao h3 { color:#B54708; }
+
+  button, .btn { background:#7C5CFC; color:#fff; font-weight:600; border:none; border-radius:12px;
+    height:40px; padding:0 20px; font-size:14px; cursor:pointer; }
+  button:hover { background:#6344E8; }
+  .acoes { display:flex; gap:10px; justify-content:center; margin-top:20px; }
+  a.link-secundario { color:#7C5CFC; font-size:12.5px; text-decoration:none; }
+  a.link-secundario:hover { text-decoration:underline; }
+
+  @media print {
+    .no-print { display:none !important; }
+    body { background:#fff; }
+    main { max-width:100%; padding:0 16px; }
+    .card { border:none; box-shadow:none; padding:12px 0; margin-bottom:12px; break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+  <header class="no-print">
+    <a class="logo" href="/people/painel.html" aria-label="Ir para o início"><div class="marca-k">k</div><div class="nome">Kyvvo People</div></a>
+    <a class="voltar" href="/people/candidatos.html">← Voltar aos candidatos</a>
+  </header>
+  <main id="conteudo">Carregando...</main>
+
+<script>
+  const token = localStorage.getItem('people_token');
+  if (!token) window.location.href = '/people/login.html';
+  const id = new URLSearchParams(window.location.search).get('id');
+
+  async function apiFetch(url) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.status === 401) { window.location.href = '/people/login.html'; throw new Error('Sessão expirada'); }
+    return res;
+  }
+
+  const EFEITO_LABEL = { corrobora: 'Corrobora', contradiz: 'Contradiz', parcial: 'Parcial', contexto: 'Contexto' };
+  const SINAL_ELIMINATORIO_LABEL = { sem_evidencia: 'Sem evidência', atende: 'Atende', nao_atende: 'Não atende', conflitante: 'Conflitante' };
+
+  // "Cada afirmação do relatório carrega a evidência de origem e seu grau"
+  // (Handoff v2, Parte 5.5) — nunca uma frase solta sem apontar de onde veio.
+  function listaEvidencias(evs) {
+    if (!evs.length) return '';
+    return `<ul class="evidencias">${evs.map((ev) => `<li>${ev.texto} <span class="origem">— ${EFEITO_LABEL[ev.efeito] || ev.efeito} · ${ev.fonte}</span></li>`).join('')}</ul>`;
+  }
+
+  // Monta os 3 blocos SEM chamada de LLM (Handoff v2, Parte 5.5) — tudo
+  // derivado do que já foi calculado por lib/aderencia.js (#47/#60) e das
+  // evidências já registradas (#50/#56); texto é só apresentação.
+  function montarBlocosAderencia(candidatura, vaga, evidData) {
+    const requisitos = vaga.requisitos_estruturados || [];
+    const aderencia = candidatura.aderencia || { porRequisito: [], eliminatorios: [], contraditorios: [] };
+    const porRequisito = Object.fromEntries((aderencia.porRequisito || []).map((r) => [r.requisitoId, r]));
+    const sinaisEliminatorio = Object.fromEntries((aderencia.eliminatorios || []).map((r) => [r.requisitoId, r]));
+    const contraditorios = new Set(evidData.requisitos_contraditorios || aderencia.contraditorios || []);
+    const evidenciasPorRequisito = {};
+    for (const ev of evidData.evidencias || []) {
+      if (!ev.requisito_id) continue;
+      (evidenciasPorRequisito[ev.requisito_id] = evidenciasPorRequisito[ev.requisito_id] || []).push(ev);
+    }
+
+    const meritos = [];
+    const verificar = [];
+    const contradicoesHtml = [];
+
+    for (const r of requisitos) {
+      const evs = evidenciasPorRequisito[r.id] || [];
+      const ehContraditorio = contraditorios.has(r.id);
+
+      if (ehContraditorio) {
+        contradicoesHtml.push(`
+          <div class="contradicao-box">
+            <h4>${r.capacidade} — evidências em conflito</h4>
+            ${listaEvidencias(evs)}
+          </div>`);
+        continue; // contradição fica só no bloco próprio (Regra 0.4), não duplica em mérito/lacuna
+      }
+
+      if (r.nivel_exigido === 'eliminatorio') {
+        const sinal = sinaisEliminatorio[r.id] ? sinaisEliminatorio[r.id].sinal : 'sem_evidencia';
+        const badge = sinal === 'atende' ? 'sucesso' : sinal === 'nao_atende' ? 'perigo' : 'neutro';
+        const html = `
+          <div class="item-requisito">
+            <div class="cab"><strong>${r.capacidade}</strong> <span class="badge neutro">eliminatório</span> <span class="badge ${badge}">${SINAL_ELIMINATORIO_LABEL[sinal]}</span></div>
+            ${evs.length ? listaEvidencias(evs) : '<p class="vazio">Sem evidência ainda — não é reprovação, é lacuna a verificar.</p>'}
+          </div>`;
+        if (sinal === 'atende') meritos.push(html); else verificar.push(html);
+        continue;
+      }
+
+      const info = porRequisito[r.id];
+      const score = info ? info.score : null;
+      const html = `
+        <div class="item-requisito">
+          <div class="cab"><strong>${r.capacidade}</strong> <span class="badge neutro">${r.nivel_exigido}</span>
+            <span class="badge ${score == null ? 'neutro' : score >= 0.7 ? 'sucesso' : score >= 0.4 ? 'aviso' : 'perigo'}">${score == null ? 'Sem evidência' : `${Math.round(score * 100)}%`}</span></div>
+          ${evs.length ? listaEvidencias(evs) : '<p class="vazio">Sem evidência ainda — ausência não penaliza, mas vale perguntar na entrevista.</p>'}
+        </div>`;
+      if (score != null && score >= 0.7) meritos.push(html);
+      else verificar.push(html);
+    }
+
+    return { meritos, verificar, contradicoesHtml };
+  }
+
+  async function carregar() {
+    const el = document.getElementById('conteudo');
+    try {
+      const candidaturaRes = await apiFetch(`/people/api/candidaturas/${id}`);
+      if (!candidaturaRes.ok) { el.textContent = 'Candidatura não encontrada.'; return; }
+      const candidatura = await candidaturaRes.json();
+
+      const [vagaRes, evidRes] = await Promise.all([
+        apiFetch(`/people/api/vagas/${candidatura.vaga_id}`),
+        apiFetch(`/people/api/candidaturas/${id}/evidencias`),
+      ]);
+      const vaga = vagaRes.ok ? await vagaRes.json() : { requisitos_estruturados: [] };
+      const evidData = evidRes.ok ? await evidRes.json() : { evidencias: [], requisitos_contraditorios: [] };
+
+      let comportamental = null;
+      if (candidatura.avaliacao_id) {
+        const avaliacaoRes = await apiFetch(`/people/api/avaliacoes/${candidatura.avaliacao_id}/relatorio`);
+        if (avaliacaoRes.ok) comportamental = await avaliacaoRes.json();
+      }
+
+      const { meritos, verificar, contradicoesHtml } = montarBlocosAderencia(candidatura, vaga, evidData);
+      const percentil = candidatura.aderencia && candidatura.aderencia.percentil;
+
+      el.innerHTML = `
+        <div class="topo">
+          <h1>${candidatura.nome}</h1>
+          <div class="sub">${candidatura.vaga_nome}</div>
+          ${percentil != null ? `
+            <div class="percentil">
+              <div class="num">${percentil}º</div>
+              <div class="label">percentil no pool</div>
+            </div>
+            <p class="aviso-percentil">Este número é sempre relativo aos outros candidatos desta vaga — não existe corte automático nem "nota mínima" (o motor só sinaliza, quem decide é você).</p>
+          ` : '<p class="aviso-percentil">Ainda sem evidências suficientes pra calcular um percentil nesta vaga.</p>'}
+        </div>
+
+        <div class="card">
+          <h2>Por que merece atenção</h2>
+          ${meritos.length ? meritos.join('') : '<p class="vazio">Nenhum requisito com evidência forte o bastante ainda.</p>'}
+        </div>
+
+        <div class="card">
+          <h2>O que verificar na entrevista</h2>
+          ${verificar.length ? verificar.join('') : '<p class="vazio">Nenhuma lacuna identificada nos requisitos estruturados desta vaga.</p>'}
+        </div>
+
+        ${contradicoesHtml.length ? `
+          <div class="card">
+            <h2>Contradições — não resolvidas automaticamente</h2>
+            ${contradicoesHtml.join('')}
+          </div>
+        ` : ''}
+
+        <div class="card">
+          <h2>Leitura comportamental (contexto, não veredito)</h2>
+          ${comportamental ? `
+            <div class="rel-secao fortes"><h3>Pontos fortes</h3><ul>${comportamental.resumo.pontosFortes.map((i) => `<li>${i}</li>`).join('')}</ul></div>
+            <div class="rel-secao atencao"><h3>Pontos de atenção</h3><ul>${comportamental.resumo.pontosAtencao.map((i) => `<li>${i}</li>`).join('')}</ul></div>
+            <p style="margin-top:14px"><a class="link-secundario no-print" href="/people/relatorio.html?id=${candidatura.avaliacao_id}">Ver relatório comportamental completo →</a></p>
+          ` : '<p class="vazio">Avaliação comportamental ainda não concluída pelo candidato.</p>'}
+        </div>
+
+        <div class="acoes no-print">
+          <button id="btn-imprimir">Exportar PDF (imprimir)</button>
+        </div>
+      `;
+
+      document.getElementById('btn-imprimir').addEventListener('click', () => window.print());
+    } catch (err) {
+      el.textContent = 'Não foi possível carregar o relatório.';
+    }
+  }
+
+  carregar();
+</script>
+</body>
+</html>

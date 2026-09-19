@@ -316,6 +316,7 @@
           <div class="detalhe-sem-preview">Carregando evidências...</div>
         </div>
         <div class="detalhe-acoes">
+          <a class="btn-secundario" href="/people/candidatura-relatorio.html?id=${c.id}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center">Relatório completo</a>
           ${c.curriculo_nome !== 'sem-arquivo' ? '<button class="btn-secundario" id="btn-download-curriculo" type="button">Baixar currículo</button>' : ''}
           <button class="btn-perigo" id="btn-reprovar" type="button"${c.status === 'reprovada' ? ' disabled' : ''}>Reprovar</button>
           <button class="btn" id="btn-proxima-etapa" type="button">Próxima etapa</button>
