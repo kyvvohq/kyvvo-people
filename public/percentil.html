@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Percentil</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){var m={escuro:'dark',claro:'light',dark:'dark',light:'light'};document.documentElement.setAttribute('data-theme',m[localStorage.getItem('people_tema')]||'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/people/shell.css">
+<style>
+  .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+  .filtros select { height:36px; min-width:220px; }
+  .aviso-percentil { padding:14px 16px; font-size:12.5px; color:var(--muted); border-bottom:1px solid var(--border); }
+  .percentil-num { font-family:var(--font-display); font-weight:700; font-size:16px; }
+  .resumo-mini { display:flex; gap:6px; flex-wrap:wrap; }
+  .vazio { padding:40px 16px; text-align:center; color:var(--muted); font-size:13.5px; }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/people/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img" src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">People</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <a class="menu-perfil-item" href="/people/configuracoes.html">
+          <span data-icon="settings" data-size="16"></span><span class="rotulo">Configurações</span>
+        </a>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <div class="sidebar-wrap">
+      <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Seleção</div>
+        <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
+        <a class="menu-item" href="/people/vagas.html"><span data-icon="briefcase"></span><span class="rotulo">Vagas</span></a>
+        <a class="menu-item" href="/people/candidatos.html"><span data-icon="users"></span><span class="rotulo">Candidatos</span></a>
+        <a class="menu-item" href="/people/avaliacoes.html"><span data-icon="brain"></span><span class="rotulo">Avaliações</span></a>
+      </nav>
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Gestão</div>
+        <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/people/percentil.html"><span data-icon="trending-up"></span><span class="rotulo">Percentil</span></a>
+        <a class="menu-item" href="/people/whatsapp.html"><span data-icon="message-circle"></span><span class="rotulo">WhatsApp</span></a>
+        <a class="menu-item" href="/people/automacoes.html"><span data-icon="zap"></span><span class="rotulo">Automações</span></a>
+        <div class="menu-item-grupo">
+          <button type="button" class="menu-item menu-item-toggle"><span data-icon="settings"></span><span class="rotulo">Configurações</span><span class="chevron" data-icon="chevron-down" data-size="14"></span></button>
+          <div class="menu-submenu">
+            <a class="menu-item" href="/people/configuracoes.html"><span class="rotulo">Geral</span></a>
+            <a class="menu-item" href="/people/plano-cobranca.html"><span class="rotulo">Plano e Cobrança</span></a>
+          </div>
+        </div>
+      </nav>
+      </aside>
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+    </div>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Percentil</h1></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="filtros">
+          <select id="filtro-vaga"></select>
+        </div>
+        <div class="aviso-percentil">
+          Visão adicional ao Quadro — mesma vaga, ordenada por aderência aos requisitos em vez de etapa. Não substitui o Kanban nem move ninguém de etapa; é só outra forma de olhar o mesmo pool. Percentil é sempre relativo aos candidatos desta vaga — nunca um corte automático.
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Candidato</th>
+              <th>Percentil</th>
+              <th>Resumo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tabela-percentil"></tbody>
+        </table>
+        <div class="vazio" id="vazio" hidden>Nenhuma candidatura nesta vaga ainda.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/people/shell.js"></script>
+  <script>
+    let vagas = [];
+
+    async function carregarVagas() {
+      const res = await apiFetch('/people/api/vagas');
+      vagas = await res.json();
+      const select = document.getElementById('filtro-vaga');
+      const vagaIdUrl = new URLSearchParams(window.location.search).get('vaga_id');
+      select.innerHTML = vagas.map((v) => `<option value="${v.id}">${v.nome}${v.status === 'encerrada' ? ' (encerrada)' : ''}</option>`).join('');
+      if (vagaIdUrl && vagas.some((v) => v.id === vagaIdUrl)) select.value = vagaIdUrl;
+      select.addEventListener('change', carregarPool);
+    }
+
+    // Resumo em 3 números — não é o relatório completo (isso é #51,
+    // candidatura-relatorio.html), é só o suficiente pra decidir em quem
+    // clicar. Derivado do que a API de pool já calcula (sem fetch extra por
+    // candidato): pontos fortes = requisito com score alto/eliminatório que
+    // atende; a verificar = sem evidência ou score baixo; contradição = já
+    // vem pronta em `contraditorios`.
+    function resumoMini(c) {
+      const porRequisito = c.porRequisito || [];
+      const eliminatorios = c.eliminatorios || [];
+      const fortes = porRequisito.filter((r) => r.score != null && r.score >= 0.7).length
+        + eliminatorios.filter((r) => r.sinal === 'atende').length;
+      const verificar = porRequisito.filter((r) => r.score == null || r.score < 0.7).length
+        + eliminatorios.filter((r) => r.sinal !== 'atende').length;
+      const contradicoes = (c.contraditorios || []).length;
+      const badges = [];
+      if (fortes) badges.push(`<span class="badge sucesso">${fortes} ponto${fortes > 1 ? 's' : ''} forte${fortes > 1 ? 's' : ''}</span>`);
+      if (verificar) badges.push(`<span class="badge aviso">${verificar} a verificar</span>`);
+      if (contradicoes) badges.push(`<span class="badge perigo">${contradicoes} contradição${contradicoes > 1 ? 'ões' : ''}</span>`);
+      if (!badges.length) badges.push('<span class="badge neutro">Sem evidências ainda</span>');
+      return `<div class="resumo-mini">${badges.join('')}</div>`;
+    }
+
+    async function carregarPool() {
+      const vagaId = document.getElementById('filtro-vaga').value;
+      const corpo = document.getElementById('tabela-percentil');
+      const vazio = document.getElementById('vazio');
+      if (!vagaId) { corpo.innerHTML = ''; vazio.hidden = false; return; }
+
+      corpo.innerHTML = `<tr><td colspan="4">Carregando...</td></tr>`;
+      vazio.hidden = true;
+      const res = await apiFetch(`/people/api/vagas/${vagaId}/aderencia`);
+      if (!res.ok) { corpo.innerHTML = `<tr><td colspan="4">Não foi possível carregar.</td></tr>`; return; }
+      const data = await res.json();
+      const candidaturas = data.candidaturas || [];
+
+      if (!candidaturas.length) { corpo.innerHTML = ''; vazio.hidden = false; return; }
+
+      corpo.innerHTML = candidaturas.map((c) => `
+        <tr>
+          <td>${c.nome}</td>
+          <td>${c.percentil != null ? `<span class="percentil-num">${c.percentil}º</span>` : '<span class="badge neutro">Sem dado</span>'}</td>
+          <td>${resumoMini(c)}</td>
+          <td><a class="acao" href="/people/candidatura-relatorio.html?id=${c.candidaturaId}" target="_blank" rel="noopener">Relatório completo →</a></td>
+        </tr>
+      `).join('');
+    }
+
+    (async function iniciar() {
+      await carregarVagas();
+      await carregarPool();
+    })();
+  </script>
+</body>
+</html>
