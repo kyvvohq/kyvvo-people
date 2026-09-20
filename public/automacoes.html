@@ -42,6 +42,9 @@
   .disparos-metrica .rotulo { font-size:12px; color:var(--muted); }
   .disparos-limite-estourado .valor { color:var(--danger); }
   .disparos-historico { margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
+  .abas-automacoes { display:flex; gap:20px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+  .aba-automacoes { background:none; border:none; padding:10px 2px; margin-bottom:-1px; font-size:14px; font-weight:600; color:var(--muted-strong); cursor:pointer; border-bottom:2px solid transparent; width:auto; height:auto; }
+  .aba-automacoes.ativa { color:var(--accent); border-bottom-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -116,32 +119,41 @@
         <button class="btn" id="btn-nova-automacao" type="button">+ Nova automação</button>
       </div>
 
-      <div class="card" style="padding:0">
-        <div class="filtros">
-          <select id="filtro-gatilho">
-            <option value="">Todos os gatilhos</option>
-            <option value="candidatura_criada">Candidatura recebida</option>
-            <option value="etapa_alcancada">Candidatura chega numa etapa</option>
-            <option value="candidatura_reprovada">Candidatura reprovada</option>
-            <option value="vaga_encerrada">Vaga encerrada</option>
-          </select>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Gatilho</th>
-              <th>Canal</th>
-              <th>Ativa</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="tabela-automacoes"></tbody>
-        </table>
-        <div class="estado-vazio-automacoes" id="estado-vazio" hidden>Nenhuma automação encontrada.</div>
+      <div class="abas-automacoes">
+        <button type="button" class="aba-automacoes ativa" id="aba-lista" data-aba="lista">Automações</button>
+        <button type="button" class="aba-automacoes" id="aba-disparos" data-aba="disparos">Disparos</button>
       </div>
 
-      <div class="card" id="card-disparos" style="margin-top:16px; padding:16px"></div>
+      <div id="conteudo-aba-lista">
+        <div class="card" style="padding:0">
+          <div class="filtros">
+            <select id="filtro-gatilho">
+              <option value="">Todos os gatilhos</option>
+              <option value="candidatura_criada">Candidatura recebida</option>
+              <option value="etapa_alcancada">Candidatura chega numa etapa</option>
+              <option value="candidatura_reprovada">Candidatura reprovada</option>
+              <option value="vaga_encerrada">Vaga encerrada</option>
+            </select>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Gatilho</th>
+                <th>Canal</th>
+                <th>Ativa</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabela-automacoes"></tbody>
+          </table>
+          <div class="estado-vazio-automacoes" id="estado-vazio" hidden>Nenhuma automação encontrada.</div>
+        </div>
+      </div>
+
+      <div id="conteudo-aba-disparos" hidden>
+        <div class="card" id="card-disparos" style="padding:16px"></div>
+      </div>
     </div>
   </div>
 
@@ -476,8 +488,6 @@
       bloqueado_24h: 'aviso',
       bloqueado_limite_plano: 'aviso',
     };
-    let historicoDisparosAberto = false;
-
     function formatarDataHoraDisparo(iso) {
       const d = new Date(iso);
       return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
@@ -521,9 +531,6 @@
             <div class="disparos-titulo">Disparos de WhatsApp</div>
             <div class="rotulo" style="font-size:12px; color:var(--muted)">Mensagens automáticas enviadas pelo fluxo de vaga.</div>
           </div>
-          <button type="button" class="btn-secundario" id="btn-toggle-historico-disparos">
-            ${historicoDisparosAberto ? 'Ocultar' : 'Ver'} histórico (${dados.total})
-          </button>
         </div>
         <div class="disparos-resumo">
           <div class="disparos-metrica">
@@ -536,25 +543,35 @@
           </div>
           ${blocoLimite}
         </div>
-        ${historicoDisparosAberto ? `
         <div class="disparos-historico">
           <table>
             <thead><tr><th>Data/hora</th><th>Telefone</th><th>Template</th><th>Status</th></tr></thead>
             <tbody>${dados.disparos.map(renderLinhaDisparo).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--muted)">Nenhum disparo ainda.</td></tr>'}</tbody>
           </table>
-        </div>` : ''}
+        </div>
       `;
     }
 
+    let disparosCarregados = false;
     async function carregarDisparos() {
+      const card = document.getElementById('card-disparos');
+      card.innerHTML = '<div class="estado-vazio-automacoes">Carregando...</div>';
       const res = await apiFetch('/people/api/automacoes/disparos');
       const dados = await res.json();
-      const card = document.getElementById('card-disparos');
       card.innerHTML = renderCardDisparos(dados);
-      const btn = document.getElementById('btn-toggle-historico-disparos');
-      if (btn) btn.addEventListener('click', () => { historicoDisparosAberto = !historicoDisparosAberto; carregarDisparos(); });
+      disparosCarregados = true;
     }
-    carregarDisparos();
+
+    document.querySelectorAll('.aba-automacoes').forEach((botao) => {
+      botao.addEventListener('click', () => {
+        const aba = botao.dataset.aba;
+        document.querySelectorAll('.aba-automacoes').forEach((b) => b.classList.toggle('ativa', b === botao));
+        document.getElementById('conteudo-aba-lista').hidden = aba !== 'lista';
+        document.getElementById('conteudo-aba-disparos').hidden = aba !== 'disparos';
+        document.getElementById('btn-nova-automacao').hidden = aba !== 'lista';
+        if (aba === 'disparos' && !disparosCarregados) carregarDisparos();
+      });
+    });
   </script>
 </body>
 </html>
