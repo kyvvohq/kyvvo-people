@@ -2,8 +2,19 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, parametroBotaoParaTemplate,
-  resolverPorCanal, detectarOptOut, SEEDS, registrarDisparo,
+  resolverPorCanal, detectarOptOut, SEEDS, registrarDisparo, limiteDoPlanoExcedido,
 } = require('../lib/automacoes');
+const planosPeople = require('../lib/planos');
+
+// Mockado uma única vez pro módulo inteiro: `limiteDoPlanoExcedido` cacheia
+// o catálogo por 5min internamente, então trocar o mock entre testes não
+// teria efeito no 2º teste em diante — por isso a lista cobre todos os
+// casos de uma vez (plano com limite, sem limite, e um chave que não existe
+// simula "não achou").
+planosPeople.buscarPlanos = async () => ([
+  { chave: 'people_start', limite_disparos: 10 },
+  { chave: 'people_professional', limite_disparos: null },
+]);
 
 test('renderizar: substitui todos os placeholders presentes', () => {
   const resultado = renderizar('Olá, {{nome}}! Vaga: {{vaga}}.', { nome: 'Ana', vaga: 'Dev Backend' });
@@ -232,4 +243,29 @@ test('registrarDisparo: template/gatilho ausentes viram null em vez de undefined
   const [, , , template, gatilho] = chamadas[0].params;
   assert.equal(template, null);
   assert.equal(gatilho, null);
+});
+
+test('limiteDoPlanoExcedido: sem planoChave (trial) nunca trava', async () => {
+  const pool = { query: async () => { throw new Error('não deveria consultar o banco'); } };
+  assert.equal(await limiteDoPlanoExcedido(pool, 't1', null), false);
+});
+
+test('limiteDoPlanoExcedido: plano com limite_disparos null nunca trava', async () => {
+  const pool = { query: async () => { throw new Error('não deveria consultar o banco'); } };
+  assert.equal(await limiteDoPlanoExcedido(pool, 't1', 'people_professional'), false);
+});
+
+test('limiteDoPlanoExcedido: plano com limite, abaixo não trava', async () => {
+  const pool = { query: async () => ({ rows: [{ total: 9 }] }) };
+  assert.equal(await limiteDoPlanoExcedido(pool, 't1', 'people_start'), false);
+});
+
+test('limiteDoPlanoExcedido: plano com limite, no limite exato já trava', async () => {
+  const pool = { query: async () => ({ rows: [{ total: 10 }] }) };
+  assert.equal(await limiteDoPlanoExcedido(pool, 't1', 'people_start'), true);
+});
+
+test('limiteDoPlanoExcedido: plano desconhecido (não achado no catálogo) não trava', async () => {
+  const pool = { query: async () => { throw new Error('não deveria consultar o banco'); } };
+  assert.equal(await limiteDoPlanoExcedido(pool, 't1', 'plano_que_nao_existe'), false);
 });
