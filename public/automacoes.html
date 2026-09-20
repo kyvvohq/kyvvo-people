@@ -35,6 +35,13 @@
   .preview-whatsapp .bolha { background:#dcf8c6; border-radius:8px 8px 8px 2px; padding:10px 12px; font-size:13.5px; line-height:1.5; color:#111b21; max-width:280px; white-space:pre-wrap; box-shadow:0 1px 1px rgba(0,0,0,.1); }
   .preview-whatsapp .bolha-botao { margin-top:2px; max-width:280px; background:#dcf8c6; border-top:1px solid rgba(0,0,0,.08); border-radius:0 0 8px 2px; padding:8px 12px; font-size:13px; color:#00a5f4; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
   .estado-vazio-automacoes { padding:40px 20px; text-align:center; color:var(--muted); }
+  .disparos-cabecalho { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .disparos-titulo { font-weight:700; font-size:14px; color:var(--text); margin-bottom:2px; }
+  .disparos-resumo { display:flex; gap:20px; flex-wrap:wrap; margin-top:10px; }
+  .disparos-metrica .valor { font-family:var(--font-display); font-size:22px; color:var(--text); }
+  .disparos-metrica .rotulo { font-size:12px; color:var(--muted); }
+  .disparos-limite-estourado .valor { color:var(--danger); }
+  .disparos-historico { margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
 </style>
 </head>
 <body>
@@ -133,6 +140,8 @@
         </table>
         <div class="estado-vazio-automacoes" id="estado-vazio" hidden>Nenhuma automação encontrada.</div>
       </div>
+
+      <div class="card" id="card-disparos" style="margin-top:16px; padding:16px"></div>
     </div>
   </div>
 
@@ -449,6 +458,103 @@
     }
 
     carregar();
+
+    // Relatório de disparos do próprio tenant (US Bruno 2026-09-20 — o
+    // cliente vê o mesmo total/realizados/limite do plano que o admin já
+    // via, sem depender do admin pra saber quanto falta no mês).
+    const STATUS_DISPARO_LABEL = {
+      enviado: 'Enviado',
+      erro: 'Erro no envio',
+      bloqueado_optout: 'Bloqueado (opt-out)',
+      bloqueado_24h: 'Bloqueado (24h)',
+      bloqueado_limite_plano: 'Bloqueado (limite do plano)',
+    };
+    const STATUS_DISPARO_BADGE = {
+      enviado: 'sucesso',
+      erro: 'perigo',
+      bloqueado_optout: 'aviso',
+      bloqueado_24h: 'aviso',
+      bloqueado_limite_plano: 'aviso',
+    };
+    let historicoDisparosAberto = false;
+
+    function formatarDataHoraDisparo(iso) {
+      const d = new Date(iso);
+      return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    function renderLinhaDisparo(d) {
+      const classe = STATUS_DISPARO_BADGE[d.status] || 'neutro';
+      return `
+        <tr>
+          <td>${formatarDataHoraDisparo(d.criado_em)}</td>
+          <td>${d.telefone_e164 || '—'}</td>
+          <td>${d.template_nome || '—'}</td>
+          <td><span class="badge ${classe}">${STATUS_DISPARO_LABEL[d.status] || d.status}</span></td>
+        </tr>
+      `;
+    }
+
+    function renderCardDisparos(dados) {
+      const limite = dados.limitePlano;
+      let blocoLimite = '';
+      if (limite) {
+        if (limite.limite == null) {
+          blocoLimite = `
+            <div class="disparos-metrica">
+              <div class="valor">${limite.usadoMesAtual}</div>
+              <div class="rotulo">Disparos este mês (plano ${limite.planoNome} — sem limite)</div>
+            </div>`;
+        } else {
+          const estourou = limite.usadoMesAtual >= limite.limite;
+          blocoLimite = `
+            <div class="disparos-metrica${estourou ? ' disparos-limite-estourado' : ''}">
+              <div class="valor">${limite.usadoMesAtual} / ${limite.limite}</div>
+              <div class="rotulo">Uso do mês (plano ${limite.planoNome})${estourou ? ' — limite atingido' : ''}</div>
+            </div>`;
+        }
+      }
+
+      return `
+        <div class="disparos-cabecalho">
+          <div>
+            <div class="disparos-titulo">Disparos de WhatsApp</div>
+            <div class="rotulo" style="font-size:12px; color:var(--muted)">Mensagens automáticas enviadas pelo fluxo de vaga.</div>
+          </div>
+          <button type="button" class="btn-secundario" id="btn-toggle-historico-disparos">
+            ${historicoDisparosAberto ? 'Ocultar' : 'Ver'} histórico (${dados.total})
+          </button>
+        </div>
+        <div class="disparos-resumo">
+          <div class="disparos-metrica">
+            <div class="valor">${dados.total}</div>
+            <div class="rotulo">Total de disparos</div>
+          </div>
+          <div class="disparos-metrica">
+            <div class="valor">${dados.realizados}</div>
+            <div class="rotulo">Realizados com sucesso</div>
+          </div>
+          ${blocoLimite}
+        </div>
+        ${historicoDisparosAberto ? `
+        <div class="disparos-historico">
+          <table>
+            <thead><tr><th>Data/hora</th><th>Telefone</th><th>Template</th><th>Status</th></tr></thead>
+            <tbody>${dados.disparos.map(renderLinhaDisparo).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--muted)">Nenhum disparo ainda.</td></tr>'}</tbody>
+          </table>
+        </div>` : ''}
+      `;
+    }
+
+    async function carregarDisparos() {
+      const res = await apiFetch('/people/api/automacoes/disparos');
+      const dados = await res.json();
+      const card = document.getElementById('card-disparos');
+      card.innerHTML = renderCardDisparos(dados);
+      const btn = document.getElementById('btn-toggle-historico-disparos');
+      if (btn) btn.addEventListener('click', () => { historicoDisparosAberto = !historicoDisparosAberto; carregarDisparos(); });
+    }
+    carregarDisparos();
   </script>
 </body>
 </html>
