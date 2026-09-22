@@ -83,32 +83,38 @@
     </div>
   </header>
   <div class="app-shell">
-    <div class="sidebar-wrap">
-      <aside class="painel-sidebar" id="painel-sidebar">
-      <nav class="grupo-menu">
-        <div class="grupo-titulo">Seleção</div>
-        <a class="menu-item" href="/people/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Visão geral</span></a>
-        <a class="menu-item" href="/people/vagas.html"><span data-icon="briefcase"></span><span class="rotulo">Vagas</span></a>
-        <a class="menu-item" href="/people/candidatos.html"><span data-icon="users"></span><span class="rotulo">Candidatos</span></a>
-        <a class="menu-item" href="/people/avaliacoes.html"><span data-icon="brain"></span><span class="rotulo">Avaliações</span></a>
-      </nav>
-      <nav class="grupo-menu">
-        <div class="grupo-titulo">Gestão</div>
-        <a class="menu-item" href="/people/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
-        <a class="menu-item" href="/people/percentil.html"><span data-icon="trending-up"></span><span class="rotulo">Percentil</span></a>
-        <div class="menu-item-grupo">
-          <button type="button" class="menu-item menu-item-toggle"><span data-icon="settings"></span><span class="rotulo">Configurações</span><span class="chevron" data-icon="chevron-down" data-size="14"></span></button>
-          <div class="menu-submenu">
-            <a class="menu-item" href="/people/whatsapp.html"><span class="rotulo">WhatsApp</span></a>
-            <a class="menu-item" href="/people/automacoes.html"><span class="rotulo">Automações</span></a>
-            <a class="menu-item" href="/people/configuracoes.html"><span class="rotulo">Geral</span></a>
-            <a class="menu-item" href="/people/plano-cobranca.html"><span class="rotulo">Plano e Cobrança</span></a>
-          </div>
-        </div>
-      </nav>
-      </aside>
-      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
-    </div>
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <div class="ds-menu-topo">
+        <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+      <div class="ds-menu-secao-titulo">Seleção</div>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/people/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Visão geral</span></a></li>
+        <li><a class="ds-menu-link" href="/people/vagas.html"><span class="ds-menu-icone" data-icon="briefcase"></span><span class="ds-menu-rotulo">Vagas</span></a></li>
+        <li><a class="ds-menu-link" href="/people/candidatos.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Candidatos</span></a></li>
+        <li><a class="ds-menu-link" href="/people/avaliacoes.html"><span class="ds-menu-icone" data-icon="brain"></span><span class="ds-menu-rotulo">Avaliações</span></a></li>
+      </ul>
+      <div class="ds-menu-secao-titulo">Gestão</div>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/people/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/people/percentil.html"><span class="ds-menu-icone" data-icon="trending-up"></span><span class="ds-menu-rotulo">Percentil</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/people/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/people/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/people/configuracoes.html">Geral</a></li>
+            <li><a class="ds-menu-sublink" href="/people/plano-cobranca.html">Plano e Cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
 
     <div class="painel-main">
       <div class="cabecalho-pagina">
