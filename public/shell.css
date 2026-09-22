@@ -57,40 +57,17 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 
 .app-shell { display:flex; flex:1; gap:var(--space-5); padding:var(--space-5); align-items:flex-start; }
 
-/* Sidebar — navegação (logo e perfil agora vivem no cabeçalho) */
-.sidebar-wrap { position:relative; flex-shrink:0; }
-.painel-sidebar { width:264px; flex-shrink:0; background:var(--card); border:1px solid var(--border);
-  border-radius:var(--radius-lg); padding:18px 14px; display:flex; flex-direction:column; gap:22px; }
-.painel-sidebar.sidebar-oculta { display:none; }
+/* Sidebar — componente data-ds-menu do @kyvvohq/design-system (v2.6.0, ver
+   components.css). O .ds-menu já é a "sidebar" (largura, fundo, borda), sem
+   wrapper próprio (era .painel-sidebar/.sidebar-wrap antes da padronização). */
+.ds-menu-secao-titulo { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px;
+  padding:0 var(--space-3); margin:var(--space-2) 0 5px; }
+.ds-menu-recolhido .ds-menu-secao-titulo { display:none; }
 
-.grupo-menu { display:flex; flex-direction:column; gap:3px; }
-.grupo-titulo { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px;
-  padding:0 12px; margin-bottom:5px; }
-.menu-item { display:flex; align-items:center; gap:11px; height:40px; padding:0 12px; border-radius:var(--radius-md);
-  color:var(--muted-strong); font-size:14px; font-weight:500; text-decoration:none; }
-.menu-item:hover { background:var(--surface-muted); }
-.menu-item.active { background:var(--accent-tint); color:var(--accent-strong); font-weight:600; }
-.menu-item svg { flex-shrink:0; color:inherit; }
-.menu-item .rotulo { flex:1; min-width:0; }
-.menu-item .contador { height:20px; padding:0 7px; border-radius:var(--radius-full); background:var(--border);
-  color:var(--muted-strong); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
-
-/* Item de menu com submenu expansível (ex: Configurações > Geral / Plano e
-   Cobrança) — botão reaproveita a aparência de .menu-item, só troca <a> por
-   <button> (reset de background/border/largura). */
-.menu-item-toggle { background:transparent; border:none; width:100%; text-align:left; cursor:pointer; font-family:var(--font-ui); }
-.menu-item-toggle .chevron { margin-left:auto; color:var(--muted); transition:transform .15s ease; flex-shrink:0; }
-.menu-item-grupo.expandido .menu-item-toggle .chevron { transform:rotate(180deg); }
-.menu-item-grupo.tem-filho-ativo > .menu-item-toggle { color:var(--accent-strong); font-weight:600; }
-.menu-submenu { display:none; flex-direction:column; gap:2px; padding-left:16px; margin-top:2px; }
-.menu-item-grupo.expandido .menu-submenu { display:flex; }
-.menu-submenu .menu-item { height:36px; font-size:13.5px; }
-
-.btn-toggle-sidebar { position:absolute; top:22px; right:-11px; width:22px; height:22px;
-  display:flex; align-items:center; justify-content:center; background:var(--card);
-  border:1px solid var(--border-strong); border-radius:var(--radius-full); color:var(--muted); font-size:12px;
-  cursor:pointer; z-index:10; }
-.btn-toggle-sidebar:hover { background:var(--surface-muted); color:var(--text); }
+/* Item que agrupa um submenu (hoje só Configurações) fica destacado quando um
+   filho está ativo — o DS não cobre esse caso (só o link/sublink ativo em
+   si), então isso continua sendo do produto. */
+.ds-menu-grupo-botao.tem-filho-ativo { color: var(--accent-strong); background: var(--accent-tint); font-weight: 600; }
 
 .painel-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--space-5); }
 
@@ -115,9 +92,32 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 @media(max-width:860px) {
   .topo-app { padding:0 var(--space-3); }
   .topo-perfil-gatilho .nome { display:none; }
-  .app-shell { flex-direction:column; padding:var(--space-3); }
-  .painel-sidebar { width:100%; }
-  .btn-toggle-sidebar { display:none; }
+  .app-shell { flex-direction:column; padding:var(--space-3); gap:var(--space-3); }
+  .ds-menu {
+    width:100%;
+    flex-direction:row;
+    align-items:center;
+    border-right:none;
+    border-bottom:1px solid var(--border);
+    padding:var(--space-2) var(--space-3);
+    overflow-x:auto;
+  }
+  .ds-menu-topo { display:none; }
+  .ds-menu-lista { flex-direction:row; gap:4px; }
+  .ds-menu-secao-titulo { display:none; }
+  .ds-menu-grupo { position:relative; }
+  .ds-menu-sub {
+    position:absolute;
+    top:100%;
+    left:0;
+    z-index:5;
+    margin-top:4px;
+    padding:var(--space-2);
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    box-shadow:0 4px 12px rgba(0, 0, 0, 0.08);
+  }
 }
 
 /* Cabeçalho de página */

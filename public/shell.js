@@ -66,36 +66,33 @@ document.querySelectorAll('[data-icon]').forEach((el) => {
   el.innerHTML = icon(el.dataset.icon, Number(el.dataset.size) || 18);
 });
 
-// --- Sidebar colapsável ---
+// --- Sidebar (componente data-ds-menu do @kyvvohq/design-system, v2.6.0) ---
+// Recolher/expandir (só ícones ↔ 248px) e o clique nos grupos já são
+// tratados pelo components.js do DS; aqui só aplicamos o estado salvo antes
+// de ele hidratar (evita flash) e persistimos a escolha em localStorage
+// via o evento que ele dispara.
 const painelSidebar = document.getElementById('painel-sidebar');
-const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
-function aplicarSidebarOculta(oculta) {
-  painelSidebar.classList.toggle('sidebar-oculta', oculta);
-  btnToggleSidebar.textContent = oculta ? '>' : '<';
-  const rotulo = oculta ? 'Exibir menu' : 'Ocultar menu';
-  btnToggleSidebar.setAttribute('aria-label', rotulo);
-  btnToggleSidebar.title = rotulo;
+if (localStorage.getItem('people_sidebar_oculta') === '1') {
+  painelSidebar.setAttribute('data-ds-menu-recolhido', '');
 }
-aplicarSidebarOculta(localStorage.getItem('people_sidebar_oculta') === '1');
-btnToggleSidebar.addEventListener('click', () => {
-  const oculta = !painelSidebar.classList.contains('sidebar-oculta');
-  aplicarSidebarOculta(oculta);
-  localStorage.setItem('people_sidebar_oculta', oculta ? '1' : '0');
+painelSidebar.addEventListener('ds-menu-alternar', (e) => {
+  localStorage.setItem('people_sidebar_oculta', e.detail.recolhido ? '1' : '0');
 });
 
 // Marca o item ativo pela URL atual (páginas separadas, não SPA).
-document.querySelectorAll('.menu-item[href]').forEach((item) => {
-  if (item.getAttribute('href') === window.location.pathname) item.classList.add('active');
-});
-
-// --- Submenu expansível (ex: Configurações > Geral / Plano e Cobrança) ---
-document.querySelectorAll('.menu-item-toggle').forEach((btn) => {
-  btn.addEventListener('click', () => btn.closest('.menu-item-grupo').classList.toggle('expandido'));
+document.querySelectorAll('.ds-menu-link[href], .ds-menu-sublink[href]').forEach((item) => {
+  if (item.getAttribute('href') !== window.location.pathname) return;
+  item.classList.add(item.classList.contains('ds-menu-sublink') ? 'ds-menu-sublink-ativo' : 'ds-menu-link-ativo');
+  item.setAttribute('aria-current', 'page');
 });
 // Abre e destaca o grupo automaticamente quando a página atual é um dos filhos.
-document.querySelectorAll('.menu-submenu .menu-item.active').forEach((item) => {
-  const grupo = item.closest('.menu-item-grupo');
-  if (grupo) grupo.classList.add('expandido', 'tem-filho-ativo');
+document.querySelectorAll('.ds-menu-sub .ds-menu-sublink-ativo').forEach((item) => {
+  const grupo = item.closest('.ds-menu-grupo');
+  const botao = grupo && grupo.querySelector('.ds-menu-grupo-botao');
+  if (botao) {
+    botao.setAttribute('aria-expanded', 'true');
+    botao.classList.add('tem-filho-ativo');
+  }
 });
 
 // --- Tema claro/escuro ---
