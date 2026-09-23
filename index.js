@@ -888,6 +888,14 @@ async function build() {
 
   fastify.patch('/people/api/vagas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     let dados = request.body || {};
+    // "" (select "Tipo de vaga" deixado em "Selecione", reenviado a cada
+    // PATCH de edição — coletarDadosForm lê todos os CAMPOS sempre) não é
+    // um dos valores da CHECK (db/018: tipo_vaga is null or tipo_vaga in
+    // (...)) — sem essa normalização, o UPDATE quebra com 500 bruto do
+    // Postgres em vez de um 400 claro. O POST de criação (linha ~852) já
+    // fazia `|| null`; faltava espelhar aqui (achado 2026-09-23, editando
+    // requisitos estruturados numa vaga sem tipo definido).
+    if (dados.tipo_vaga === '') dados.tipo_vaga = null;
     const campos = Object.keys(dados).filter((campo) => CAMPOS_VAGA_EDITAVEIS.includes(campo));
     if (!campos.length) {
       return reply.code(400).send({ error: 'Nenhum campo válido para atualizar' });
