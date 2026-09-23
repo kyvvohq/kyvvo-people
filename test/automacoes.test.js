@@ -2,15 +2,15 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   renderizar, extrairTokenDoLink, escolherMelhorTemplate, montarParametrosWhatsapp, parametroBotaoParaTemplate,
-  resolverPorCanal, detectarOptOut, SEEDS, registrarDisparo, limiteDoPlanoExcedido,
+  resolverPorCanal, detectarOptOut, SEEDS, registrarDisparo, limiteDoPlanoExcedido, renderizarCorpoTemplate,
 } = require('../lib/automacoes');
 const planosPeople = require('../lib/planos');
 
 // Mockado uma única vez pro módulo inteiro: `limiteDoPlanoExcedido` cacheia
-// o catálogo por 5min internamente, então trocar o mock entre testes não
-// teria efeito no 2º teste em diante — por isso a lista cobre todos os
-// casos de uma vez (plano com limite, sem limite, e um chave que não existe
-// simula "não achou").
+// o catálogo por 1min internamente (era 5min até 2026-09-23), então trocar
+// o mock entre testes não teria efeito no 2º teste em diante — por isso a
+// lista cobre todos os casos de uma vez (plano com limite, sem limite, e um
+// chave que não existe simula "não achou").
 planosPeople.buscarPlanos = async () => ([
   { chave: 'people_start', limite_disparos: 10 },
   { chave: 'people_professional', limite_disparos: null },
@@ -243,6 +243,40 @@ test('registrarDisparo: template/gatilho ausentes viram null em vez de undefined
   const [, , , template, gatilho] = chamadas[0].params;
   assert.equal(template, null);
   assert.equal(gatilho, null);
+});
+
+test('registrarDisparo: mensagemTexto é gravado; ausente vira null (não undefined)', async () => {
+  const chamadas = [];
+  const pool = { query: async (sql, params) => { chamadas.push({ sql, params }); return { rows: [] }; } };
+  await registrarDisparo(pool, { tenantId: 't1', telefoneE164: '+5534999998888', status: 'enviado', mensagemTexto: 'Oi Ana!' });
+  await registrarDisparo(pool, { tenantId: 't1', telefoneE164: '+5534999998888', status: 'enviado' });
+  assert.equal(chamadas[0].params[6], 'Oi Ana!');
+  assert.equal(chamadas[1].params[6], null);
+});
+
+test('renderizarCorpoTemplate: nomeado substitui {{nome_do_parametro}} pelo valor', () => {
+  assert.equal(
+    renderizarCorpoTemplate('Oi {{nome}}! Vaga: {{vaga}}.', [
+      { nome: 'nome', valor: 'Ana', nomeado: true },
+      { nome: 'vaga', valor: 'Dev', nomeado: true },
+    ]),
+    'Oi Ana! Vaga: Dev.'
+  );
+});
+
+test('renderizarCorpoTemplate: posicional substitui {{1}}, {{2}}... na ordem', () => {
+  assert.equal(
+    renderizarCorpoTemplate('Oi {{1}}, vaga {{2}}.', [{ valor: 'Bia', nomeado: false }, { valor: 'QA', nomeado: false }]),
+    'Oi Bia, vaga QA.'
+  );
+});
+
+test('renderizarCorpoTemplate: sem parâmetros devolve o corpo como veio', () => {
+  assert.equal(renderizarCorpoTemplate('hello_world', []), 'hello_world');
+});
+
+test('renderizarCorpoTemplate: corpo vazio/nulo devolve string vazia', () => {
+  assert.equal(renderizarCorpoTemplate(null, [{ nome: 'x', valor: '1', nomeado: true }]), '');
 });
 
 test('limiteDoPlanoExcedido: sem planoChave (trial) nunca trava', async () => {
