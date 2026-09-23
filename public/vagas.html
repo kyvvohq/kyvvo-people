@@ -89,6 +89,9 @@
   .preview-whatsapp { margin-top:10px; background:#e5ddd5; border-radius:10px; padding:16px; }
   .preview-whatsapp .bolha { background:#dcf8c6; border-radius:8px 8px 8px 2px; padding:10px 12px; font-size:13.5px; line-height:1.5; color:#111b21; max-width:280px; white-space:pre-wrap; box-shadow:0 1px 1px rgba(0,0,0,.1); }
   .preview-whatsapp .bolha-botao { margin-top:2px; max-width:280px; background:#dcf8c6; border-top:1px solid rgba(0,0,0,.08); border-radius:0 0 8px 2px; padding:8px 12px; font-size:13px; color:#00a5f4; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+  .filtros select { height:36px; }
+  tr.linha-vaga, .cartao { cursor:pointer; }
 </style>
 </head>
 <body>
@@ -175,6 +178,10 @@
         <button type="button" data-vis="kanban">Quadro</button>
       </div>
 
+      <div class="filtros">
+        <select id="filtro-status-vaga"><option value="">Todos os status</option></select>
+      </div>
+
       <div id="vista-lista">
         <div class="card" style="padding:0">
           <table>
@@ -214,6 +221,7 @@
     let formRequisitos = [];
     let formCamposExtras = [];
     let vagas = [];
+    let vagasFiltroStatus = '';
     let visualizacao = localStorage.getItem('people_vagas_visualizacao') === 'kanban' ? 'kanban' : 'lista';
     const STATUS_ORDEM = ['rascunho', 'nova', 'em_andamento', 'pausada', 'encerrada'];
     // Mesmos tons leves do menu Quadro, rotativos por posição da raia.
@@ -248,10 +256,18 @@
       if (visualizacao === 'kanban') renderizarKanban(); else renderizarLista();
     }
 
+    // Filtro por status (client-side, mesmo padrão de avaliacoes.html) —
+    // vagas.length continua sendo a fonte completa (usada por
+    // vagas.find(...) nos handlers de ação), só o que é DESENHADO passa
+    // pelo filtro.
+    function vagasFiltradas() {
+      return vagasFiltroStatus ? vagas.filter((v) => v.status === vagasFiltroStatus) : vagas;
+    }
+
     function renderizarLista() {
       const corpo = document.getElementById('tabela-vagas');
-      corpo.innerHTML = vagas.map((v) => `
-        <tr>
+      corpo.innerHTML = vagasFiltradas().map((v) => `
+        <tr class="linha-vaga" data-id="${v.id}">
           <td>${v.status === 'rascunho' ? '<span class="badge neutro" style="margin-right:6px">Rascunho</span>' : ''}${v.nome}</td>
           <td><span class="badge ${STATUS_CLASSE[v.status]}">${STATUS_LABEL[v.status]}</span></td>
           <td>${v.total_candidatos}</td>
@@ -275,7 +291,8 @@
         html += `<div class="coluna-header">${STATUS_LABEL[status]}</div>`;
       });
 
-      vagas.forEach((v, indice) => {
+      const lista = vagasFiltradas();
+      lista.forEach((v, indice) => {
         const cor = CORES_RAIA[indice % CORES_RAIA.length];
         html += `<div class="raia-label" style="background:${cor}" title="${v.nome}"></div>`;
         STATUS_ORDEM.forEach((status) => {
@@ -294,7 +311,7 @@
       });
 
       grid.innerHTML = html;
-      if (!vagas.length) {
+      if (!lista.length) {
         grid.insertAdjacentHTML('beforeend', '<div class="celula-vazia" style="grid-column:1/-1">Nenhuma vaga cadastrada ainda.</div>');
       }
       ligarDragDropVagas();
@@ -336,6 +353,15 @@
       visualizacao = btn.dataset.vis;
       localStorage.setItem('people_vagas_visualizacao', visualizacao);
       aplicarVisualizacao();
+      renderizar();
+    });
+
+    const filtroStatusEl = document.getElementById('filtro-status-vaga');
+    STATUS_ORDEM.forEach((status) => {
+      filtroStatusEl.insertAdjacentHTML('beforeend', `<option value="${status}">${STATUS_LABEL[status]}</option>`);
+    });
+    filtroStatusEl.addEventListener('change', () => {
+      vagasFiltroStatus = filtroStatusEl.value;
       renderizar();
     });
 
@@ -975,6 +1001,14 @@
         if (vaga) copiarLink(vaga);
         return;
       }
+
+      // Clicar na linha (Lista) ou no cartão (Quadro) abre a mesma edição
+      // do menu "⋯" > Editar — já não chega aqui se o clique foi dentro do
+      // menu-acoes (os `return` acima cobrem isso antes).
+      const linhaVaga = e.target.closest('tr.linha-vaga');
+      if (linhaVaga) { abrirModalEditar(linhaVaga.dataset.id); return; }
+      const cartaoVaga = e.target.closest('.cartao[data-cartao-vaga]');
+      if (cartaoVaga) { abrirModalEditar(cartaoVaga.dataset.cartaoVaga); return; }
 
       if (!e.target.closest('.menu-acoes-painel')) fecharMenusAcoes();
     });
