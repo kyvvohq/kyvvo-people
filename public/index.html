@@ -1,11 +1,17 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kyvvo People — Recrutamento inteligente</title>
 <link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
 <meta name="description" content="Automatize a triagem de candidatos, agende entrevistas, aplique avaliações comportamentais e comunique-se automaticamente durante todo o processo seletivo.">
+<!-- Só pro rodapé público (.ds-rodape-publico, componente do DS) — o resto
+     da página continua com as variáveis/CSS locais logo abaixo, que vêm
+     DEPOIS no documento e vencem em empate de especificidade pra tudo que
+     já existia (mesmo nome de variável, ex. --border/--muted). -->
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
 <style>
   :root {
     color-scheme: dark;
@@ -170,9 +176,17 @@
   .cta-final-direita { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
   .cta-final-direita .whats { font-size:11px; color:var(--muted); }
 
-  footer { border-top:1px solid var(--border); padding:32px 24px; }
-  .footer-inner { max-width:1160px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
-  .footer-inner .muted { font-size:12px; color:var(--muted); }
+  /* Rodapé público novo (.ds-rodape-publico, componente do DS) — undo do
+     border-top acima: a própria .ds-rodape-publico-conteudo já desenha o
+     dela (::before, barra em gradiente), duplicava a linha. */
+  .ds-rodape-publico { border-top:none; }
+  /* kyvvo-claro.svg é o wordmark horizontal (522x240, com retângulo branco
+     de fundo embutido no próprio SVG) — o slot do DS é 1:1 com
+     object-fit:cover, pensado pra uma foto real de post do Instagram; com
+     "cover" o logo fica cortado (mesmo bug corrigido no rodapé do Studio,
+     server/public-studio/shared.css). "contain" mostra o logo inteiro até
+     ter uma foto de verdade pra trocar. */
+  .ds-rodape-publico-imagem img { object-fit:contain; }
 </style>
 </head>
 <body>
@@ -413,13 +427,59 @@
   </div>
 </section>
 
-<footer>
-  <div class="footer-inner">
-    <div class="logo">ky<span>vv</span>o people</div>
-    <span class="muted">Inteligência aplicada ao recrutamento e seleção.</span>
-    <span class="muted">people.kyvvo.com.br</span>
+<footer class="ds-rodape-publico">
+  <div class="ds-rodape-publico-conteudo">
+    <figure class="ds-rodape-publico-social">
+      <a class="ds-rodape-publico-imagem" href="https://www.instagram.com/somoskyvvo" tabindex="-1" aria-hidden="true">
+        <img src="/images/kyvvo-claro.svg" alt="">
+      </a>
+      <figcaption class="ds-rodape-publico-texto">Siga a Kyvvo no <a href="https://www.instagram.com/somoskyvvo">Instagram</a></figcaption>
+    </figure>
+    <div class="ds-rodape-publico-produtos">
+      <h2 class="ds-rodape-publico-titulo" id="rp-produtos">Nossos produtos</h2>
+      <div class="ds-carrossel" data-ds-carrossel aria-labelledby="rp-produtos">
+        <div class="ds-carrossel-trilho">
+          <div class="ds-carrossel-slide">
+            <div class="ds-rodape-publico-produto">
+              <h3 class="ds-rodape-publico-produto-nome"><a href="https://www.studio.kyvvo.com.br">Studio</a></h3>
+              <p class="ds-rodape-publico-produto-texto">Agenda e WhatsApp inteligente pra salões e clínicas.</p>
+              <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+            </div>
+          </div>
+          <div class="ds-carrossel-slide">
+            <div class="ds-rodape-publico-produto">
+              <h3 class="ds-rodape-publico-produto-nome"><a href="/">People</a></h3>
+              <p class="ds-rodape-publico-produto-texto">Recrutamento e seleção com avaliação comportamental.</p>
+              <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+            </div>
+          </div>
+          <div class="ds-carrossel-slide">
+            <div class="ds-rodape-publico-produto">
+              <h3 class="ds-rodape-publico-produto-nome"><a href="https://www.crm.kyvvo.com.br">CRM</a></h3>
+              <p class="ds-rodape-publico-produto-texto">Gestão de clientes e vendas em um só lugar.</p>
+              <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+            </div>
+          </div>
+        </div>
+        <div class="ds-carrossel-controles">
+          <button type="button" class="ds-carrossel-btn ds-carrossel-ant" aria-label="Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <div class="ds-carrossel-pontos"></div>
+          <button type="button" class="ds-carrossel-btn ds-carrossel-prox" aria-label="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <nav class="ds-rodape-publico-links" aria-label="Informações legais e ajuda">
+      <ul class="ds-rodape-publico-lista">
+        <li><a href="https://studio.kyvvo.com.br/privacidade.html">LGPD</a></li>
+        <li><a href="https://wa.me/5534953301195?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20Kyvvo%20People.">Ajuda</a></li>
+        <li><a href="https://studio.kyvvo.com.br/privacidade.html">Política de Privacidade</a></li>
+        <li><a href="https://studio.kyvvo.com.br/termos.html">Termos de Uso</a></li>
+      </ul>
+    </nav>
   </div>
 </footer>
+
+<script src="/ds/components.js"></script>
 
 <script>
   // Preço dos planos Start/Professional era hardcoded no HTML — edição no
