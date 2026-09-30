@@ -14,15 +14,15 @@
 <link rel="stylesheet" href="/people/shell.css">
 </head>
 <body>
-  <header class="topo-app">
-    <a class="topo-logo" href="/people/painel.html" aria-label="Ir para o início">
-      <img class="topo-logo-img" src="/people/images/logo-kyvvo.svg" alt="Kyvvo">
-      <span class="topo-produto-tag">People</span>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/people/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">Pe</span>ople</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
     </a>
     <div class="topo-perfil" id="topo-perfil">
-      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
-        <div class="avatar js-avatar-usuario"></div>
-        <span class="nome js-nome-usuario"></span>
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
         <span data-icon="chevron-down" data-size="14"></span>
       </button>
       <div class="menu-perfil" id="menu-perfil" hidden>
@@ -96,7 +96,7 @@
     </div>
   </div>
 
-  <footer data-ds-rodape></footer>
+  <footer data-ds-rodape data-ds-produto="People"></footer>
 
   <script src="/ds/components.js"></script>
   <script src="/people/shell.js"></script>
