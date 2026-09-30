@@ -50,8 +50,18 @@ const PLATFORM_URL = process.env.PLATFORM_URL || 'http://platform:3003';
 // do kyvvo-platform que já temos em mãos naquele momento — o People nunca
 // guarda esse token, só o resultado já filtrado, embutido no próprio JWT.
 const PRODUTOS_CRUZADOS_PEOPLE = {
-  agenda_inteligente: { nome: 'Studio', url: 'https://studio.kyvvo.com.br' },
-  crm: { nome: 'CRM', url: 'https://crm.kyvvo.com.br' },
+  agenda_inteligente: { chave: 'studio', nome: 'Studio', url: 'https://studio.kyvvo.com.br' },
+  crm: { chave: 'crm', nome: 'CRM', url: 'https://crm.kyvvo.com.br' },
+};
+
+// Login automático ao trocar de produto (handoff via kyvvo-platform, ver
+// kyvvo-platform/routes/handoff.js e o par simétrico em kyvvo-studio/
+// kyvvo-crm). Mesmo INTERNAL_HANDOFF_TOKEN precisa estar configurado nos 4
+// serviços — sem ele, o platform recusa a chamada e o link cai pra landing
+// pública do produto (best-effort, nunca trava o clique).
+const PRODUTOS_HANDOFF_DESTINO = {
+  studio: 'https://studio.kyvvo.com.br/sso',
+  crm: 'https://crm.kyvvo.com.br/crm/sso',
 };
 // Ainda o painel do Studio: catálogo de planos do People (GET /api/planos/people,
 // editado no admin do Studio) — não migrou pro platform ainda.
@@ -192,6 +202,68 @@ async function build() {
 
     const token = fastify.jwt.sign({ tenantId, email, nome, outrosProdutos }, { expiresIn: '12h' });
     return { token, nome };
+  });
+
+  // "Trocar de produto" (menu de perfil) — gera um código de handoff de
+  // curta duração no kyvvo-platform, que o outro produto troca por uma
+  // sessão já autenticada (ver GET /people/sso abaixo e o par simétrico em
+  // kyvvo-studio/kyvvo-crm).
+  fastify.post('/people/api/meus-produtos/handoff', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const destino = PRODUTOS_HANDOFF_DESTINO[(request.body || {}).produto];
+    if (!destino) {
+      return reply.code(400).send({ error: 'Produto inválido' });
+    }
+    const { tenantId, email, nome } = request.user;
+    try {
+      const res = await fetch(`${PLATFORM_URL}/internal/handoff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_HANDOFF_TOKEN },
+        body: JSON.stringify({ tenantId, email, nome }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`platform respondeu ${res.status}`);
+      const { code } = await res.json();
+      return { url: `${destino}?code=${encodeURIComponent(code)}` };
+    } catch (err) {
+      request.log.error(`Falha ao gerar handoff: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível gerar o login automático agora.' });
+    }
+  });
+
+  // Consome um código de handoff vindo de outro produto (Studio/CRM) — CA
+  // "clicar no produto já deve entrar logado". Sem preHandler de auth: é
+  // exatamente o ponto de entrada de quem ainda não tem sessão no People. O
+  // People nunca vê/toca usuarios/tenants (mesmo princípio do login normal
+  // acima) — confia direto no que o platform devolveu, sem checagem local
+  // extra. outrosProdutos fica vazio aqui de propósito (o handoff não
+  // carrega um token RS256 do platform pra consultar /entitlements como o
+  // login faz) — o item "trocar de produto" só reaparece no próximo login
+  // de verdade, dentro da janela de 12h do token.
+  fastify.get('/people/sso', async (request, reply) => {
+    const { code } = request.query || {};
+    if (!code) return reply.redirect('/people/login.html');
+
+    try {
+      const res = await fetch(`${PLATFORM_URL}/internal/handoff/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_HANDOFF_TOKEN },
+        body: JSON.stringify({ code }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return reply.redirect('/people/login.html');
+      const { tenantId, email, nome } = await res.json();
+
+      const token = fastify.jwt.sign({ tenantId, email, nome, outrosProdutos: [] }, { expiresIn: '12h' });
+      reply.type('text/html');
+      return `<!doctype html><html><body><script>
+        localStorage.setItem('people_token', ${JSON.stringify(token)});
+        localStorage.setItem('people_nome', ${JSON.stringify(nome || '')});
+        location.href = '/people/painel.html';
+      </script></body></html>`;
+    } catch (err) {
+      request.log.error(`Falha ao consumir handoff: ${err.message}`);
+      return reply.redirect('/people/login.html');
+    }
   });
 
   // Cadastro self-service (landing > Criar conta). A criação de conta/tenant
