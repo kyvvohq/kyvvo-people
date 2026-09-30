@@ -45,6 +45,14 @@ async function buscarTokenAvaliacao(avaliacaoId) {
 // pela internet). O login do People passa a não depender do painel do Studio
 // estar no ar.
 const PLATFORM_URL = process.env.PLATFORM_URL || 'http://platform:3003';
+// "Trocar de produto" no menu de perfil: outros produtos Kyvvo que o mesmo
+// tenant também tem ativo. Resolvido uma vez no login usando o token RS256
+// do kyvvo-platform que já temos em mãos naquele momento — o People nunca
+// guarda esse token, só o resultado já filtrado, embutido no próprio JWT.
+const PRODUTOS_CRUZADOS_PEOPLE = {
+  agenda_inteligente: { nome: 'Studio', url: 'https://studio.kyvvo.com.br' },
+  crm: { nome: 'CRM', url: 'https://crm.kyvvo.com.br' },
+};
 // Ainda o painel do Studio: catálogo de planos do People (GET /api/planos/people,
 // editado no admin do Studio) — não migrou pro platform ainda.
 const KYVVO_APP_URL = process.env.KYVVO_APP_URL || 'https://studio.kyvvo.com.br';
@@ -166,7 +174,23 @@ async function build() {
     // tenant. ON CONFLICT DO NOTHING: idempotente, login seguinte não mexe.
     await pool.query('insert into assinaturas (tenant_id) values ($1) on conflict (tenant_id) do nothing', [tenantId]);
 
-    const token = fastify.jwt.sign({ tenantId, email, nome }, { expiresIn: '12h' });
+    // Best-effort: nunca impede o login se o kyvvo-platform estiver
+    // instável nesse instante — "trocar de produto" é só um atalho de UX.
+    let outrosProdutos = [];
+    try {
+      const entRes = await fetch(`${PLATFORM_URL}/entitlements/${tenantId}`, {
+        headers: { Authorization: `Bearer ${kyvvoToken}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (entRes.ok) {
+        const { modulos } = await entRes.json();
+        outrosProdutos = (modulos || []).map((m) => PRODUTOS_CRUZADOS_PEOPLE[m]).filter(Boolean);
+      }
+    } catch (err) {
+      request.log.warn(`Falha ao buscar outros produtos do tenant: ${err.message}`);
+    }
+
+    const token = fastify.jwt.sign({ tenantId, email, nome, outrosProdutos }, { expiresIn: '12h' });
     return { token, nome };
   });
 

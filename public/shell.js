@@ -52,6 +52,7 @@ const ICON_PATHS = {
   trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
   pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.986L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
   'trending-up': '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  package: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73z"/><path d="M12 22V12"/><path d="M3.3 7 12 12l8.7-5"/>',
 };
 
 function icon(name, size = 18) {
@@ -164,12 +165,26 @@ document.querySelectorAll('.js-nome-usuario').forEach((el) => { el.textContent =
 // E-mail só pra exibição no menu de perfil — decodifica o payload do JWT
 // sem verificar (o próprio dono do token já enxerga esse conteúdo).
 let emailUsuario = '';
+let outrosProdutosUsuario = [];
 try {
-  emailUsuario = JSON.parse(atob(token.split('.')[1])).email || '';
+  const payloadToken = JSON.parse(atob(token.split('.')[1]));
+  emailUsuario = payloadToken.email || '';
+  outrosProdutosUsuario = payloadToken.outrosProdutos || [];
 } catch {
   emailUsuario = '';
 }
 document.querySelectorAll('.js-email-usuario').forEach((el) => { el.textContent = emailUsuario; });
+
+// "Trocar de produto" — outros produtos Kyvvo que o mesmo tenant também tem
+// ativo (embutido no token no login, ver kyvvo-people/index.js). Logo acima
+// de "Sair da conta" (People não tem um item "Meu Perfil" pra ancorar
+// embaixo, só "Configurações").
+const menuOutrosProdutos = document.getElementById('menu-perfil-outros-produtos');
+if (menuOutrosProdutos) {
+  menuOutrosProdutos.innerHTML = outrosProdutosUsuario
+    .map((p) => `<a class="menu-perfil-item" href="${p.url}">${icon('package')}<span class="rotulo">${p.nome}</span></a>`)
+    .join('');
+}
 
 document.querySelectorAll('.btn-sair').forEach((btn) => {
   btn.addEventListener('click', () => {
