@@ -55,12 +55,9 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 
 .app-shell { display:flex; flex:1; gap:var(--space-5); padding:var(--space-5); align-items:flex-start; }
 
-/* Sidebar — componente data-ds-menu do @kyvvohq/design-system (v2.6.0, ver
+/* Sidebar — componente data-ds-menu do @kyvvohq/design-system (ver
    components.css). O .ds-menu já é a "sidebar" (largura, fundo, borda), sem
    wrapper próprio (era .painel-sidebar/.sidebar-wrap antes da padronização). */
-.ds-menu-secao-titulo { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px;
-  padding:0 var(--space-3); margin:var(--space-2) 0 5px; }
-.ds-menu-recolhido .ds-menu-secao-titulo { display:none; }
 
 /* Item que agrupa um submenu (hoje só Configurações) fica destacado quando um
    filho está ativo — o DS não cobre esse caso (só o link/sublink ativo em
@@ -100,9 +97,7 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
     padding:var(--space-2) var(--space-3);
     overflow-x:auto;
   }
-  .ds-menu-topo { display:none; }
   .ds-menu-lista { flex-direction:row; gap:4px; }
-  .ds-menu-secao-titulo { display:none; }
   .ds-menu-grupo { position:relative; }
   .ds-menu-sub {
     position:absolute;
