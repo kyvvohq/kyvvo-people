@@ -13,20 +13,7 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/people/shell.css">
 <style>
-  .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
-  .filtros select { height:36px; }
-  td.col-nome { font-weight:600; color:var(--text); }
-  td.col-contexto { color:var(--muted-strong); font-size:13px; }
   .badge-canal { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--muted-strong); }
-  .badge-obrigatoria { font-size:11px; font-weight:600; padding:3px 8px; border-radius:var(--radius-full); background:var(--border); color:var(--muted-strong); }
-  .toggle-automacao { width:36px; height:20px; border-radius:999px; background:var(--border-strong); border:none; position:relative; cursor:pointer; padding:0; }
-  .toggle-automacao .bolinha { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
-  .toggle-automacao[aria-checked="true"] { background:var(--accent); }
-  .toggle-automacao[aria-checked="true"] .bolinha { left:18px; }
-  .toggle-automacao:disabled { opacity:.5; cursor:not-allowed; }
-  .acoes-tabela { display:flex; gap:12px; }
-  .acoes-tabela button { background:none; border:none; padding:0; color:var(--accent); font-size:12.5px; font-weight:600; cursor:pointer; width:auto; height:auto; }
-  .acoes-tabela button.perigo { color:var(--danger); }
   .campo-automacao { margin-bottom:12px; }
   .campo-automacao label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:4px; }
   .campo-automacao textarea { min-height:110px; resize:vertical; font-family:inherit; }
@@ -34,14 +21,10 @@
   .preview-whatsapp { margin-top:10px; background:#e5ddd5; border-radius:10px; padding:16px; }
   .preview-whatsapp .bolha { background:#dcf8c6; border-radius:8px 8px 8px 2px; padding:10px 12px; font-size:13.5px; line-height:1.5; color:#111b21; max-width:280px; white-space:pre-wrap; box-shadow:0 1px 1px rgba(0,0,0,.1); }
   .preview-whatsapp .bolha-botao { margin-top:2px; max-width:280px; background:#dcf8c6; border-top:1px solid rgba(0,0,0,.08); border-radius:0 0 8px 2px; padding:8px 12px; font-size:13px; color:#00a5f4; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
-  .estado-vazio-automacoes { padding:40px 20px; text-align:center; color:var(--muted); }
-  .disparos-cabecalho { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .disparos-titulo { font-weight:700; font-size:14px; color:var(--text); margin-bottom:2px; }
-  .disparos-resumo { display:flex; gap:20px; flex-wrap:wrap; margin-top:10px; }
-  .disparos-metrica .valor { font-family:var(--font-display); font-size:22px; color:var(--text); }
-  .disparos-metrica .rotulo { font-size:12px; color:var(--muted); }
-  .disparos-limite-estourado .valor { color:var(--danger); }
-  .disparos-historico { margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
+  /* TODO: remover quando o DS publicar `.ds-vazio[hidden]` (display:flex vence o atributo hidden). */
+  .ds-vazio[hidden] { display:none; }
+  .pilha { display:flex; flex-direction:column; gap:var(--space-4); }
+  .ds-tabela .badge-canal { white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -109,49 +92,48 @@
     </nav>
 
     <div class="painel-main">
-      <div class="cabecalho-pagina">
-        <div class="textos">
-          <div class="linha-titulo"><h1>Automações</h1></div>
-          <p class="descricao-pagina">Mensagens automáticas (e-mail/WhatsApp) disparadas no fluxo da vaga.</p>
-        </div>
-        <button class="btn" id="btn-nova-automacao" type="button">+ Nova automação</button>
+      <div class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto"><h1 class="ds-pagina-cab-titulo">Automações</h1></div>
+        <div class="ds-pagina-cab-acoes"><button class="ds-btn ds-btn-primario" id="btn-nova-automacao" type="button">+ Nova automação</button></div>
       </div>
 
       <div class="ds-abas" data-ds-abas>
         <div class="ds-abas-lista">
           <button type="button" class="ds-aba" id="aba-lista" aria-controls="conteudo-aba-lista" aria-selected="true">Automações</button>
-          <button type="button" class="ds-aba" id="aba-disparos" aria-controls="conteudo-aba-disparos" aria-selected="false">Disparos</button>
+          <button type="button" class="ds-aba" id="aba-disparos" aria-controls="conteudo-aba-disparos" aria-selected="false">Disparos <span class="ds-aba-contagem" id="contagem-disparos" hidden></span></button>
         </div>
 
         <div class="ds-abas-painel" id="conteudo-aba-lista" aria-labelledby="aba-lista">
-          <div class="card" style="padding:0">
-            <div class="filtros">
-              <select id="filtro-gatilho">
-                <option value="">Todos os gatilhos</option>
-                <option value="candidatura_criada">Candidatura recebida</option>
-                <option value="etapa_alcancada">Candidatura chega numa etapa</option>
-                <option value="candidatura_reprovada">Candidatura reprovada</option>
-                <option value="vaga_encerrada">Vaga encerrada</option>
-              </select>
+          <div class="ds-tabela" role="table" aria-label="Automações" style="--ds-colunas: minmax(0,1.4fr) minmax(0,1.6fr) 120px 150px 48px">
+            <div class="ds-filtros">
+              <div class="ds-select">
+                <select id="filtro-gatilho" aria-label="Filtrar por gatilho">
+                  <option value="">Todos os gatilhos</option>
+                  <option value="candidatura_criada">Candidatura recebida</option>
+                  <option value="etapa_alcancada">Candidatura chega numa etapa</option>
+                  <option value="candidatura_reprovada">Candidatura reprovada</option>
+                  <option value="vaga_encerrada">Vaga encerrada</option>
+                </select>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Gatilho</th>
-                  <th>Canal</th>
-                  <th>Ativa</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="tabela-automacoes"></tbody>
-            </table>
-            <div class="estado-vazio-automacoes" id="estado-vazio" hidden>Nenhuma automação encontrada.</div>
+            <div class="ds-tabela-cabecalho" role="row">
+              <span role="columnheader">Nome</span>
+              <span role="columnheader">Gatilho</span>
+              <span role="columnheader">Canal</span>
+              <span role="columnheader">Ativa</span>
+              <span role="columnheader"><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Ações</span></span>
+            </div>
+            <div id="tabela-automacoes"></div>
+            <div class="ds-vazio" id="estado-vazio" hidden>
+              <p class="ds-vazio-titulo">Nenhuma automação encontrada</p>
+              <p class="ds-vazio-texto">Troque o filtro de gatilho ou crie uma nova automação.</p>
+            </div>
           </div>
         </div>
 
-        <div class="ds-abas-painel" id="conteudo-aba-disparos" aria-labelledby="aba-disparos" hidden>
-          <div class="card" id="card-disparos" style="padding:16px"></div>
+        <div class="ds-abas-painel pilha" id="conteudo-aba-disparos" aria-labelledby="aba-disparos" hidden>
+          <div id="card-disparos"></div>
         </div>
       </div>
     </div>
@@ -196,48 +178,42 @@
       const tbody = document.getElementById('tabela-automacoes');
       document.getElementById('estado-vazio').hidden = itens.length > 0;
       tbody.innerHTML = itens.map((a) => `
-        <tr>
-          <td class="col-nome">${a.nome}</td>
-          <td class="col-contexto">${contextoLabel(a)}</td>
-          <td><span class="badge-canal">${icon(CANAL_ICONE[a.canal], 14)} ${CANAL_LABEL[a.canal]}</span></td>
-          <td>
+        <div class="ds-tabela-linha" role="row">
+          <span role="cell"><span class="ds-tabela-primario">${escapeHtmlDisparo(a.nome)}</span></span>
+          <span role="cell" class="ds-tabela-mudo" data-rotulo="Gatilho">${escapeHtmlDisparo(contextoLabel(a))}</span>
+          <span role="cell" data-rotulo="Canal"><span class="badge-canal">${icon(CANAL_ICONE[a.canal], 14)} ${CANAL_LABEL[a.canal]}</span></span>
+          <span role="cell">
             ${a.removivel
-              ? `<button type="button" class="toggle-automacao" data-toggle="${a.id}" role="switch" aria-checked="${a.ativo}"><span class="bolinha"></span></button>`
-              : '<span class="badge-obrigatoria">Obrigatória — sempre ativa</span>'}
-          </td>
-          <td>
-            <div class="acoes-tabela">
-              <button type="button" data-ver="${a.id}">Editar</button>
-              <button type="button" data-duplicar="${a.id}">Duplicar</button>
-              ${a.removivel ? `<button type="button" class="perigo" data-excluir="${a.id}">Excluir</button>` : ''}
+              ? `<label class="ds-switch"><input type="checkbox" role="switch" data-toggle="${a.id}" aria-label="Ativar ${escapeHtmlDisparo(a.nome)}" ${a.ativo ? 'checked' : ''}><span class="ds-switch-trilho"></span></label>`
+              : '<span class="ds-badge ds-badge-sm ds-badge-sem-ponto">Obrigatória — sempre ativa</span>'}
+          </span>
+          <span role="cell" class="ds-tabela-acoes">
+            <div class="ds-acoes" data-id="${a.id}">
+              <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações de ${escapeHtmlDisparo(a.nome)}">⋯</button>
+              <div class="ds-acoes-menu" role="menu" hidden>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="editar">Editar</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="duplicar">Duplicar</button>
+                ${a.removivel ? '<hr class="ds-acoes-separador"><button type="button" class="ds-acoes-item" role="menuitem" data-acao="excluir">Excluir</button>' : ''}
+              </div>
             </div>
-          </td>
-        </tr>
+          </span>
+        </div>
       `).join('');
-
-      tbody.querySelectorAll('[data-toggle]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const a = automacoes.find((x) => x.id === btn.dataset.toggle);
-          await apiFetch(`/people/api/automacoes/${a.id}`, { method: 'PATCH', body: JSON.stringify({ ativo: !a.ativo }) });
-          await carregar();
-        });
-      });
-      tbody.querySelectorAll('[data-ver]').forEach((btn) => {
-        btn.addEventListener('click', () => abrirFormulario(automacoes.find((x) => x.id === btn.dataset.ver)));
-      });
-      tbody.querySelectorAll('[data-duplicar]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/people/api/automacoes/${btn.dataset.duplicar}/duplicar`, { method: 'POST' });
-          await carregar();
-        });
-      });
-      tbody.querySelectorAll('[data-excluir]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/people/api/automacoes/${btn.dataset.excluir}`, { method: 'DELETE' });
-          await carregar();
-        });
-      });
     }
+
+    const tabelaAutomacoes = document.getElementById('tabela-automacoes');
+    tabelaAutomacoes.addEventListener('change', async (e) => {
+      const input = e.target.closest('[data-toggle]');
+      if (!input) return;
+      await apiFetch(`/people/api/automacoes/${input.dataset.toggle}`, { method: 'PATCH', body: JSON.stringify({ ativo: input.checked }) });
+      await carregar();
+    });
+    tabelaAutomacoes.addEventListener('ds-acoes-escolher', async (e) => {
+      const id = e.target.closest('[data-id]').dataset.id;
+      if (e.detail.acao === 'editar') abrirFormulario(automacoes.find((x) => x.id === id));
+      else if (e.detail.acao === 'duplicar') { await apiFetch(`/people/api/automacoes/${id}/duplicar`, { method: 'POST' }); await carregar(); }
+      else if (e.detail.acao === 'excluir') { await apiFetch(`/people/api/automacoes/${id}`, { method: 'DELETE' }); await carregar(); }
+    });
 
     document.getElementById('filtro-gatilho').addEventListener('change', (e) => {
       filtroGatilho = e.target.value;
@@ -482,99 +458,154 @@
       bloqueado_limite_plano: 'Bloqueado (limite do plano)',
     };
     const STATUS_DISPARO_BADGE = {
-      enviado: 'sucesso',
-      erro: 'perigo',
-      bloqueado_optout: 'aviso',
-      bloqueado_24h: 'aviso',
-      bloqueado_limite_plano: 'aviso',
+      enviado: 'ds-badge-sucesso',
+      erro: 'ds-badge-erro',
+      bloqueado_optout: 'ds-badge-aviso',
+      bloqueado_24h: 'ds-badge-aviso',
+      bloqueado_limite_plano: 'ds-badge-aviso',
     };
-    function formatarDataHoraDisparo(iso) {
-      const d = new Date(iso);
-      return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-    }
-
+    // Motivo mostrado no detalhe — só o que o status já diz de fato (a tabela
+    // não guarda o texto de erro devolvido pela Meta).
+    const STATUS_DISPARO_MOTIVO = {
+      erro: 'O envio não foi concluído. Confira se o modelo continua aprovado e se o número é válido.',
+      bloqueado_optout: 'O candidato pediu para não receber mensagens (opt-out).',
+      bloqueado_24h: 'Já houve um disparo para este número nas últimas 24h.',
+      bloqueado_limite_plano: 'O limite de disparos do plano no mês foi atingido.',
+    };
     function escapeHtmlDisparo(valor) {
       return String(valor ?? '').replace(/[&<>"']/g, (c) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
       }[c]));
     }
-    // Trunca em 25 caracteres + "…", com o texto inteiro no title (tooltip
-    // nativo do navegador). Disparos antigos (antes da coluna mensagem_texto
-    // existir) mostram "—".
-    function truncarMensagem(msg) {
-      if (!msg) return '—';
-      if (msg.length <= 25) return escapeHtmlDisparo(msg);
-      return `<span title="${escapeHtmlDisparo(msg)}">${escapeHtmlDisparo(msg.slice(0, 25))}...</span>`;
+    function badgeDisparo(status) {
+      return `<span class="ds-badge ${STATUS_DISPARO_BADGE[status] || ''}">${escapeHtmlDisparo(STATUS_DISPARO_LABEL[status] || status)}</span>`;
     }
 
-    function renderLinhaDisparo(d) {
-      const classe = STATUS_DISPARO_BADGE[d.status] || 'neutro';
+    let disparos = [];
+    const estadoDisparos = { pagina: 1, tamanho: 10 };
+
+    function disparosFiltrados() {
+      const busca = (document.getElementById('disp-busca').value || '').trim().toLowerCase();
+      const status = document.getElementById('disp-status').value;
+      const dias = Number(document.getElementById('disp-periodo').value) || 0;
+      const corte = dias ? Date.now() - dias * 86400000 : 0;
+      return disparos.filter((d) => {
+        if (status && d.status !== status) return false;
+        if (corte && new Date(d.criado_em).getTime() < corte) return false;
+        if (busca && !`${d.candidato_nome || ''} ${d.telefone_e164 || ''}`.toLowerCase().includes(busca)) return false;
+        return true;
+      });
+    }
+
+    function renderLinhaDisparo(d, indice) {
       return `
-        <tr>
-          <td>${formatarDataHoraDisparo(d.criado_em)}</td>
-          <td>${escapeHtmlDisparo(d.candidato_nome || '—')}</td>
-          <td>${escapeHtmlDisparo(d.telefone_e164 || '—')}</td>
-          <td>${escapeHtmlDisparo(d.template_nome || '—')}</td>
-          <td>${truncarMensagem(d.mensagem_texto)}</td>
-          <td><span class="badge ${classe}">${STATUS_DISPARO_LABEL[d.status] || d.status}</span></td>
-        </tr>
-      `;
+        <div class="ds-tabela-linha ds-tabela-linha-clicavel" role="row" tabindex="0" data-indice="${indice}">
+          <span role="cell" class="ds-tabela-mudo" title="${KyvvoDS.dataCompleta(d.criado_em)}">${KyvvoDS.dataRelativa(d.criado_em)}</span>
+          <span role="cell"><span class="ds-tabela-primario">${escapeHtmlDisparo(d.candidato_nome || '—')}</span></span>
+          <span role="cell" class="ds-tabela-mudo" data-rotulo="Telefone">${escapeHtmlDisparo(d.telefone_e164 || '—')}</span>
+          <span role="cell" class="ds-tabela-mudo">${escapeHtmlDisparo(d.template_nome || '—')}</span>
+          <span role="cell">${badgeDisparo(d.status)}</span>
+        </div>`;
+    }
+
+    function desenharDisparos() {
+      const lista = disparosFiltrados();
+      const inicio = (estadoDisparos.pagina - 1) * estadoDisparos.tamanho;
+      const fatia = lista.slice(inicio, inicio + estadoDisparos.tamanho);
+      const usaFiltro = document.getElementById('disp-busca').value || document.getElementById('disp-status').value || document.getElementById('disp-periodo').value;
+      document.getElementById('disp-limpar').hidden = !usaFiltro;
+      document.getElementById('disp-linhas').innerHTML = fatia.length
+        ? fatia.map((d) => renderLinhaDisparo(d, disparos.indexOf(d))).join('')
+        : `<div class="ds-vazio"><p class="ds-vazio-titulo">${disparos.length ? 'Nenhum disparo encontrado' : 'Nenhum disparo ainda'}</p><p class="ds-vazio-texto">${disparos.length ? 'Ajuste os filtros ou o período.' : 'Os disparos das automações de WhatsApp aparecem aqui.'}</p></div>`;
+      KyvvoDS.paginacaoAtualizar(document.getElementById('disp-paginacao'), { total: lista.length, pagina: estadoDisparos.pagina, tamanho: estadoDisparos.tamanho });
+    }
+
+    function abrirDetalheDisparo(d) {
+      const motivo = STATUS_DISPARO_MOTIVO[d.status];
+      KyvvoDS.modalAbrir(`
+        <div class="ds-detalhe">
+          <div class="ds-detalhe-cab"><h3 class="ds-detalhe-titulo">${escapeHtmlDisparo(d.candidato_nome || 'Candidato sem cadastro')}</h3>${badgeDisparo(d.status)}</div>
+          ${motivo ? `<div class="ds-alerta ${d.status === 'erro' ? 'ds-alerta-erro' : 'ds-alerta-aviso'}"><div class="ds-alerta-corpo"><p class="ds-alerta-titulo">${d.status === 'erro' ? 'Não foi possível enviar' : 'Disparo bloqueado'}</p><p class="ds-alerta-texto">${escapeHtmlDisparo(motivo)}</p></div></div>` : ''}
+          <dl class="ds-detalhe-grade">
+            <div class="ds-detalhe-item"><dt>Data/hora</dt><dd>${KyvvoDS.dataCompleta(d.criado_em)}</dd></div>
+            <div class="ds-detalhe-item"><dt>Telefone</dt><dd>${escapeHtmlDisparo(d.telefone_e164 || '—')}</dd></div>
+            <div class="ds-detalhe-item"><dt>Gatilho</dt><dd>${escapeHtmlDisparo(GATILHO_LABEL[d.gatilho] || d.gatilho || '—')}</dd></div>
+            <div class="ds-detalhe-item"><dt>Modelo</dt><dd>${escapeHtmlDisparo(d.template_nome || '—')}</dd></div>
+          </dl>
+          <div>
+            <p class="ds-detalhe-secao">Mensagem</p>
+            <div class="ds-mensagem">
+              ${d.mensagem_texto ? `<p class="ds-mensagem-balao">${escapeHtmlDisparo(d.mensagem_texto)}</p>` : '<p class="ds-mensagem-balao ds-mensagem-vazia">Texto não registrado (disparo anterior ao registro de mensagens).</p>'}
+              <p class="ds-mensagem-rodape">${KyvvoDS.dataCompleta(d.criado_em)}</p>
+            </div>
+          </div>
+        </div>`, { classeExtra: 'ds-modal-card-detalhe' });
     }
 
     function renderCardDisparos(dados) {
       const limite = dados.limitePlano;
-      let blocoLimite = '';
-      if (limite) {
-        if (limite.limite == null) {
-          blocoLimite = `
-            <div class="disparos-metrica">
-              <div class="valor">${limite.usadoMesAtual}</div>
-              <div class="rotulo">Disparos este mês (plano ${limite.planoNome} — sem limite)</div>
-            </div>`;
-        } else {
-          const estourou = limite.usadoMesAtual >= limite.limite;
-          blocoLimite = `
-            <div class="disparos-metrica${estourou ? ' disparos-limite-estourado' : ''}">
-              <div class="valor">${limite.usadoMesAtual} / ${limite.limite}</div>
-              <div class="rotulo">Uso do mês (plano ${limite.planoNome})${estourou ? ' — limite atingido' : ''}</div>
-            </div>`;
-        }
-      }
+      const temLimite = limite && limite.limite != null;
+      const rotulo = limite ? `Disparos este mês · plano ${escapeHtmlDisparo(limite.planoNome)}` : 'Disparos de WhatsApp';
+      const usado = limite ? limite.usadoMesAtual : dados.realizados;
+      const medidor = `
+        <div class="ds-medidor"${temLimite ? ` data-ds-medidor data-ds-usado="${limite.usadoMesAtual}" data-ds-limite="${limite.limite}"` : ''}>
+          <div class="ds-medidor-cab"><p class="ds-medidor-rotulo">${rotulo}</p></div>
+          <p class="ds-medidor-valor"><span class="ds-medidor-usado">${usado}</span>${temLimite ? ` <span class="ds-medidor-limite">de <span class="ds-medidor-limite-valor">${limite.limite}</span></span>` : (limite ? ' <span class="ds-medidor-limite">sem limite no plano</span>' : ' <span class="ds-medidor-limite">realizados</span>')}</p>
+          ${temLimite ? '<div class="ds-medidor-trilho"><div class="ds-medidor-barra"></div></div>' : ''}
+          <p class="ds-medidor-legenda"><span>Total de disparos: ${dados.total}</span><span>Realizados com sucesso: ${dados.realizados}</span></p>
+        </div>`;
+      const opcoesStatus = Object.keys(STATUS_DISPARO_LABEL).map((k) => `<option value="${k}">${STATUS_DISPARO_LABEL[k]}</option>`).join('');
+      const seta = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+      return `${medidor}
+        <div class="ds-tabela" role="table" aria-label="Disparos" style="--ds-colunas: 130px minmax(0,1.2fr) minmax(0,1.1fr) minmax(0,1.2fr) 170px">
+          <div class="ds-filtros">
+            <div class="ds-pesquisa">
+              <svg class="ds-pesquisa-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input class="ds-pesquisa-input" type="search" id="disp-busca" placeholder="Buscar candidato ou telefone" aria-label="Buscar candidato ou telefone">
+            </div>
+            <div class="ds-select"><select id="disp-status" aria-label="Status"><option value="">Todos os status</option>${opcoesStatus}</select>${seta}</div>
+            <div class="ds-select"><select id="disp-periodo" aria-label="Período"><option value="">Todo o período</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option></select>${seta}</div>
+            <div class="ds-filtros-fim"><button type="button" class="ds-btn ds-btn-ghost ds-btn-sm" id="disp-limpar" hidden>Limpar filtros</button></div>
+          </div>
+          <div class="ds-tabela-cabecalho" role="row">
+            <span role="columnheader">Quando</span><span role="columnheader">Candidato</span><span role="columnheader">Telefone</span><span role="columnheader">Modelo</span><span role="columnheader">Status</span>
+          </div>
+          <div id="disp-linhas"></div>
+          <div class="ds-tabela-rodape"><nav data-ds-paginacao id="disp-paginacao" data-ds-total="0" data-ds-tamanho="10" data-ds-tamanhos="10,25,50"></nav></div>
+        </div>`;
+    }
 
-      return `
-        <div class="disparos-cabecalho">
-          <div>
-            <div class="disparos-titulo">Disparos de WhatsApp</div>
-            <div class="rotulo" style="font-size:12px; color:var(--muted)">Mensagens automáticas enviadas pelo fluxo de vaga.</div>
-          </div>
-        </div>
-        <div class="disparos-resumo">
-          <div class="disparos-metrica">
-            <div class="valor">${dados.total}</div>
-            <div class="rotulo">Total de disparos</div>
-          </div>
-          <div class="disparos-metrica">
-            <div class="valor">${dados.realizados}</div>
-            <div class="rotulo">Realizados com sucesso</div>
-          </div>
-          ${blocoLimite}
-        </div>
-        <div class="disparos-historico">
-          <table>
-            <thead><tr><th>Data/hora</th><th>Candidato</th><th>Telefone</th><th>Template</th><th>Mensagem</th><th>Status</th></tr></thead>
-            <tbody>${dados.disparos.map(renderLinhaDisparo).join('') || '<tr><td colspan="6" style="text-align:center; color:var(--muted)">Nenhum disparo ainda.</td></tr>'}</tbody>
-          </table>
-        </div>
-      `;
+    function ligarDisparos() {
+      const pag = document.getElementById('disp-paginacao');
+      pag.addEventListener('ds-paginacao-alterar', (e) => { estadoDisparos.pagina = e.detail.pagina; estadoDisparos.tamanho = e.detail.tamanho; desenharDisparos(); });
+      ['disp-busca', 'disp-status', 'disp-periodo'].forEach((id) => {
+        document.getElementById(id).addEventListener(id === 'disp-busca' ? 'input' : 'change', () => { estadoDisparos.pagina = 1; desenharDisparos(); });
+      });
+      document.getElementById('disp-limpar').addEventListener('click', () => {
+        ['disp-busca', 'disp-status', 'disp-periodo'].forEach((id) => { document.getElementById(id).value = ''; });
+        estadoDisparos.pagina = 1; desenharDisparos();
+      });
+      document.getElementById('disp-linhas').addEventListener('click', (e) => {
+        const linha = e.target.closest('[data-indice]');
+        if (linha) abrirDetalheDisparo(disparos[Number(linha.dataset.indice)]);
+      });
     }
 
     let disparosCarregados = false;
     async function carregarDisparos() {
       const card = document.getElementById('card-disparos');
-      card.innerHTML = '<div class="estado-vazio-automacoes">Carregando...</div>';
+      card.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-texto">Carregando…</p></div>';
       const res = await apiFetch('/people/api/automacoes/disparos');
       const dados = await res.json();
+      disparos = dados.disparos || [];
+      card.className = 'pilha';
       card.innerHTML = renderCardDisparos(dados);
+      const medidor = card.querySelector('[data-ds-medidor]');
+      if (medidor) KyvvoDS.medidorAtualizar(medidor, medidor.dataset.dsUsado, medidor.dataset.dsLimite);
+      ligarDisparos();
+      desenharDisparos();
+      const contagem = document.getElementById('contagem-disparos');
+      contagem.textContent = dados.total; contagem.hidden = false;
       disparosCarregados = true;
     }
 
