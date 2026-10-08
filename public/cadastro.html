@@ -194,6 +194,7 @@
         if (!res.ok) { erroGeral.textContent = data.error || 'Erro ao criar conta. Tente novamente.'; return; }
         localStorage.setItem('people_token', data.token);
         localStorage.setItem('people_nome', data.nome || '');
+        localStorage.setItem('people_outros_produtos', JSON.stringify(data.outros_produtos || []));
         window.location.href = '/people/plano-cobranca.html';
       } catch (err) {
         erroGeral.textContent = 'Erro ao processar. Tente novamente.';
