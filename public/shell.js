@@ -20,6 +20,7 @@ async function apiFetch(url, opts = {}) {
   if (res.status === 401) {
     localStorage.removeItem('people_token');
     localStorage.removeItem('people_nome');
+    localStorage.removeItem('people_outros_produtos');
     window.location.href = '/people/login.html';
     throw new Error('Sessão expirada');
   }
@@ -165,20 +166,27 @@ document.querySelectorAll('.js-nome-usuario').forEach((el) => { el.textContent =
 // E-mail só pra exibição no menu de perfil — decodifica o payload do JWT
 // sem verificar (o próprio dono do token já enxerga esse conteúdo).
 let emailUsuario = '';
-let outrosProdutosUsuario = [];
 try {
   const payloadToken = JSON.parse(atob(token.split('.')[1]));
   emailUsuario = payloadToken.email || '';
-  outrosProdutosUsuario = payloadToken.outrosProdutos || [];
 } catch {
   emailUsuario = '';
 }
 document.querySelectorAll('.js-email-usuario').forEach((el) => { el.textContent = emailUsuario; });
 
 // "Trocar de produto" — outros produtos Kyvvo que o mesmo tenant também tem
-// ativo (embutido no token no login, ver kyvvo-people/index.js). Logo acima
-// de "Sair da conta" (People não tem um item "Meu Perfil" pra ancorar
-// embaixo, só "Configurações").
+// ativo. Corte de sessão (RS256 unificado): o token agora é emitido pelo
+// platform e não carrega mais isso — vem separado na resposta do login,
+// cacheado em localStorage (mesmo padrão já usado pra people_nome), não
+// mais decodificado do token (ver kyvvo-people/index.js, kyvvo-people/
+// public/login.html). Logo acima de "Sair da conta" (People não tem um
+// item "Meu Perfil" pra ancorar embaixo, só "Configurações").
+let outrosProdutosUsuario = [];
+try {
+  outrosProdutosUsuario = JSON.parse(localStorage.getItem('people_outros_produtos') || '[]');
+} catch {
+  outrosProdutosUsuario = [];
+}
 const menuOutrosProdutos = document.getElementById('menu-perfil-outros-produtos');
 if (menuOutrosProdutos) {
   menuOutrosProdutos.innerHTML = outrosProdutosUsuario
@@ -196,7 +204,7 @@ document.addEventListener('click', (e) => {
   if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   const destinoDireto = link.href;
-  apiFetch('/people/api/meus-produtos/handoff', { method: 'POST', body: JSON.stringify({ produto: link.dataset.produtoChave }) })
+  apiFetch('/people/api/meus-produtos/handoff', { method: 'POST', body: JSON.stringify({ produto: link.dataset.produtoChave, nome: localStorage.getItem('people_nome') || '', outrosProdutos: outrosProdutosUsuario }) })
     .then((res) => res.json())
     .then((dados) => { window.location.href = (dados && dados.url) || destinoDireto; })
     .catch(() => { window.location.href = destinoDireto; });
@@ -206,6 +214,7 @@ document.querySelectorAll('.btn-sair').forEach((btn) => {
   btn.addEventListener('click', () => {
     localStorage.removeItem('people_token');
     localStorage.removeItem('people_nome');
+    localStorage.removeItem('people_outros_produtos');
     window.location.href = '/people/login.html';
   });
 });

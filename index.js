@@ -3,7 +3,6 @@ require('dotenv').config();
 const path = require('path');
 const crypto = require('crypto');
 const Fastify = require('fastify');
-const fastifyJwt = require('@fastify/jwt');
 const fastifyStatic = require('@fastify/static');
 const fastifyMultipart = require('@fastify/multipart');
 
@@ -26,6 +25,8 @@ const { listarTemplates } = require('./lib/whatsapp');
 const asaas = require('./lib/asaas');
 const planosPeople = require('./lib/planos');
 const { buscarMensagensAtivas } = require('./lib/mensagens-admin');
+const platform = require('./lib/platform');
+const { resolverClaims } = require('./lib/resolver-sessao');
 
 const PORT = process.env.PORT || 3002;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://people.kyvvo.com.br';
@@ -47,8 +48,9 @@ async function buscarTokenAvaliacao(avaliacaoId) {
 const PLATFORM_URL = process.env.PLATFORM_URL || 'http://platform:3003';
 // "Trocar de produto" no menu de perfil: outros produtos Kyvvo que o mesmo
 // tenant também tem ativo. Resolvido uma vez no login usando o token RS256
-// do kyvvo-platform que já temos em mãos naquele momento — o People nunca
-// guarda esse token, só o resultado já filtrado, embutido no próprio JWT.
+// do kyvvo-platform que já temos em mãos naquele momento — o resultado já
+// filtrado vai pro front, que cacheia em localStorage (o token RS256 do
+// platform em si não carrega mais essa lista).
 const PRODUTOS_CRUZADOS_PEOPLE = {
   agenda_inteligente: { chave: 'studio', nome: 'Studio', url: 'https://studio.kyvvo.com.br' },
   crm: { chave: 'crm', nome: 'CRM', url: 'https://crm.kyvvo.com.br' },
@@ -74,8 +76,6 @@ const CARACTERISTICAS_PUBLICAS = CARACTERISTICAS.map((c) => ({ id: c.id, texto: 
 async function build() {
   const fastify = Fastify({ logger: true });
 
-  fastify.register(fastifyJwt, { secret: process.env.PEOPLE_JWT_SECRET });
-
   // Rotas de pagamento continuam liberadas mesmo sem assinatura fechada —
   // senão ninguém conseguiria pagar pra sair do bloqueio abaixo.
   const ROTAS_LIVRES_SEM_ASSINATURA = new Set([
@@ -84,14 +84,18 @@ async function build() {
     'DELETE /people/api/pagamentos/assinatura',
   ]);
 
-  // Mesmo padrão do `authenticateAdmin` do painel principal (server/panel/index.js):
-  // secret próprio, sem lookup em banco por request — adequado pra 1 usuário fixo.
+  // Sessão não é mais JWT local assinado pelo People: o kyvvo-platform é a
+  // única autoridade de auth (mesmo corte já feito no Studio) — token RS256
+  // verificado local via @kyvvohq/platform-client (JWKS, sem round-trip).
   fastify.decorate('authenticate', async (request, reply) => {
-    try {
-      await request.jwtVerify();
-    } catch {
+    const claims = await resolverClaims({
+      authorizationHeader: request.headers.authorization,
+      verificarRs256: (token) => platform.verifyToken(token),
+    });
+    if (!claims) {
       return reply.code(401).send({ error: 'Não autenticado' });
     }
+    request.user = claims;
 
     // Bloqueio por assinatura não fechada (pedido do Bruno, 2026-09-11): quem
     // nunca pagou não pode fazer NADA no produto até confirmar o pagamento —
@@ -138,8 +142,8 @@ async function build() {
   // vez de credencial fixa — qualquer usuário Kyvvo com o módulo "people"
   // ativo pode entrar. O People nunca vê/toca usuarios/tenants: só confia numa
   // checagem servidor-a-servidor (POST /api/auth/login + GET
-  // /api/auth/people/acesso na plataforma) e emite seu próprio JWT interno
-  // (12h, PEOPLE_JWT_SECRET) depois.
+  // /api/auth/people/acesso na plataforma) e devolve o token RS256 do
+  // platform direto pro front (corte de sessão unificado — sem JWT próprio).
   fastify.post('/people/api/login', async (request, reply) => {
     const { email, senha } = request.body || {};
     if (!email || !senha) {
@@ -162,12 +166,12 @@ async function build() {
       const dados = await loginRes.json().catch(() => ({}));
       return reply.code(401).send({ error: dados.error || 'E-mail ou senha inválidos' });
     }
-    const { token: kyvvoToken, nome } = await loginRes.json();
+    const { token, nome } = await loginRes.json();
 
     let acessoRes;
     try {
       acessoRes = await fetch(`${PLATFORM_URL}/api/auth/people/acesso`, {
-        headers: { Authorization: `Bearer ${kyvvoToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(8000),
       });
     } catch (err) {
@@ -189,7 +193,7 @@ async function build() {
     let outrosProdutos = [];
     try {
       const entRes = await fetch(`${PLATFORM_URL}/entitlements/${tenantId}`, {
-        headers: { Authorization: `Bearer ${kyvvoToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(8000),
       });
       if (entRes.ok) {
@@ -200,8 +204,7 @@ async function build() {
       request.log.warn(`Falha ao buscar outros produtos do tenant: ${err.message}`);
     }
 
-    const token = fastify.jwt.sign({ tenantId, email, nome, outrosProdutos }, { expiresIn: '12h' });
-    return { token, nome };
+    return { token, nome, outros_produtos: outrosProdutos };
   });
 
   // "Trocar de produto" (menu de perfil) — gera um código de handoff de
@@ -209,21 +212,21 @@ async function build() {
   // sessão já autenticada (ver GET /people/sso abaixo e o par simétrico em
   // kyvvo-studio/kyvvo-crm).
   fastify.post('/people/api/meus-produtos/handoff', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const produtoDestino = (request.body || {}).produto;
+    const { produto: produtoDestino, nome: nomeBody, outrosProdutos: outrosProdutosBody } = request.body || {};
     const destino = PRODUTOS_HANDOFF_DESTINO[produtoDestino];
     if (!destino) {
       return reply.code(400).send({ error: 'Produto inválido' });
     }
-    const { tenantId, email, nome } = request.user;
-    // outrosProdutos do PONTO DE VISTA DO DESTINO (bug real em produção,
-    // 2026-09-30) — o People não tem como consultar /entitlements aqui (o
-    // token RS256 do platform só existe no momento do login, já descartado),
-    // mas já tem a resposta de quando logou, embutida no próprio JWT
-    // (request.user.outrosProdutos) — só repassa, tirando o destino da
-    // lista (ele não precisa linkar pra si mesmo). Pode estar levemente
-    // desatualizado (até 12h, mesma janela do token) — aceitável, mesmo
+    const { tenantId, email } = request.user;
+    // nome e outrosProdutos do PONTO DE VISTA DO DESTINO (bug real em
+    // produção, 2026-09-30) — o token RS256 do platform não carrega mais
+    // esses campos (corte de sessão unificado), então o front manda o que
+    // já tem cacheado em localStorage desde o login (ver public/shell.js) —
+    // tira o destino da lista de outros produtos (ele não precisa linkar
+    // pra si mesmo). Pode estar levemente desatualizado — aceitável, mesmo
     // trade-off já feito pro resto do "trocar de produto".
-    const outrosProdutos = (request.user.outrosProdutos || []).filter((p) => p.chave !== produtoDestino);
+    const nome = nomeBody || '';
+    const outrosProdutos = (outrosProdutosBody || []).filter((p) => p.chave !== produtoDestino);
     try {
       const res = await fetch(`${PLATFORM_URL}/internal/handoff`, {
         method: 'POST',
@@ -257,17 +260,17 @@ async function build() {
       const res = await fetch(`${PLATFORM_URL}/internal/handoff/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_HANDOFF_TOKEN },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, emitirToken: true }),
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return reply.redirect('/people/login.html');
-      const { tenantId, email, nome, outrosProdutos } = await res.json();
+      const { nome, outrosProdutos, token } = await res.json();
 
-      const token = fastify.jwt.sign({ tenantId, email, nome, outrosProdutos: outrosProdutos || [] }, { expiresIn: '12h' });
       reply.type('text/html');
       return `<!doctype html><html><body><script>
         localStorage.setItem('people_token', ${JSON.stringify(token)});
         localStorage.setItem('people_nome', ${JSON.stringify(nome || '')});
+        localStorage.setItem('people_outros_produtos', ${JSON.stringify(JSON.stringify(outrosProdutos || []))});
         location.href = '/people/painel.html';
       </script></body></html>`;
     } catch (err) {
@@ -302,8 +305,9 @@ async function build() {
     // O token do platform (RS256) já carrega tenantId no payload — decodifica
     // sem verificar assinatura (confiamos na resposta HTTPS do próprio
     // serviço que acabamos de chamar, mesmo princípio de confiança do login
-    // logo acima). Não usamos esse token diretamente: o People sempre emite
-    // o seu próprio (12h, PEOPLE_JWT_SECRET), igual ao login.
+    // logo acima), só pra gravar a linha de assinatura. O token em si é
+    // devolvido direto pro front, sem reassinar (corte de sessão unificado —
+    // o People não emite JWT próprio nunca mais).
     let tenantId;
     try {
       tenantId = JSON.parse(Buffer.from(dados.token.split('.')[1], 'base64url').toString('utf8')).tenantId;
@@ -313,8 +317,7 @@ async function build() {
     }
 
     await pool.query('insert into assinaturas (tenant_id) values ($1) on conflict (tenant_id) do nothing', [tenantId]);
-    const token = fastify.jwt.sign({ tenantId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
-    return reply.code(201).send({ token, nome: dados.nome });
+    return reply.code(201).send({ token: dados.token, nome: dados.nome, outros_produtos: [] });
   });
 
   // Catálogo de planos pra tela pública de cadastro (sem sessão ainda) —
