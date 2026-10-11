@@ -210,8 +210,28 @@
       const id = e.target.closest('[data-id]').dataset.id;
       if (e.detail.acao === 'editar') abrirFormulario(automacoes.find((x) => x.id === id));
       else if (e.detail.acao === 'duplicar') { await apiFetch(`/people/api/automacoes/${id}/duplicar`, { method: 'POST' }); await carregar(); }
-      else if (e.detail.acao === 'excluir') { await apiFetch(`/people/api/automacoes/${id}`, { method: 'DELETE' }); await carregar(); }
+      else if (e.detail.acao === 'excluir') confirmarExcluir(automacoes.find((x) => x.id === id));
     });
+
+    // Exclusão é destrutiva e imediata (automação para de disparar na hora) —
+    // merece confirmação, mesmo padrão já usado no resto do People
+    // (candidatos.html, quadro.html: .btn-secundario/.btn-perigo).
+    function confirmarExcluir(automacao) {
+      if (!automacao) return;
+      abrirModal('<h3>Excluir automação?</h3>', `
+        <p class="modal-texto">"${escapeHtmlDisparo(automacao.nome)}" para de disparar imediatamente. Essa ação não pode ser desfeita.</p>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="excluir-automacao-voltar">Voltar</button>
+          <button type="button" class="btn-perigo" id="excluir-automacao-confirmar">Excluir</button>
+        </div>
+      `);
+      document.getElementById('excluir-automacao-voltar').addEventListener('click', fecharModal);
+      document.getElementById('excluir-automacao-confirmar').addEventListener('click', async () => {
+        await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'DELETE' });
+        fecharModal();
+        await carregar();
+      });
+    }
 
     document.getElementById('filtro-gatilho').addEventListener('change', (e) => {
       filtroGatilho = e.target.value;
