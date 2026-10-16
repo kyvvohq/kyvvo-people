@@ -1955,7 +1955,7 @@ async function build() {
       [request.params.id]
     );
     const vaga = rows[0];
-    if (!vaga || vaga.status === 'encerrada' || vaga.status === 'rascunho') {
+    if (!vaga || vaga.status === 'encerrada' || vaga.status === 'cancelada' || vaga.status === 'rascunho') {
       return reply.code(404).send({ error: 'Vaga não encontrada ou encerrada' });
     }
     return vaga;
@@ -1964,7 +1964,7 @@ async function build() {
   fastify.post('/people/api/vaga-publica/:id/candidatar', async (request, reply) => {
     const { rows: vagaRows } = await pool.query("select id, tenant_id, status from vagas where id = $1", [request.params.id]);
     const vaga = vagaRows[0];
-    if (!vaga || vaga.status === 'encerrada' || vaga.status === 'rascunho') {
+    if (!vaga || vaga.status === 'encerrada' || vaga.status === 'cancelada' || vaga.status === 'rascunho') {
       return reply.code(404).send({ error: 'Vaga não encontrada ou encerrada' });
     }
 
