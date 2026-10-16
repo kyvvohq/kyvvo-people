@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Candidato</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){var m={escuro:'dark',claro:'light',dark:'dark',light:'light'};document.documentElement.setAttribute('data-theme',m[localStorage.getItem('people_tema')]||'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/people/shell.css">
+<style>
+  .voltar { display:inline-flex; align-items:center; gap:6px; color:var(--muted-strong); text-decoration:none; font-size:13px; font-weight:600; margin-bottom:10px; }
+  .voltar:hover { color:var(--text); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+  @media(max-width:520px) { .grid2 { grid-template-columns:1fr; } }
+  .campo-arquivo { display:flex; align-items:center; gap:10px; }
+  .campo-arquivo input[type=file] { font-size:12.5px; }
+
+  .detalhe-cabecalho { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:20px; border-bottom:1px solid var(--border); }
+  .detalhe-cabecalho h2 { font-size:18px; margin:0 0 6px; color:var(--text); font-family:var(--font-display); }
+  .detalhe-cabecalho .info { font-size:13px; color:var(--muted); line-height:1.7; }
+  .detalhe-cabecalho .info a { color:var(--accent); text-decoration:none; }
+
+  .detalhe-visualizador { min-height:400px; background:var(--bg); display:flex; align-items:center; justify-content:center; }
+  .detalhe-visualizador iframe { width:100%; height:78vh; border:none; display:block; }
+  .detalhe-sem-preview { padding:60px 20px; text-align:center; color:var(--muted); font-size:13.5px; }
+  .detalhe-acoes { display:flex; gap:10px; justify-content:flex-end; padding:16px 20px; border-top:1px solid var(--border); flex-wrap:wrap; }
+</style>
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/people/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">Pe</span>ople</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <a class="menu-perfil-item" href="/people/configuracoes.html">
+          <span data-icon="settings" data-size="16"></span><span class="rotulo">Configurações</span>
+        </a>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/people/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Visão geral</span></a></li>
+        <li><a class="ds-menu-link" href="/people/vagas.html"><span class="ds-menu-icone" data-icon="briefcase"></span><span class="ds-menu-rotulo">Vagas</span></a></li>
+        <li><a class="ds-menu-link ds-menu-link-ativo" href="/people/candidatos.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Candidatos</span></a></li>
+        <li><a class="ds-menu-link" href="/people/avaliacoes.html"><span class="ds-menu-icone" data-icon="brain"></span><span class="ds-menu-rotulo">Avaliações</span></a></li>
+        <li><a class="ds-menu-link" href="/people/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/people/percentil.html"><span class="ds-menu-icone" data-icon="trending-up"></span><span class="ds-menu-rotulo">Percentil</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/people/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/people/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/people/configuracoes.html">Geral</a></li>
+            <li><a class="ds-menu-sublink" href="/people/plano-cobranca.html">Plano e Cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <a class="voltar" href="/people/candidatos.html"><span id="icone-voltar"></span> Voltar aos candidatos</a>
+      <div class="card" style="padding:0" id="detalhe-container">Carregando...</div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="People"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/people/shell.js"></script>
+  <script>
+    document.getElementById('icone-voltar').innerHTML = icon('arrow-left', 16);
+
+    const STATUS_CLASSE = { nova: 'destaque', reprovada: 'perigo', aprovada: 'sucesso' };
+    const STATUS_LABEL = { nova: 'Nova', reprovada: 'Reprovada', aprovada: 'Aprovada' };
+    const EFEITO_LABEL = { corrobora: 'Corrobora', contradiz: 'Contradiz', parcial: 'Parcial', contexto: 'Contexto' };
+    const SINAL_ELIMINATORIO_LABEL = { sem_evidencia: 'Sem evidência', atende: 'Atende', nao_atende: 'Não atende', conflitante: 'Conflitante' };
+
+    const candidaturaId = new URLSearchParams(window.location.search).get('id');
+    let candidaturas = [];
+    let vagas = [];
+    let etapas = [];
+    let urlPreview = null;
+
+    async function carregarListas() {
+      const [resCand, resVagas, resEtapas] = await Promise.all([
+        apiFetch('/people/api/candidaturas'),
+        apiFetch('/people/api/vagas'),
+        apiFetch('/people/api/etapas'),
+      ]);
+      candidaturas = await resCand.json();
+      vagas = await resVagas.json();
+      etapas = await resEtapas.json();
+    }
+
+    function nomeEtapa(etapaId) {
+      if (!etapaId) return 'Nova';
+      const etapa = etapas.find((e) => e.id === etapaId);
+      return etapa ? etapa.nome : 'Nova';
+    }
+
+    function opcoesVagas(selecionadoId) {
+      return vagas.map((v) => `<option value="${v.id}" ${v.id === selecionadoId ? 'selected' : ''}>${v.nome}</option>`).join('');
+    }
+
+    async function renderizarDetalhe() {
+      const detalheEl = document.getElementById('detalhe-container');
+      detalheEl.innerHTML = '<div class="vazio" style="padding:20px">Carregando...</div>';
+
+      const res = await apiFetch(`/people/api/candidaturas/${candidaturaId}`);
+      if (!res.ok) { detalheEl.innerHTML = '<div class="vazio" style="padding:20px">Candidatura não encontrada.</div>'; return; }
+      const c = await res.json();
+
+      // Mesma pessoa pode ter mais de uma candidatura simultânea — a
+      // listagem principal comprime isso numa linha só (badge +N), aqui
+      // no detalhe é onde as outras ficam acessíveis de fato.
+      const irmas = candidaturas.filter((x) => x.candidato_id === c.candidato_id);
+
+      detalheEl.innerHTML = `
+        <div class="detalhe-cabecalho">
+          <div>
+            <h2>${c.nome}</h2>
+            <div class="info">
+              ${c.vaga_nome} · <span class="badge ${STATUS_CLASSE[c.status]}">${STATUS_LABEL[c.status]}</span> · Etapa: ${nomeEtapa(c.etapa_id)}
+              ${c.score ? ` · Score: <strong>${c.score.geral}</strong>` : ''}
+              ${c.aderencia && c.aderencia.percentil != null ? ` · Percentil no pool: <strong>${c.aderencia.percentil}º</strong>` : ''}
+              <a class="acao" href="#" id="btn-editar-score" style="margin-left:6px">${c.score ? 'Editar score' : 'Lançar score'}</a><br>
+              ${c.whatsapp}${c.whatsapp_opt_out ? ' <span class="badge neutro" title="Pediu pra não receber mais WhatsApp">Opt-out</span>' : ''} · ${c.email}${c.linkedin ? ` · <a href="${c.linkedin}" target="_blank" rel="noopener">LinkedIn</a>` : ''}<br>
+              <a class="acao" href="#" id="btn-banco-talentos">Adicionar a outra vaga</a>
+              ${c.anonimizado_em
+                ? '<a class="acao" href="#" id="btn-reverter-anonimizar">Reverter mascaramento</a>'
+                : '<a class="acao" href="#" id="btn-anonimizar" style="color:var(--danger)">Anonimizar</a>'}
+              <a class="acao" href="#" id="btn-toggle-opt-out"${c.whatsapp_opt_out ? '' : ' style="color:var(--danger)"'}>${c.whatsapp_opt_out ? 'Reativar WhatsApp' : 'Não contatar via WhatsApp'}</a>
+              ${irmas.length > 1 ? `
+                <div style="margin-top:6px">Outras candidaturas: ${irmas.map((x) => `<a href="#" class="acao candidatura-irma" data-id="${x.id}" style="margin-right:10px${x.id === c.id ? ';font-weight:700;color:var(--text);pointer-events:none' : ''}">${x.vaga_nome}${x.vaga_status === 'encerrada' ? ' (encerrada)' : ''}</a>`).join('')}</div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="detalhe-visualizador" id="detalhe-visualizador">
+          <div class="detalhe-sem-preview">Carregando currículo...</div>
+        </div>
+        ${c.curriculo_nome !== 'sem-arquivo' ? blocoCurriculoEstruturado(c) : ''}
+        <div class="detalhe-evidencias" id="detalhe-evidencias">
+          <div class="detalhe-sem-preview">Carregando evidências...</div>
+        </div>
+        <div class="detalhe-acoes">
+          <a class="btn-secundario" href="/people/candidatura-relatorio.html?id=${c.id}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center">Relatório completo</a>
+          ${c.curriculo_nome !== 'sem-arquivo' ? '<button class="btn-secundario" id="btn-download-curriculo" type="button">Baixar currículo</button>' : ''}
+          <button class="btn-perigo" id="btn-reprovar" type="button"${c.status === 'reprovada' ? ' disabled' : ''}>Reprovar</button>
+          <button class="btn" id="btn-proxima-etapa" type="button">Próxima etapa</button>
+        </div>
+      `;
+
+      const btnDownload = document.getElementById('btn-download-curriculo');
+      if (btnDownload) btnDownload.addEventListener('click', () => baixarCurriculo(c.id, c.curriculo_nome));
+      document.getElementById('btn-reprovar').addEventListener('click', () => confirmarReprovar(c));
+      document.getElementById('btn-proxima-etapa').addEventListener('click', () => avancarEtapa(c));
+      document.getElementById('btn-editar-score').addEventListener('click', (e) => { e.preventDefault(); formularioScore(c); });
+      const btnEditarCurriculo = document.getElementById('btn-editar-curriculo-estruturado');
+      if (btnEditarCurriculo) btnEditarCurriculo.addEventListener('click', (e) => { e.preventDefault(); formularioCurriculoEstruturado(c); });
+      document.getElementById('btn-banco-talentos').addEventListener('click', (e) => { e.preventDefault(); formularioBancoDeTalentos(c); });
+      const btnAnonimizar = document.getElementById('btn-anonimizar');
+      if (btnAnonimizar) btnAnonimizar.addEventListener('click', (e) => { e.preventDefault(); confirmarAnonimizar(c); });
+      const btnReverter = document.getElementById('btn-reverter-anonimizar');
+      if (btnReverter) btnReverter.addEventListener('click', (e) => { e.preventDefault(); reverterAnonimizar(c); });
+      document.getElementById('btn-toggle-opt-out').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await apiFetch(`/people/api/candidatos/${c.candidato_id}/whatsapp-opt-out`, {
+          method: 'PATCH',
+          body: JSON.stringify({ opt_out: !c.whatsapp_opt_out }),
+        });
+        renderizarDetalhe();
+      });
+      detalheEl.querySelectorAll('.candidatura-irma').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (el.dataset.id !== c.id) window.location.href = `/people/candidato-detalhe.html?id=${el.dataset.id}`;
+        });
+      });
+
+      carregarPreview(c);
+      carregarEvidencias(c);
+    }
+
+    // #48: resumo somente-leitura dos dados de carreira extraídos do
+    // currículo (via Claude Haiku, no envio da candidatura). Extração é
+    // best-effort e assíncrona — pode ainda não ter rodado, ter falhado, ou
+    // simplesmente não ter achado nada; nesses casos o bloco fica vazio,
+    // nunca é erro (Regra 0.3: ausência de evidência é neutra).
+    function blocoCurriculoEstruturado(c) {
+      const dados = c.curriculo_estruturado;
+      const vazio = !dados || (!dados.experiencias?.length && !dados.ferramentas?.length && !dados.formacao?.length);
+      return `
+        <div class="detalhe-curriculo-estruturado" style="padding:16px 20px; border-top:1px solid var(--border)">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+            <strong style="font-size:13px">Dados extraídos do currículo</strong>
+            <a class="acao" href="#" id="btn-editar-curriculo-estruturado">${vazio ? 'Preencher' : 'Editar'}</a>
+          </div>
+          ${vazio
+            ? '<p class="campo-ajuda">Extração automática ainda não disponível (pode estar em andamento, ter falhado, ou não ter achado nada no arquivo). Isso não bloqueia a candidatura — dá pra preencher à mão.</p>'
+            : `
+              ${dados.experiencias.length ? `<div><strong style="font-size:12px">Experiências</strong><ul style="margin:4px 0 10px; padding-left:18px; font-size:13px">${dados.experiencias.map((e) => `<li>${e.cargo}${e.empresa ? ` — ${e.empresa}` : ''}${e.duracao_meses ? ` (${e.duracao_meses}m)` : ''}</li>`).join('')}</ul></div>` : ''}
+              ${dados.ferramentas.length ? `<div style="margin-bottom:10px"><strong style="font-size:12px">Ferramentas</strong><div>${dados.ferramentas.map((f) => `<span class="badge neutro" style="margin:4px 4px 0 0; display:inline-block">${f}</span>`).join('')}</div></div>` : ''}
+              ${dados.formacao.length ? `<div><strong style="font-size:12px">Formação</strong><ul style="margin:4px 0 0; padding-left:18px; font-size:13px">${dados.formacao.map((f) => `<li>${f.curso}${f.instituicao ? ` — ${f.instituicao}` : ''}</li>`).join('')}</ul></div>` : ''}
+            `}
+          ${c.curriculo_estruturado_revisado_em ? `<p class="campo-ajuda" style="margin-top:8px">Revisado por ${c.curriculo_estruturado_revisado_por} em ${new Date(c.curriculo_estruturado_revisado_em).toLocaleString('pt-BR')}</p>` : ''}
+        </div>
+      `;
+    }
+
+    // Formato de texto simples pra edição — uma experiência/formação por
+    // linha ("Cargo — Empresa (18m)" / "Curso — Instituição"), ferramentas
+    // separadas por vírgula. O servidor tolera qualquer coisa incompleta
+    // (normalizarCurriculoEstruturado), então o parser aqui não precisa ser
+    // rigoroso: melhor esforço, sem travar o recrutador com validação.
+    function textoExperiencias(lista) {
+      return (lista || []).map((e) => {
+        let linha = [e.cargo || '', e.empresa || ''].filter(Boolean).join(' — ');
+        if (e.duracao_meses) linha += ` (${e.duracao_meses}m)`;
+        return linha;
+      }).join('\n');
+    }
+    function parseExperiencias(texto) {
+      return texto.split('\n').map((l) => l.trim()).filter(Boolean).map((linha) => {
+        const matchMeses = linha.match(/\((\d+)\s*m\)\s*$/i);
+        const duracao_meses = matchMeses ? Number(matchMeses[1]) : null;
+        const semMeses = (matchMeses ? linha.slice(0, matchMeses.index) : linha).trim();
+        const [cargo, empresa] = semMeses.split('—').map((p) => (p || '').trim());
+        return { cargo: cargo || '', empresa: empresa || '', duracao_meses };
+      });
+    }
+    function textoFormacao(lista) {
+      return (lista || []).map((f) => [f.curso || '', f.instituicao || ''].filter(Boolean).join(' — ')).join('\n');
+    }
+    function parseFormacao(texto) {
+      return texto.split('\n').map((l) => l.trim()).filter(Boolean).map((linha) => {
+        const [curso, instituicao] = linha.split('—').map((p) => (p || '').trim());
+        return { curso: curso || '', instituicao: instituicao || '' };
+      });
+    }
+
+    function formularioCurriculoEstruturado(c) {
+      const dados = c.curriculo_estruturado || { experiencias: [], ferramentas: [], formacao: [] };
+      abrirModal(
+        '<h3>Dados extraídos do currículo</h3>',
+        `
+          <form id="form-curriculo-estruturado">
+            <p class="campo-ajuda">Uma experiência/formação por linha. Duração em meses é opcional, entre parênteses no fim.</p>
+            <label for="ce-experiencias">Experiências (ex.: "Dev Backend — Acme (18m)")</label>
+            <textarea id="ce-experiencias" rows="4" style="width:100%; box-sizing:border-box; font:inherit">${textoExperiencias(dados.experiencias)}</textarea>
+            <label for="ce-ferramentas" style="margin-top:10px; display:block">Ferramentas (separadas por vírgula)</label>
+            <input id="ce-ferramentas" type="text" style="width:100%; box-sizing:border-box" value="${(dados.ferramentas || []).join(', ')}">
+            <label for="ce-formacao" style="margin-top:10px; display:block">Formação (ex.: "Ciência da Computação — UFMG")</label>
+            <textarea id="ce-formacao" rows="3" style="width:100%; box-sizing:border-box; font:inherit">${textoFormacao(dados.formacao)}</textarea>
+            <div class="modal-erro" id="msg-curriculo-estruturado"></div>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-curriculo-estruturado">Cancelar</button>
+              <button type="submit" class="btn">Salvar</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-curriculo-estruturado').addEventListener('click', fecharModal);
+      document.getElementById('form-curriculo-estruturado').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-curriculo-estruturado');
+        const payload = {
+          experiencias: parseExperiencias(document.getElementById('ce-experiencias').value),
+          ferramentas: document.getElementById('ce-ferramentas').value.split(',').map((f) => f.trim()).filter(Boolean),
+          formacao: parseFormacao(document.getElementById('ce-formacao').value),
+        };
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/curriculo-estruturado`, { method: 'PATCH', body: JSON.stringify(payload) });
+        if (!res.ok) { msg.textContent = 'Falha ao salvar'; return; }
+        fecharModal();
+        renderizarDetalhe();
+      });
+    }
+
+    // #50: evidências de entrevista/observações — a UI que alimenta o
+    // motor de aderência (#47) de verdade. Cada evidência vinculada a um
+    // requisito aparece ao lado do score daquele requisito (é a "evidência
+    // que causou a mudança" pedida no critério de aceite); observação geral
+    // (sem requisito) nunca entra em nenhum score, só é listada como
+    // contexto. ator_email nunca vem daqui — o servidor deriva da sessão.
+    async function carregarEvidencias(c) {
+      const el = document.getElementById('detalhe-evidencias');
+      if (!el) return;
+      try {
+        const [vagaRes, evidRes] = await Promise.all([
+          apiFetch(`/people/api/vagas/${c.vaga_id}`),
+          apiFetch(`/people/api/candidaturas/${c.id}/evidencias`),
+        ]);
+        if (!vagaRes.ok || !evidRes.ok) throw new Error();
+        const vaga = await vagaRes.json();
+        const evidData = await evidRes.json();
+        if (candidaturaId !== c.id) return; // usuário já navegou pra outro candidato enquanto isso carregava
+        el.innerHTML = renderEvidencias(c, vaga, evidData);
+        const btnGeral = document.getElementById('btn-nova-evidencia');
+        if (btnGeral) btnGeral.addEventListener('click', (e) => { e.preventDefault(); formularioEvidencia(c, vaga, null); });
+        el.querySelectorAll('[data-requisito]').forEach((link) => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            formularioEvidencia(c, vaga, { requisitoId: link.dataset.requisito, capacidade: link.dataset.capacidade });
+          });
+        });
+      } catch {
+        el.innerHTML = '<div class="detalhe-sem-preview">Não foi possível carregar as evidências.</div>';
+      }
+    }
+
+    function linhaEvidencia(ev) {
+      const dataFmt = new Date(ev.criado_em).toLocaleString('pt-BR');
+      return `<li><span class="badge neutro">${EFEITO_LABEL[ev.efeito] || ev.efeito}</span> ${ev.texto}
+        <span class="campo-ajuda" style="display:inline">— ${ev.fonte}${ev.ator_email ? ` · ${ev.ator_email}` : ''} · ${dataFmt}</span></li>`;
+    }
+
+    function renderEvidencias(c, vaga, evidData) {
+      const requisitos = vaga.requisitos_estruturados || [];
+      const porRequisito = Object.fromEntries(((c.aderencia && c.aderencia.porRequisito) || []).map((r) => [r.requisitoId, r]));
+      const sinaisEliminatorio = Object.fromEntries(((c.aderencia && c.aderencia.eliminatorios) || []).map((r) => [r.requisitoId, r]));
+      const contraditorios = new Set(evidData.requisitos_contraditorios || []);
+      const evidenciasPorRequisito = {};
+      const observacoesGerais = [];
+      for (const ev of evidData.evidencias || []) {
+        if (ev.requisito_id) {
+          (evidenciasPorRequisito[ev.requisito_id] = evidenciasPorRequisito[ev.requisito_id] || []).push(ev);
+        } else {
+          observacoesGerais.push(ev);
+        }
+      }
+
+      const linhasRequisito = requisitos.map((r) => {
+        const evs = evidenciasPorRequisito[r.id] || [];
+        const ehContraditorio = contraditorios.has(r.id);
+        let marcador;
+        let classeBadge = 'neutro';
+        if (r.nivel_exigido === 'eliminatorio') {
+          const sinal = sinaisEliminatorio[r.id] ? sinaisEliminatorio[r.id].sinal : 'sem_evidencia';
+          marcador = SINAL_ELIMINATORIO_LABEL[sinal];
+          classeBadge = sinal === 'atende' ? 'sucesso' : sinal === 'nao_atende' ? 'perigo' : sinal === 'conflitante' ? 'aviso' : 'neutro';
+        } else {
+          const info = porRequisito[r.id];
+          marcador = info && info.score != null ? `${Math.round(info.score * 100)}%` : 'Sem evidência';
+          classeBadge = info && info.score != null ? (info.score >= 0.7 ? 'sucesso' : info.score >= 0.4 ? 'aviso' : 'perigo') : 'neutro';
+        }
+        return `
+          <div class="evidencia-requisito${ehContraditorio ? ' contraditorio' : ''}" style="padding:10px 0; border-top:1px solid var(--border)">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+              <strong style="font-size:13px">${r.capacidade}</strong>
+              <span class="badge neutro">${r.nivel_exigido}</span>
+              <span class="badge ${classeBadge}">${marcador}${ehContraditorio ? ' · contradição' : ''}</span>
+              <a class="acao" href="#" data-requisito="${r.id}" data-capacidade="${r.capacidade}" style="margin-left:auto">+ evidência</a>
+            </div>
+            ${evs.length ? `<ul class="evidencia-lista" style="margin:6px 0 0; padding-left:18px; font-size:13px">${evs.map(linhaEvidencia).join('')}</ul>` : '<p class="campo-ajuda">Nenhuma evidência registrada ainda — ausência não penaliza.</p>'}
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="detalhe-evidencias-conteudo" style="padding:16px 20px; border-top:1px solid var(--border)">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+            <strong style="font-size:13px">Evidências e aderência por requisito</strong>
+            <a class="acao" href="#" id="btn-nova-evidencia">+ Observação geral</a>
+          </div>
+          ${requisitos.length ? linhasRequisito : '<p class="campo-ajuda">Esta vaga não tem requisitos estruturados definidos.</p>'}
+          ${observacoesGerais.length ? `
+            <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border)">
+              <strong style="font-size:12px">Observações gerais (contexto — nunca muda um score)</strong>
+              <ul class="evidencia-lista" style="margin:6px 0 0; padding-left:18px; font-size:13px">${observacoesGerais.map(linhaEvidencia).join('')}</ul>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function formularioEvidencia(c, vaga, requisitoPreSelecionado) {
+      const requisitos = vaga.requisitos_estruturados || [];
+      const opcoesRequisito = requisitos.map((r) => `<option value="${r.id}"${requisitoPreSelecionado && requisitoPreSelecionado.requisitoId === r.id ? ' selected' : ''}>${r.capacidade} (${r.nivel_exigido})</option>`).join('');
+      abrirModal(
+        `<h3>Nova evidência${requisitoPreSelecionado ? ` — ${requisitoPreSelecionado.capacidade}` : ''}</h3>`,
+        `
+          <form id="form-evidencia">
+            <label for="ev-requisito">Requisito</label>
+            <select id="ev-requisito">
+              <option value="">Observação geral (não muda score nenhum)</option>
+              ${opcoesRequisito}
+            </select>
+            <label for="ev-fonte" style="margin-top:10px; display:block">Origem</label>
+            <select id="ev-fonte">
+              <option value="entrevista">Entrevista</option>
+              <option value="manual">Anotação manual</option>
+            </select>
+            <label for="ev-efeito" style="margin-top:10px; display:block">Efeito</label>
+            <select id="ev-efeito">
+              <option value="corrobora">Corrobora o requisito</option>
+              <option value="parcial">Atende parcialmente</option>
+              <option value="contradiz">Contradiz o requisito</option>
+              <option value="contexto">Só contexto (não muda o score)</option>
+            </select>
+            <label for="ev-texto" style="margin-top:10px; display:block">O que foi observado</label>
+            <textarea id="ev-texto" rows="3" style="width:100%; box-sizing:border-box; font:inherit" required></textarea>
+            <div class="modal-erro" id="msg-evidencia"></div>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-evidencia">Cancelar</button>
+              <button type="submit" class="btn">Registrar</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-evidencia').addEventListener('click', fecharModal);
+      document.getElementById('form-evidencia').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-evidencia');
+        const payload = {
+          requisito_id: document.getElementById('ev-requisito').value || null,
+          fonte: document.getElementById('ev-fonte').value,
+          efeito: document.getElementById('ev-efeito').value,
+          texto: document.getElementById('ev-texto').value,
+        };
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/evidencias`, { method: 'POST', body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          msg.textContent = dados.error || 'Falha ao registrar evidência';
+          return;
+        }
+        fecharModal();
+        renderizarDetalhe();
+      });
+    }
+
+    function formularioScore(c) {
+      const s = c.score || {};
+      abrirModal(
+        '<h3>Score de aderência</h3>',
+        `
+          <form id="form-score">
+            <div class="modal-erro" id="msg-score"></div>
+            <p class="campo-ajuda">Nota de 0 a 100 em cada componente — o "geral" é calculado pela média ponderada pelos pesos da vaga.</p>
+            <div class="grid2" style="grid-template-columns:1fr 1fr 1fr">
+              <div><label for="score-tecnica">Técnica</label><input id="score-tecnica" type="number" min="0" max="100" value="${s.tecnica ?? ''}"></div>
+              <div><label for="score-experiencia">Experiência</label><input id="score-experiencia" type="number" min="0" max="100" value="${s.experiencia ?? ''}"></div>
+              <div><label for="score-entrevista">Entrevista</label><input id="score-entrevista" type="number" min="0" max="100" value="${s.entrevista ?? ''}"></div>
+            </div>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-score">Cancelar</button>
+              <button type="submit" class="btn">Salvar score</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-score').addEventListener('click', fecharModal);
+      document.getElementById('form-score').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-score');
+        const componentes = {};
+        ['tecnica', 'experiencia', 'entrevista'].forEach((k) => {
+          const v = document.getElementById(`score-${k}`).value;
+          if (v !== '') componentes[k] = Number(v);
+        });
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/score`, { method: 'PATCH', body: JSON.stringify(componentes) });
+        const data = await res.json();
+        if (!res.ok) { msg.textContent = data.error || 'Falha ao salvar score'; return; }
+        fecharModal();
+        renderizarDetalhe();
+      });
+    }
+
+    function formularioBancoDeTalentos(c) {
+      abrirModal(
+        '<h3>Adicionar a outra vaga</h3>',
+        `
+          <form id="form-banco-talentos">
+            <div class="modal-erro" id="msg-banco-talentos"></div>
+            <label for="bt-vaga">Vaga</label>
+            <select id="bt-vaga" required><option value="">Selecione</option>${opcoesVagas(null)}</select>
+            <p class="campo-ajuda">"${c.nome}" entra na vaga escolhida reaproveitando a última avaliação concluída válida, sem precisar preencher o formulário de novo.</p>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-banco-talentos">Cancelar</button>
+              <button type="submit" class="btn">Adicionar</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-banco-talentos').addEventListener('click', fecharModal);
+      document.getElementById('form-banco-talentos').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg-banco-talentos');
+        const vagaId = document.getElementById('bt-vaga').value;
+        const res = await apiFetch('/people/api/candidaturas/banco-de-talentos', {
+          method: 'POST',
+          body: JSON.stringify({ candidato_id: c.candidato_id, vaga_id: vagaId }),
+        });
+        const data = await res.json();
+        if (!res.ok) { msg.textContent = data.error || 'Falha ao adicionar candidato à vaga'; return; }
+        fecharModal();
+        window.location.href = `/people/candidato-detalhe.html?id=${data.id}`;
+      });
+    }
+
+    function confirmarAnonimizar(c) {
+      abrirModal(
+        '<h3>Anonimizar candidato?</h3>',
+        `
+          <p class="modal-texto">Mascara nome, e-mail e telefone de "${c.nome}" e remove o LinkedIn. Dá pra reverter depois, quando precisar. Por ser reversível, isto não é anonimização legal (LGPD Art. 12) — o dado original fica guardado e continua sendo dado pessoal enquanto a reversão for possível.</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-anonimizar">Cancelar</button>
+            <button type="button" class="btn-perigo" id="confirmar-anonimizar">Anonimizar</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-anonimizar').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-anonimizar').addEventListener('click', async () => {
+        fecharModal();
+        await apiFetch(`/people/api/candidatos/${c.candidato_id}/anonimizar`, { method: 'POST' });
+        await carregarListas();
+        renderizarDetalhe();
+      });
+    }
+
+    function reverterAnonimizar(c) {
+      abrirModal(
+        '<h3>Reverter mascaramento?</h3>',
+        `
+          <p class="modal-texto">Restaura nome, e-mail, telefone e LinkedIn originais de "${c.nome}".</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-reverter">Cancelar</button>
+            <button type="button" class="btn" id="confirmar-reverter">Reverter</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-reverter').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-reverter').addEventListener('click', async () => {
+        fecharModal();
+        await apiFetch(`/people/api/candidatos/${c.candidato_id}/reverter-anonimizacao`, { method: 'POST' });
+        await carregarListas();
+        renderizarDetalhe();
+      });
+    }
+
+    async function carregarPreview(c) {
+      const visualizador = document.getElementById('detalhe-visualizador');
+      if (urlPreview) { URL.revokeObjectURL(urlPreview); urlPreview = null; }
+
+      if (c.curriculo_nome === 'sem-arquivo') {
+        visualizador.innerHTML = '<div class="detalhe-sem-preview">Nenhum currículo anexado a este candidato.</div>';
+        return;
+      }
+      if (c.curriculo_tipo !== 'application/pdf') {
+        visualizador.innerHTML = '<div class="detalhe-sem-preview">Pré-visualização disponível só para currículos em PDF.<br>Use "Baixar currículo" para abrir este arquivo.</div>';
+        return;
+      }
+      try {
+        const res = await apiFetch(`/people/api/candidaturas/${c.id}/curriculo/visualizar`);
+        if (!res.ok) throw new Error();
+        const blob = await res.blob();
+        urlPreview = URL.createObjectURL(blob);
+        if (candidaturaId === c.id) {
+          visualizador.innerHTML = `<iframe src="${urlPreview}" title="Currículo de ${c.nome}"></iframe>`;
+        }
+      } catch {
+        visualizador.innerHTML = '<div class="detalhe-sem-preview">Não foi possível carregar a prévia do currículo.</div>';
+      }
+    }
+
+    async function baixarCurriculo(id, nomeArquivo) {
+      const res = await apiFetch(`/people/api/candidaturas/${id}/curriculo`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeArquivo || 'curriculo';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function confirmarReprovar(c) {
+      abrirModal(
+        '<h3>Reprovar candidato?</h3>',
+        `
+          <p class="modal-texto">"${c.nome}" sai do quadro Kanban. Essa ação não pode ser desfeita.</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="cancelar-reprovar">Cancelar</button>
+            <button type="button" class="btn-perigo" id="confirmar-reprovar">Reprovar</button>
+          </div>
+        `
+      );
+      document.getElementById('cancelar-reprovar').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-reprovar').addEventListener('click', async () => {
+        fecharModal();
+        await apiFetch(`/people/api/candidaturas/${c.id}/reprovar`, { method: 'PATCH' });
+        await carregarListas();
+        renderizarDetalhe();
+      });
+    }
+
+    async function avancarEtapa(c) {
+      const res = await apiFetch(`/people/api/candidaturas/${c.id}/avancar-etapa`, { method: 'PATCH' });
+      const data = await res.json();
+      if (!res.ok) { avisar('Erro', data.error || 'Falha ao avançar etapa'); return; }
+
+      if (data.semProximaEtapa) {
+        perguntarNovaEtapa(c);
+        return;
+      }
+      await carregarListas();
+      renderizarDetalhe();
+    }
+
+    function perguntarNovaEtapa(c) {
+      abrirModal(
+        '<h3>Não possui próxima etapa</h3>',
+        `
+          <p class="modal-texto">Não há uma próxima etapa cadastrada depois de "${nomeEtapa(c.etapa_id)}". Deseja cadastrar uma nova etapa e mover "${c.nome}" pra ela?</p>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="nao-nova-etapa">Não</button>
+            <button type="button" class="btn" id="sim-nova-etapa">Sim</button>
+          </div>
+        `
+      );
+      document.getElementById('nao-nova-etapa').addEventListener('click', fecharModal);
+      document.getElementById('sim-nova-etapa').addEventListener('click', () => formularioNovaEtapa(c));
+    }
+
+    function formularioNovaEtapa(c) {
+      abrirModal(
+        '<h3>Nova etapa</h3>',
+        `
+          <form id="form-nova-etapa-rapida">
+            <div class="modal-erro" id="msg-nova-etapa"></div>
+            <label for="nome-etapa-rapida">Nome da etapa</label>
+            <input id="nome-etapa-rapida" required autofocus>
+            <div class="modal-acoes">
+              <button type="button" class="btn-secundario" id="cancelar-nova-etapa">Cancelar</button>
+              <button type="submit" class="btn">Criar e mover</button>
+            </div>
+          </form>
+        `
+      );
+      document.getElementById('cancelar-nova-etapa').addEventListener('click', fecharModal);
+      document.getElementById('form-nova-etapa-rapida').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nome = document.getElementById('nome-etapa-rapida').value.trim();
+        if (!nome) return;
+        const resEtapa = await apiFetch('/people/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
+        const etapa = await resEtapa.json();
+        if (!resEtapa.ok) { document.getElementById('msg-nova-etapa').textContent = etapa.error || 'Falha ao criar etapa'; return; }
+
+        await apiFetch(`/people/api/candidaturas/${c.id}/etapa`, { method: 'PATCH', body: JSON.stringify({ etapa_id: etapa.id }) });
+        fecharModal();
+        await carregarListas();
+        renderizarDetalhe();
+      });
+    }
+
+    async function iniciar() {
+      await carregarListas();
+      renderizarDetalhe();
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>
