@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Candidaturas da vaga</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){var m={escuro:'dark',claro:'light',dark:'dark',light:'light'};document.documentElement.setAttribute('data-theme',m[localStorage.getItem('people_tema')]||'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/people/shell.css">
+<style>
+  .candidaturas-lista .item { display:flex; justify-content:space-between; align-items:center; gap:12px;
+    padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .candidaturas-lista .item:last-child { border-bottom:none; }
+  .automacoes-vaga { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+  .automacoes-vaga h4 { font-size:13px; margin:0 0 10px; color:var(--text-secondary); }
+  .automacoes-vaga-linha { display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; }
+  .automacoes-vaga-linha .btn-automacao { background:transparent; border:none; color:var(--muted); cursor:pointer; padding:4px; border-radius:6px; width:auto; height:auto; }
+  .automacoes-vaga-linha .btn-automacao:hover { background:var(--surface-muted); color:var(--text); }
+  .automacoes-vaga-linha .btn-automacao.tem-automacao { color:var(--accent); }
+  .automacao-item { border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:10px; }
+  .automacao-item-topo { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .automacao-canal { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--muted-strong); }
+  .automacao-nome { font-size:13.5px; font-weight:600; color:var(--text); margin-bottom:8px; }
+  .automacao-acoes { display:flex; gap:14px; }
+  .automacao-acoes .btn-link { background:none; border:none; padding:0; color:var(--accent); font-size:12.5px; font-weight:600; cursor:pointer; width:auto; height:auto; }
+  .automacao-acoes .btn-link.perigo { color:var(--danger); }
+  .badge-obrigatoria { font-size:11px; font-weight:600; padding:3px 8px; border-radius:var(--radius-full); background:var(--border); color:var(--muted-strong); }
+  .toggle-automacao { width:36px; height:20px; border-radius:999px; background:var(--border-strong); border:none; position:relative; cursor:pointer; padding:0; }
+  .toggle-automacao .bolinha { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
+  .toggle-automacao[aria-checked="true"] { background:var(--accent); }
+  .toggle-automacao[aria-checked="true"] .bolinha { left:18px; }
+  .campo-automacao { margin-bottom:12px; }
+  .campo-automacao label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:4px; }
+  .campo-automacao textarea { min-height:110px; resize:vertical; font-family:inherit; }
+  .campo-automacao .ajuda { font-size:12px; color:var(--muted); margin-top:4px; }
+  .preview-whatsapp { margin-top:10px; background:#e5ddd5; border-radius:10px; padding:16px; }
+  .preview-whatsapp .bolha { background:#dcf8c6; border-radius:8px 8px 8px 2px; padding:10px 12px; font-size:13.5px; line-height:1.5; color:#111b21; max-width:280px; white-space:pre-wrap; box-shadow:0 1px 1px rgba(0,0,0,.1); }
+  .preview-whatsapp .bolha-botao { margin-top:2px; max-width:280px; background:#dcf8c6; border-top:1px solid rgba(0,0,0,.08); border-radius:0 0 8px 2px; padding:8px 12px; font-size:13px; color:#00a5f4; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .voltar { display:inline-flex; align-items:center; gap:6px; color:var(--muted-strong); text-decoration:none; font-size:13px; font-weight:600; margin-bottom:10px; }
+  .voltar:hover { color:var(--text); }
+</style>
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/people/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">Pe</span>ople</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <a class="menu-perfil-item" href="/people/configuracoes.html">
+          <span data-icon="settings" data-size="16"></span><span class="rotulo">Configurações</span>
+        </a>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/people/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Visão geral</span></a></li>
+        <li><a class="ds-menu-link ds-menu-link-ativo" href="/people/vagas.html"><span class="ds-menu-icone" data-icon="briefcase"></span><span class="ds-menu-rotulo">Vagas</span></a></li>
+        <li><a class="ds-menu-link" href="/people/candidatos.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Candidatos</span></a></li>
+        <li><a class="ds-menu-link" href="/people/avaliacoes.html"><span class="ds-menu-icone" data-icon="brain"></span><span class="ds-menu-rotulo">Avaliações</span></a></li>
+        <li><a class="ds-menu-link" href="/people/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/people/percentil.html"><span class="ds-menu-icone" data-icon="trending-up"></span><span class="ds-menu-rotulo">Percentil</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/people/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/people/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/people/configuracoes.html">Geral</a></li>
+            <li><a class="ds-menu-sublink" href="/people/plano-cobranca.html">Plano e Cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <a class="voltar" href="/people/vagas.html"><span id="icone-voltar"></span> Voltar pra Vagas</a>
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1 id="titulo-pagina">Candidaturas</h1></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="candidaturas-lista" id="lista-candidaturas">Carregando...</div>
+        <div class="automacoes-vaga">
+          <h4>Automações só desta vaga</h4>
+          <p class="ajuda" style="margin:-6px 0 10px">Sobrepõem a automação geral da mesma etapa (configurada no Quadro), só pra candidatos desta vaga.</p>
+          <div id="automacoes-vaga-lista">Carregando...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="People"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/people/shell.js"></script>
+  <script>
+    document.getElementById('icone-voltar').innerHTML = icon('arrow-left', 16);
+    const vagaId = new URLSearchParams(window.location.search).get('id');
+
+    let automacoesDaVaga = [];
+    const CANAL_LABEL_VAGA = { email: 'E-mail', whatsapp: 'WhatsApp' };
+    const CANAL_ICONE_VAGA = { email: 'file-text', whatsapp: 'message-circle' };
+
+    function renderizarListaEtapasAutomacao(vagaId, etapas) {
+      const container = document.getElementById('automacoes-vaga-lista');
+      if (!etapas.length) { container.innerHTML = '<p class="ajuda">Nenhuma etapa cadastrada ainda — crie etapas no Quadro primeiro.</p>'; return; }
+
+      container.innerHTML = etapas.map((etapa) => {
+        const temEspecifica = automacoesDaVaga.some((a) => a.gatilho === 'etapa_alcancada' && a.etapa_id === etapa.id && a.vaga_id === vagaId && a.ativo);
+        return `
+          <div class="automacoes-vaga-linha">
+            <span>${etapa.nome}</span>
+            <button type="button" class="btn-automacao${temEspecifica ? ' tem-automacao' : ''}" data-etapa-automacao="${etapa.id}" data-etapa-nome="${etapa.nome}" title="Automação desta etapa, só nesta vaga">${icon('zap', 16)}</button>
+          </div>
+        `;
+      }).join('');
+
+      container.querySelectorAll('[data-etapa-automacao]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          renderModalListaAutomacoesVaga({ vagaId, etapaId: btn.dataset.etapaAutomacao, etapaNome: btn.dataset.etapaNome }, etapas);
+        });
+      });
+    }
+
+    function itensDoContextoVaga(contexto) {
+      return automacoesDaVaga.filter((a) => a.gatilho === 'etapa_alcancada' && a.etapa_id === contexto.etapaId && a.vaga_id === contexto.vagaId);
+    }
+
+    function itemAutomacaoHtmlVaga(a) {
+      return `
+        <div class="automacao-item">
+          <div class="automacao-item-topo">
+            <span class="automacao-canal">${icon(CANAL_ICONE_VAGA[a.canal], 14)} ${CANAL_LABEL_VAGA[a.canal]}</span>
+            ${a.removivel
+              ? `<button type="button" class="toggle-automacao" data-toggle-automacao="${a.id}" role="switch" aria-checked="${a.ativo}"><span class="bolinha"></span></button>`
+              : '<span class="badge-obrigatoria">Obrigatória</span>'}
+          </div>
+          <div class="automacao-nome">${a.nome}</div>
+          <div class="automacao-acoes">
+            <button type="button" class="btn-link" data-ver-automacao="${a.id}">Editar</button>
+            <button type="button" class="btn-link" data-duplicar-automacao="${a.id}">Duplicar</button>
+            ${a.removivel ? `<button type="button" class="btn-link perigo" data-excluir-automacao="${a.id}">Excluir</button>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    async function recarregarAutomacoesDaVaga() {
+      const res = await apiFetch('/people/api/automacoes');
+      automacoesDaVaga = await res.json();
+    }
+
+    function renderModalListaAutomacoesVaga(contexto, etapas) {
+      const itens = itensDoContextoVaga(contexto);
+      const overlay = abrirModal(
+        `<h3>Automação — ${contexto.etapaNome} (só nesta vaga)</h3>`,
+        `
+          <div id="lista-automacoes">${itens.length ? itens.map(itemAutomacaoHtmlVaga).join('') : '<p class="modal-texto">Nenhuma automação específica desta vaga aqui ainda.</p>'}</div>
+          <div class="modal-acoes"><button type="button" class="btn-secundario" id="btn-nova-automacao">+ Nova automação (só desta vaga)</button></div>
+        `,
+        'modal-card-larga'
+      );
+
+      overlay.querySelectorAll('[data-toggle-automacao]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const automacao = automacoesDaVaga.find((a) => a.id === btn.dataset.toggleAutomacao);
+          await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify({ ativo: !automacao.ativo }) });
+          await recarregarAutomacoesDaVaga();
+          renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
+          renderModalListaAutomacoesVaga(contexto, etapas);
+        });
+      });
+      overlay.querySelectorAll('[data-ver-automacao]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          renderModalFormAutomacaoVaga(contexto, etapas, automacoesDaVaga.find((a) => a.id === btn.dataset.verAutomacao));
+        });
+      });
+      overlay.querySelectorAll('[data-duplicar-automacao]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/people/api/automacoes/${btn.dataset.duplicarAutomacao}/duplicar`, { method: 'POST' });
+          await recarregarAutomacoesDaVaga();
+          renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
+          renderModalListaAutomacoesVaga(contexto, etapas);
+        });
+      });
+      overlay.querySelectorAll('[data-excluir-automacao]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/people/api/automacoes/${btn.dataset.excluirAutomacao}`, { method: 'DELETE' });
+          await recarregarAutomacoesDaVaga();
+          renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
+          renderModalListaAutomacoesVaga(contexto, etapas);
+        });
+      });
+      document.getElementById('btn-nova-automacao').addEventListener('click', () => renderModalFormAutomacaoVaga(contexto, etapas, null));
+    }
+
+    const EXEMPLO_PARAMETROS_CORPO_VAGA = ['Maria Silva', 'Desenvolvedora Backend', 'Entrevista'];
+
+    function renderModalFormAutomacaoVaga(contexto, etapas, automacao) {
+      const obrigatoria = !!(automacao && !automacao.removivel);
+      const canalAtual = automacao ? automacao.canal : 'email';
+      const overlay = abrirModal(
+        `<h3>${automacao ? 'Editar automação' : 'Nova automação'}</h3>`,
+        `
+          ${obrigatoria ? '<p class="modal-texto">Automação obrigatória — não pode ser desativada nem excluída, mas você pode trocar o template.</p>' : ''}
+          ${!automacao ? `
+          <div class="campo-automacao">
+            <label>Canal</label>
+            <select id="form-canal">
+              <option value="email">E-mail</option>
+              <option value="whatsapp">WhatsApp</option>
+            </select>
+          </div>` : ''}
+          <div class="campo-automacao" id="wrap-nome" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
+            <label>Nome (só pra identificar na lista)</label>
+            <input type="text" id="form-nome" value="${automacao ? automacao.nome.replace(/"/g, '&quot;') : ''}">
+          </div>
+          <div class="campo-automacao" id="wrap-assunto" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
+            <label>Assunto do e-mail</label>
+            <input type="text" id="form-assunto" value="${automacao && automacao.assunto ? automacao.assunto.replace(/"/g, '&quot;') : ''}">
+          </div>
+          <div class="campo-automacao" id="wrap-mensagem" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
+            <label>Mensagem</label>
+            <textarea id="form-corpo">${automacao ? automacao.corpo : ''}</textarea>
+            <div class="ajuda">Placeholders disponíveis: {{nome}}, {{vaga}}, {{empresa}}, {{etapa}}</div>
+          </div>
+          <div class="campo-automacao" id="wrap-template" ${canalAtual === 'email' ? 'hidden' : ''}>
+            <label>Template aprovado na Meta (WhatsApp)</label>
+            <select id="form-template-select" hidden></select>
+            <input type="text" id="form-template" value="${automacao && automacao.whatsapp_template ? automacao.whatsapp_template : ''}" placeholder="ex.: candidatura_recebida_pt">
+            <div class="ajuda" id="ajuda-template">Sem template aprovado aqui, o envio fica em modo de teste (só loga, não manda de verdade).</div>
+            <div class="preview-whatsapp" id="preview-whatsapp" hidden>
+              <div class="bolha" id="preview-whatsapp-corpo"></div>
+              <div class="bolha-botao" id="preview-whatsapp-botao" hidden></div>
+            </div>
+          </div>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="btn-voltar-automacao">Voltar</button>
+            <button type="button" class="btn" id="btn-salvar-automacao">Salvar</button>
+          </div>
+        `,
+        'modal-card-larga'
+      );
+
+      document.getElementById('btn-voltar-automacao').addEventListener('click', () => renderModalListaAutomacoesVaga(contexto, etapas));
+
+      let templatesCache = [];
+      let templatesCarregados = false;
+      const sincronizarWhatsapp = () => {
+        const nomeTemplate = valorTemplateEscolhidoVaga();
+        const template = templatesCache.find((t) => t.nome === nomeTemplate);
+        atualizarPreviewWhatsappVaga(template);
+        document.getElementById('form-nome').value = nomeTemplate || '';
+        document.getElementById('form-corpo').value = template ? (template.corpo || '') : (nomeTemplate ? 'Mensagem definida pelo template aprovado na Meta.' : '');
+      };
+      if (canalAtual === 'whatsapp') {
+        montarSeletorTemplateVaga(automacao ? automacao.whatsapp_template : '', sincronizarWhatsapp).then((lista) => {
+          templatesCache = lista; templatesCarregados = true; sincronizarWhatsapp();
+        });
+        document.getElementById('form-template').addEventListener('input', sincronizarWhatsapp);
+      }
+
+      const selectCanal = document.getElementById('form-canal');
+      if (selectCanal) {
+        selectCanal.addEventListener('change', () => {
+          const ehWhatsapp = selectCanal.value === 'whatsapp';
+          document.getElementById('wrap-nome').hidden = ehWhatsapp;
+          document.getElementById('wrap-assunto').hidden = ehWhatsapp;
+          document.getElementById('wrap-mensagem').hidden = ehWhatsapp;
+          document.getElementById('wrap-template').hidden = !ehWhatsapp;
+          if (ehWhatsapp) {
+            document.getElementById('form-template').addEventListener('input', sincronizarWhatsapp);
+            if (!templatesCarregados) {
+              templatesCarregados = true;
+              montarSeletorTemplateVaga('', sincronizarWhatsapp).then((lista) => { templatesCache = lista; sincronizarWhatsapp(); });
+            } else {
+              sincronizarWhatsapp();
+            }
+          }
+        });
+      }
+
+      const btnSalvar = document.getElementById('btn-salvar-automacao');
+      btnSalvar.addEventListener('click', async () => {
+        const canal = automacao ? automacao.canal : selectCanal.value;
+        if (canal === 'whatsapp') sincronizarWhatsapp();
+        const nome = document.getElementById('form-nome').value.trim();
+        const corpo = document.getElementById('form-corpo').value.trim();
+        if (!nome || !corpo) { avisar('Erro', canal === 'whatsapp' ? 'Escolha um template' : 'Nome e mensagem são obrigatórios'); return; }
+        const payload = {
+          nome, corpo,
+          assunto: canal === 'email' ? document.getElementById('form-assunto').value.trim() : null,
+          whatsapp_template: canal === 'whatsapp' ? valorTemplateEscolhidoVaga() : null,
+        };
+        btnSalvar.disabled = true;
+        if (automacao) {
+          await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        } else {
+          await apiFetch('/people/api/automacoes', {
+            method: 'POST',
+            body: JSON.stringify({ ...payload, gatilho: 'etapa_alcancada', etapa_id: contexto.etapaId, vaga_id: contexto.vagaId, canal }),
+          });
+        }
+        await recarregarAutomacoesDaVaga();
+        renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
+        renderModalListaAutomacoesVaga(contexto, etapas);
+      });
+    }
+
+    function valorTemplateEscolhidoVaga() {
+      const select = document.getElementById('form-template-select');
+      const input = document.getElementById('form-template');
+      if (!select.hidden && select.value !== '__manual__') return select.value;
+      return input.value.trim();
+    }
+
+    function atualizarPreviewWhatsappVaga(template) {
+      const preview = document.getElementById('preview-whatsapp');
+      if (!template || !template.corpo) { preview.hidden = true; return; }
+      let corpoPreenchido = template.corpo;
+      (template.parametros_corpo || []).forEach((nomeParam, i) => {
+        const chave = template.parametros_nomeados ? nomeParam : String(i + 1);
+        corpoPreenchido = corpoPreenchido.replace(new RegExp(`\\{\\{${chave}\\}\\}`, 'g'), EXEMPLO_PARAMETROS_CORPO_VAGA[i] || '');
+      });
+      document.getElementById('preview-whatsapp-corpo').textContent = corpoPreenchido;
+      const botao = document.getElementById('preview-whatsapp-botao');
+      botao.hidden = !template.tem_botao_url;
+      if (template.tem_botao_url) botao.innerHTML = `${icon('file-text', 14)} ${template.botao_texto || 'Abrir link'}`;
+      preview.hidden = false;
+    }
+
+    async function montarSeletorTemplateVaga(valorAtual, aoMudar) {
+      const select = document.getElementById('form-template-select');
+      const input = document.getElementById('form-template');
+      try {
+        const res = await apiFetch('/people/api/automacoes/templates-whatsapp');
+        const templates = await res.json();
+        if (!Array.isArray(templates) || !templates.length) return [];
+
+        select.innerHTML = templates.map((t) => `
+          <option value="${t.nome}">${t.nome} — ${t.status}${t.tem_botao_url ? '' : ' (sem botão de link!)'}</option>
+        `).join('') + '<option value="__manual__">Digitar nome manualmente…</option>';
+
+        const bateComAlgum = templates.some((t) => t.nome === valorAtual);
+        select.value = bateComAlgum ? valorAtual : (valorAtual ? '__manual__' : templates[0].nome);
+        select.hidden = false;
+        input.hidden = select.value !== '__manual__';
+        select.addEventListener('change', () => {
+          input.hidden = select.value !== '__manual__';
+          aoMudar();
+        });
+        return templates;
+      } catch (err) {
+        return [];
+      }
+    }
+
+    document.addEventListener('click', async (e) => {
+      const alvo = e.target.closest('[data-curriculo]');
+      if (!alvo) return;
+      e.preventDefault();
+      const res = await apiFetch(`/people/api/candidaturas/${alvo.dataset.curriculo}/curriculo`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'curriculo';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    async function iniciar() {
+      if (!vagaId) { document.getElementById('lista-candidaturas').innerHTML = '<div class="vazio">Vaga não informada.</div>'; return; }
+
+      const [resVaga, resCand, resEtapas, resAuto] = await Promise.all([
+        apiFetch(`/people/api/vagas/${vagaId}`),
+        apiFetch(`/people/api/vagas/${vagaId}/candidaturas`),
+        apiFetch('/people/api/etapas'),
+        apiFetch('/people/api/automacoes'),
+      ]);
+      const vaga = await resVaga.json();
+      if (resVaga.ok) document.getElementById('titulo-pagina').textContent = `Candidaturas — ${vaga.nome}`;
+
+      const candidaturas = await resCand.json();
+      document.getElementById('lista-candidaturas').innerHTML = candidaturas.map((c) => `
+        <div class="item">
+          <span>${c.nome} — ${c.whatsapp} — ${c.email}${c.linkedin ? ` — <a class="acao" href="${c.linkedin}" target="_blank">LinkedIn</a>` : ''}</span>
+          <a class="acao" href="#" data-curriculo="${c.id}">Baixar currículo</a>
+        </div>
+      `).join('') || '<div class="vazio">Nenhuma candidatura recebida ainda.</div>';
+
+      const etapas = await resEtapas.json();
+      automacoesDaVaga = await resAuto.json();
+      renderizarListaEtapasAutomacao(vagaId, etapas);
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

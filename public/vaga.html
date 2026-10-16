@@ -8,14 +8,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Cabeçalho (.ds-topbar) e rodapé (.ds-rodape-publico) da área não logada,
+     mesmos componentes do DS usados em public/index.html — o resto da
+     página continua com o CSS local abaixo, que vem DEPOIS e vence em
+     empate de especificidade onde os nomes colidem (ex. --border/--muted). -->
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
 <style>
   :root { color-scheme: light; }
   body { margin:0; background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
   main { max-width:640px; margin:0 auto; padding:32px 24px 80px; }
-  .logo { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
-  .logo .marca-k { width:28px; height:28px; border-radius:8px; background:#0F111A; color:#fff;
-    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:center; }
-  .logo .nome { font-size:15px; font-weight:700; }
   .card { background:#fff; border:1px solid #E7EAF2; border-radius:16px; padding:28px; margin-bottom:24px; }
   h1 { font-family:'Space Grotesk',sans-serif; font-size:20px; margin:0 0 8px; }
   .meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
@@ -33,14 +35,78 @@
   button:hover { background:#6344E8; }
   button:disabled { opacity:.5; cursor:default; }
   .erro { color:#F04438; font-size:13px; margin-top:12px; min-height:16px; }
+  a.entrar { color:#6B7385; text-decoration:none; font-size:13px; font-weight:600; }
+  .ds-rodape-publico { border-top:none; }
+  .ds-rodape-publico-imagem img { object-fit:contain; }
 </style>
 </head>
 <body>
+<header class="ds-topbar">
+  <a class="ds-topbar-marca" href="/" aria-label="Ir para o início">
+    <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">Pe</span>ople</span>
+    <span class="ds-topbar-kyvvo">kyvvo</span>
+  </a>
+  <div class="ds-topbar-acoes">
+    <a class="entrar" href="/people/login.html">Entrar</a>
+  </div>
+</header>
 <main>
-  <div class="logo"><div class="marca-k">k</div><div class="nome">Kyvvo People</div></div>
   <div class="card" id="conteudo">Carregando...</div>
 </main>
 
+<footer class="ds-rodape-publico">
+  <div class="ds-rodape-publico-conteudo">
+    <figure class="ds-rodape-publico-social">
+      <a class="ds-rodape-publico-imagem" href="https://www.instagram.com/somoskyvvo" tabindex="-1" aria-hidden="true">
+        <img src="/people/images/kyvvo-claro.svg" alt="">
+      </a>
+      <figcaption class="ds-rodape-publico-texto">Siga a Kyvvo no <a href="https://www.instagram.com/somoskyvvo">Instagram</a></figcaption>
+    </figure>
+    <div class="ds-rodape-publico-produtos">
+      <h2 class="ds-rodape-publico-titulo" id="rp-produtos">Nossos produtos</h2>
+      <div class="ds-carrossel" data-ds-carrossel aria-labelledby="rp-produtos">
+        <div class="ds-carrossel-trilho">
+          <div class="ds-carrossel-slide">
+            <div class="ds-rodape-publico-produto">
+              <h3 class="ds-rodape-publico-produto-nome"><a href="https://www.studio.kyvvo.com.br">Studio</a></h3>
+              <p class="ds-rodape-publico-produto-texto">Agenda e WhatsApp inteligente pra salões e clínicas.</p>
+              <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+            </div>
+          </div>
+          <div class="ds-carrossel-slide">
+            <div class="ds-rodape-publico-produto">
+              <h3 class="ds-rodape-publico-produto-nome"><a href="/">People</a></h3>
+              <p class="ds-rodape-publico-produto-texto">Recrutamento e seleção com avaliação comportamental.</p>
+              <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+            </div>
+          </div>
+          <div class="ds-carrossel-slide">
+            <div class="ds-rodape-publico-produto">
+              <h3 class="ds-rodape-publico-produto-nome"><a href="https://www.crm.kyvvo.com.br">CRM</a></h3>
+              <p class="ds-rodape-publico-produto-texto">Gestão de clientes e vendas em um só lugar.</p>
+              <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+            </div>
+          </div>
+        </div>
+        <div class="ds-carrossel-controles">
+          <button type="button" class="ds-carrossel-btn ds-carrossel-ant" aria-label="Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <div class="ds-carrossel-pontos"></div>
+          <button type="button" class="ds-carrossel-btn ds-carrossel-prox" aria-label="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <nav class="ds-rodape-publico-links" aria-label="Informações legais e ajuda">
+      <ul class="ds-rodape-publico-lista">
+        <li><a href="https://studio.kyvvo.com.br/privacidade.html">LGPD</a></li>
+        <li><a href="https://wa.me/5534985588788?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20Kyvvo%20People.">Ajuda</a></li>
+        <li><a href="https://studio.kyvvo.com.br/privacidade.html">Política de Privacidade</a></li>
+        <li><a href="https://studio.kyvvo.com.br/termos.html">Termos de Uso</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+<script src="/ds/components.js"></script>
 <script>
   const vagaId = window.location.pathname.split('/').filter(Boolean).pop();
   const conteudo = document.getElementById('conteudo');

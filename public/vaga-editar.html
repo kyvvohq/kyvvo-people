@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo People — Editar vaga</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){var m={escuro:'dark',claro:'light',dark:'dark',light:'light'};document.documentElement.setAttribute('data-theme',m[localStorage.getItem('people_tema')]||'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/people/shell.css">
+<style>
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+  @media(max-width:520px) { .grid2 { grid-template-columns:1fr; } }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chips .badge { display:inline-flex; align-items:center; gap:2px; }
+  .linha-requisito { display:grid; grid-template-columns:2fr 1fr 1fr 130px 80px 90px 28px; gap:8px; align-items:center; margin-bottom:8px; }
+  @media(max-width:700px) { .linha-requisito { grid-template-columns:1fr 1fr; } }
+  .voltar { display:inline-flex; align-items:center; gap:6px; color:var(--muted-strong); text-decoration:none; font-size:13px; font-weight:600; margin-bottom:10px; }
+  .voltar:hover { color:var(--text); }
+</style>
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/people/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">Pe</span>ople</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <a class="menu-perfil-item" href="/people/configuracoes.html">
+          <span data-icon="settings" data-size="16"></span><span class="rotulo">Configurações</span>
+        </a>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/people/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Visão geral</span></a></li>
+        <li><a class="ds-menu-link ds-menu-link-ativo" href="/people/vagas.html"><span class="ds-menu-icone" data-icon="briefcase"></span><span class="ds-menu-rotulo">Vagas</span></a></li>
+        <li><a class="ds-menu-link" href="/people/candidatos.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Candidatos</span></a></li>
+        <li><a class="ds-menu-link" href="/people/avaliacoes.html"><span class="ds-menu-icone" data-icon="brain"></span><span class="ds-menu-rotulo">Avaliações</span></a></li>
+        <li><a class="ds-menu-link" href="/people/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/people/percentil.html"><span class="ds-menu-icone" data-icon="trending-up"></span><span class="ds-menu-rotulo">Percentil</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/people/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/people/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/people/configuracoes.html">Geral</a></li>
+            <li><a class="ds-menu-sublink" href="/people/plano-cobranca.html">Plano e Cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <a class="voltar" href="/people/vagas.html"><span id="icone-voltar"></span> Voltar pra Vagas</a>
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1 id="titulo-pagina">Editar vaga</h1></div>
+        </div>
+      </div>
+
+      <div class="card" id="container-form">Carregando...</div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="People"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/people/shell.js"></script>
+  <script>
+    document.getElementById('icone-voltar').innerHTML = icon('arrow-left', 16);
+
+    const CAMPOS = ['nome', 'empresa', 'cidade', 'descricao', 'salario', 'modalidade', 'tipo_vaga', 'nivel_experiencia', 'requisitos'];
+    const CAMPOS_EXCLUIDOS_DEFAULT = ['idade', 'ano_formatura', 'genero', 'estado_civil', 'nome', 'foto', 'endereco_completo', 'gaps_temporais_nao_justificados'];
+
+    let formRequisitos = [];
+    let formCamposExtras = [];
+    const vagaId = new URLSearchParams(window.location.search).get('id');
+
+    function formularioVaga(v) {
+      return `
+        <div class="modal-erro" id="msg-vaga"></div>
+        <label for="nome">Nome da vaga *</label>
+        <input id="nome" required value="${v.nome || ''}">
+        <div class="grid2">
+          <div><label for="empresa">Empresa</label><input id="empresa" value="${v.empresa || ''}"></div>
+          <div><label for="cidade">Cidade</label><input id="cidade" value="${v.cidade || ''}"></div>
+        </div>
+        <div class="grid2">
+          <div>
+            <label for="modalidade">Modalidade</label>
+            <select id="modalidade">
+              <option value="" ${!v.modalidade ? 'selected' : ''}>Selecione</option>
+              <option ${v.modalidade === 'Presencial' ? 'selected' : ''}>Presencial</option>
+              <option ${v.modalidade === 'Remoto' ? 'selected' : ''}>Remoto</option>
+              <option ${v.modalidade === 'Híbrido' ? 'selected' : ''}>Híbrido</option>
+            </select>
+          </div>
+          <div>
+            <label for="tipo_vaga">Tipo de vaga</label>
+            <select id="tipo_vaga">
+              <option value="" ${!v.tipo_vaga ? 'selected' : ''}>Selecione</option>
+              <option ${v.tipo_vaga === 'CLT' ? 'selected' : ''}>CLT</option>
+              <option ${v.tipo_vaga === 'PJ' ? 'selected' : ''}>PJ</option>
+              <option ${v.tipo_vaga === 'Estágio' ? 'selected' : ''}>Estágio</option>
+              <option ${v.tipo_vaga === 'Integral' ? 'selected' : ''}>Integral</option>
+              <option ${v.tipo_vaga === 'Meio período' ? 'selected' : ''}>Meio período</option>
+            </select>
+          </div>
+        </div>
+        <label for="descricao">Descrição *</label>
+        <textarea id="descricao">${v.descricao || ''}</textarea>
+        <div class="grid2">
+          <div>
+            <label for="salario">Salário</label>
+            <input id="salario" placeholder="Ex: A combinar, R$ 3.000 a R$ 4.000" value="${v.salario || ''}">
+          </div>
+          <div>
+            <label for="nivel_experiencia">Nível de experiência</label>
+            <input id="nivel_experiencia" placeholder="Ex: Júnior, Pleno, Sênior" value="${v.nivel_experiencia || ''}">
+          </div>
+        </div>
+        <label for="requisitos">Requisitos *</label>
+        <textarea id="requisitos">${v.requisitos || ''}</textarea>
+        <label for="status">Status</label>
+        <select id="status">
+          <option value="rascunho" ${v.status === 'rascunho' ? 'selected' : ''}>Rascunho</option>
+          <option value="nova" ${v.status === 'nova' ? 'selected' : ''}>Nova</option>
+          <option value="em_andamento" ${v.status === 'em_andamento' ? 'selected' : ''}>Em andamento</option>
+          <option value="pausada" ${v.status === 'pausada' ? 'selected' : ''}>Pausada</option>
+          <option value="encerrada" ${v.status === 'encerrada' ? 'selected' : ''}>Encerrada</option>
+        </select>
+
+        <label>Pesos do score de aderência</label>
+        <p class="campo-ajuda">Usados quando a psicóloga lança nota (0-100) em cada componente da candidatura — o "geral" é a média ponderada por esses pesos.</p>
+        <div class="grid2" style="grid-template-columns:1fr 1fr 1fr">
+          <div><label for="peso-tecnica">Técnica</label><input id="peso-tecnica" type="number" step="0.05" min="0" max="1" value="${(v.pesos && v.pesos.tecnica) ?? 0.4}"></div>
+          <div><label for="peso-experiencia">Experiência</label><input id="peso-experiencia" type="number" step="0.05" min="0" max="1" value="${(v.pesos && v.pesos.experiencia) ?? 0.4}"></div>
+          <div><label for="peso-entrevista">Entrevista</label><input id="peso-entrevista" type="number" step="0.05" min="0" max="1" value="${(v.pesos && v.pesos.entrevista) ?? 0.2}"></div>
+        </div>
+
+        <label>Requisitos estruturados (motor de match)</label>
+        <p class="campo-ajuda">Fundação pro cálculo automático de aderência — hoje só grava os dados; o cálculo em si ainda é manual (lançar score no candidato). Eliminatório exige natureza legal, regulatória ou físico-logística — nenhum outro motivo exclui um candidato, não importa quantos eliminatórios a vaga tenha.</p>
+        <div id="lista-requisitos-estruturados"></div>
+        <button type="button" class="btn-secundario" id="btn-add-requisito" style="margin:4px 0 8px">+ Adicionar requisito</button>
+
+        <label>Campos excluídos do score</label>
+        <p class="campo-ajuda">Nunca entram no cálculo de aderência — a lista padrão não pode ser removida, só ampliada.</p>
+        <div id="lista-campos-excluidos" class="chips"></div>
+        <div class="campo-arquivo" style="margin-top:8px">
+          <input id="novo-campo-excluido" placeholder="Ex: nome_da_faculdade" style="flex:1">
+          <button type="button" class="btn-secundario" id="btn-add-campo-excluido">Adicionar</button>
+        </div>
+        <div class="modal-acoes">
+          <a class="btn-secundario" href="/people/vagas.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Cancelar</a>
+          <button type="submit" class="btn">Salvar alterações</button>
+        </div>
+      `;
+    }
+
+    function renderizarRequisitos() {
+      const el = document.getElementById('lista-requisitos-estruturados');
+      el.innerHTML = formRequisitos.map((r, i) => `
+        <div class="linha-requisito" data-i="${i}">
+          <input class="req-capacidade" placeholder="Capacidade (ex: Controladoria)" value="${r.capacidade || ''}">
+          <select class="req-categoria">
+            <option value="tecnica" ${r.categoria === 'tecnica' ? 'selected' : ''}>Técnica</option>
+            <option value="experiencia" ${r.categoria === 'experiencia' ? 'selected' : ''}>Experiência</option>
+            <option value="idioma" ${r.categoria === 'idioma' ? 'selected' : ''}>Idioma</option>
+            <option value="comportamental" ${r.categoria === 'comportamental' ? 'selected' : ''}>Comportamental</option>
+          </select>
+          <select class="req-nivel">
+            <option value="eliminatorio" ${r.nivel_exigido === 'eliminatorio' ? 'selected' : ''}>Eliminatório</option>
+            <option value="importante" ${r.nivel_exigido === 'importante' ? 'selected' : ''}>Importante</option>
+            <option value="desejavel" ${r.nivel_exigido === 'desejavel' ? 'selected' : ''}>Desejável</option>
+          </select>
+          <select class="req-natureza" title="Só requisito legal, regulatório ou físico-logístico pode excluir um candidato" ${r.nivel_exigido === 'eliminatorio' ? '' : 'hidden'}>
+            <option value="" ${!r.natureza ? 'selected' : ''} disabled>Natureza…</option>
+            <option value="legal" ${r.natureza === 'legal' ? 'selected' : ''}>Legal</option>
+            <option value="regulatorio" ${r.natureza === 'regulatorio' ? 'selected' : ''}>Regulatório</option>
+            <option value="fisico_logistico" ${r.natureza === 'fisico_logistico' ? 'selected' : ''}>Físico-logístico</option>
+          </select>
+          <input class="req-peso" type="number" step="0.1" min="0" max="1" value="${r.peso ?? 0.5}" title="Peso">
+          <input class="req-anos" type="number" min="0" step="1" placeholder="Anos mín." value="${r.anos_minimos ?? ''}" title="Anos mínimos (só experiência)">
+          <button type="button" class="btn-remover-requisito" data-i="${i}" title="Remover" style="background:transparent;color:var(--danger);padding:0">${icon('x', 16)}</button>
+        </div>
+      `).join('') || '<p class="campo-ajuda">Nenhum requisito estruturado ainda.</p>';
+
+      el.querySelectorAll('.btn-remover-requisito').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          sincronizarRequisitosDoDom();
+          formRequisitos.splice(Number(btn.dataset.i), 1);
+          renderizarRequisitos();
+        });
+      });
+      el.querySelectorAll('.req-nivel').forEach((select) => {
+        select.addEventListener('change', () => {
+          sincronizarRequisitosDoDom();
+          renderizarRequisitos();
+        });
+      });
+    }
+
+    function sincronizarRequisitosDoDom() {
+      const el = document.getElementById('lista-requisitos-estruturados');
+      if (!el) return;
+      el.querySelectorAll('.linha-requisito').forEach((linha, i) => {
+        const nivelExigido = linha.querySelector('.req-nivel').value;
+        const naturezaEl = linha.querySelector('.req-natureza');
+        formRequisitos[i] = {
+          ...formRequisitos[i],
+          capacidade: linha.querySelector('.req-capacidade').value,
+          categoria: linha.querySelector('.req-categoria').value,
+          nivel_exigido: nivelExigido,
+          natureza: nivelExigido === 'eliminatorio' ? (naturezaEl.value || null) : null,
+          peso: Number(linha.querySelector('.req-peso').value) || 0,
+          anos_minimos: linha.querySelector('.req-anos').value ? Number(linha.querySelector('.req-anos').value) : null,
+        };
+      });
+    }
+
+    function renderizarCamposExcluidos() {
+      const el = document.getElementById('lista-campos-excluidos');
+      el.innerHTML = [
+        ...CAMPOS_EXCLUIDOS_DEFAULT.map((c) => `<span class="badge neutro" title="Padrão fixo, não pode ser removido">${c}</span>`),
+        ...formCamposExtras.map((c, i) => `<span class="badge aviso">${c} <button type="button" class="btn-remover-campo-excluido" data-i="${i}" style="background:transparent;border:none;color:inherit;cursor:pointer;padding:0 0 0 4px">×</button></span>`),
+      ].join(' ');
+      el.querySelectorAll('.btn-remover-campo-excluido').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          formCamposExtras.splice(Number(btn.dataset.i), 1);
+          renderizarCamposExcluidos();
+        });
+      });
+    }
+
+    async function salvar(e) {
+      e.preventDefault();
+      const msg = document.getElementById('msg-vaga');
+      msg.textContent = '';
+      const dados = {};
+      CAMPOS.forEach((c) => { dados[c] = document.getElementById(c).value; });
+      dados.status = document.getElementById('status').value;
+      dados.pesos = {
+        tecnica: Number(document.getElementById('peso-tecnica').value) || 0,
+        experiencia: Number(document.getElementById('peso-experiencia').value) || 0,
+        entrevista: Number(document.getElementById('peso-entrevista').value) || 0,
+      };
+      sincronizarRequisitosDoDom();
+      dados.requisitos_estruturados = formRequisitos;
+      dados.campos_excluidos_score = [...CAMPOS_EXCLUIDOS_DEFAULT, ...formCamposExtras];
+
+      try {
+        const res = await apiFetch(`/people/api/vagas/${vagaId}`, { method: 'PATCH', body: JSON.stringify(dados) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha ao salvar vaga');
+        window.location.href = '/people/vagas.html';
+      } catch (err) {
+        msg.textContent = err.message;
+      }
+    }
+
+    async function iniciar() {
+      const container = document.getElementById('container-form');
+      if (!vagaId) { container.innerHTML = '<p class="modal-texto">Vaga não informada.</p>'; return; }
+
+      const res = await apiFetch(`/people/api/vagas/${vagaId}`);
+      const vaga = await res.json();
+      if (!res.ok) { container.innerHTML = `<p class="modal-texto">${vaga.error || 'Falha ao carregar vaga'}</p>`; return; }
+
+      document.getElementById('titulo-pagina').textContent = `Editar vaga: ${vaga.nome}`;
+      formRequisitos = vaga.requisitos_estruturados ? JSON.parse(JSON.stringify(vaga.requisitos_estruturados)) : [];
+      formCamposExtras = vaga.campos_excluidos_score ? vaga.campos_excluidos_score.filter((c) => !CAMPOS_EXCLUIDOS_DEFAULT.includes(c)) : [];
+
+      container.innerHTML = `<form id="form-vaga">${formularioVaga(vaga)}</form>`;
+      renderizarRequisitos();
+      renderizarCamposExcluidos();
+      document.getElementById('btn-add-requisito').addEventListener('click', () => {
+        sincronizarRequisitosDoDom();
+        formRequisitos.push({ capacidade: '', categoria: 'tecnica', nivel_exigido: 'importante', peso: 0.5, anos_minimos: null });
+        renderizarRequisitos();
+      });
+      document.getElementById('btn-add-campo-excluido').addEventListener('click', () => {
+        const input = document.getElementById('novo-campo-excluido');
+        const valor = input.value.trim();
+        if (!valor || CAMPOS_EXCLUIDOS_DEFAULT.includes(valor) || formCamposExtras.includes(valor)) { input.value = ''; return; }
+        formCamposExtras.push(valor);
+        input.value = '';
+        renderizarCamposExcluidos();
+      });
+      document.getElementById('form-vaga').addEventListener('submit', salvar);
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>
