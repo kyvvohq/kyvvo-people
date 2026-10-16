@@ -15,9 +15,6 @@
 <style>
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
   @media(max-width:520px) { .grid2 { grid-template-columns:1fr; } }
-  .candidaturas-lista .item { display:flex; justify-content:space-between; align-items:center; gap:12px;
-    padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
-  .candidaturas-lista .item:last-child { border-bottom:none; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; }
   .chips .badge { display:inline-flex; align-items:center; gap:2px; }
   .linha-requisito { display:grid; grid-template-columns:2fr 1fr 1fr 130px 80px 90px 28px; gap:8px; align-items:center; margin-bottom:8px; }
@@ -36,6 +33,9 @@
     border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:0 12px 32px rgba(15,17,26,.12); padding:6px; z-index:40; }
   .menu-acoes-painel a { display:block; padding:8px 10px; border-radius:8px; font-size:13px; color:var(--text-secondary); text-decoration:none; }
   .menu-acoes-painel a:hover { background:var(--surface-muted); }
+  .menu-acoes-painel a.perigo { color:var(--danger); }
+  .btn-perigo { background:var(--danger); color:#fff; }
+  .btn-perigo:hover { background:var(--danger); filter:brightness(0.92); }
 
   /* Visão em colunas: mesma estrutura raia×coluna do Quadro (menu
      Quadro) — aqui raia = vaga, coluna = status, e cada raia só tem 1
@@ -64,31 +64,6 @@
   .cartao .data { color:var(--muted); font-size:11px; margin-top:4px; }
   .celula-vazia { color:var(--muted); font-size:11px; padding:6px; }
 
-  .automacoes-vaga { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
-  .automacoes-vaga h4 { font-size:13px; margin:0 0 10px; color:var(--text-secondary); }
-  .automacoes-vaga-linha { display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; }
-  .automacoes-vaga-linha .btn-automacao { background:transparent; border:none; color:var(--muted); cursor:pointer; padding:4px; border-radius:6px; width:auto; height:auto; }
-  .automacoes-vaga-linha .btn-automacao:hover { background:var(--surface-muted); color:var(--text); }
-  .automacoes-vaga-linha .btn-automacao.tem-automacao { color:var(--accent); }
-  .automacao-item { border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:10px; }
-  .automacao-item-topo { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-  .automacao-canal { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--muted-strong); }
-  .automacao-nome { font-size:13.5px; font-weight:600; color:var(--text); margin-bottom:8px; }
-  .automacao-acoes { display:flex; gap:14px; }
-  .automacao-acoes .btn-link { background:none; border:none; padding:0; color:var(--accent); font-size:12.5px; font-weight:600; cursor:pointer; width:auto; height:auto; }
-  .automacao-acoes .btn-link.perigo { color:var(--danger); }
-  .badge-obrigatoria { font-size:11px; font-weight:600; padding:3px 8px; border-radius:var(--radius-full); background:var(--border); color:var(--muted-strong); }
-  .toggle-automacao { width:36px; height:20px; border-radius:999px; background:var(--border-strong); border:none; position:relative; cursor:pointer; padding:0; }
-  .toggle-automacao .bolinha { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
-  .toggle-automacao[aria-checked="true"] { background:var(--accent); }
-  .toggle-automacao[aria-checked="true"] .bolinha { left:18px; }
-  .campo-automacao { margin-bottom:12px; }
-  .campo-automacao label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:4px; }
-  .campo-automacao textarea { min-height:110px; resize:vertical; font-family:inherit; }
-  .campo-automacao .ajuda { font-size:12px; color:var(--muted); margin-top:4px; }
-  .preview-whatsapp { margin-top:10px; background:#e5ddd5; border-radius:10px; padding:16px; }
-  .preview-whatsapp .bolha { background:#dcf8c6; border-radius:8px 8px 8px 2px; padding:10px 12px; font-size:13.5px; line-height:1.5; color:#111b21; max-width:280px; white-space:pre-wrap; box-shadow:0 1px 1px rgba(0,0,0,.1); }
-  .preview-whatsapp .bolha-botao { margin-top:2px; max-width:280px; background:#dcf8c6; border-top:1px solid rgba(0,0,0,.08); border-radius:0 0 8px 2px; padding:8px 12px; font-size:13px; color:#00a5f4; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
   .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
   .filtros select { height:36px; }
   tr.linha-vaga, .cartao { cursor:pointer; }
@@ -175,7 +150,25 @@
 
       <div class="filtros">
         <select id="filtro-status-vaga"><option value="">Todos os status</option></select>
+        <select id="filtro-data-modo">
+          <option value="">Sem filtro de data</option>
+          <option value="periodo">Período (criada → finalizada)</option>
+          <option value="apartir">A partir de uma data</option>
+        </select>
+        <span id="filtro-data-periodo" hidden style="display:inline-flex;gap:8px;align-items:center">
+          <input type="date" id="filtro-criada-de" title="Criada a partir de">
+          <span style="color:var(--muted);font-size:12px">até</span>
+          <input type="date" id="filtro-finalizada-ate" title="Finalizada até">
+        </span>
+        <span id="filtro-data-apartir" hidden style="display:inline-flex;gap:8px;align-items:center">
+          <select id="filtro-apartir-campo">
+            <option value="criado_em">Criada em</option>
+            <option value="finalizada_em">Finalizada em</option>
+          </select>
+          <input type="date" id="filtro-apartir-data">
+        </span>
       </div>
+      <div class="modal-erro" id="erro-filtro-data" style="padding:0 16px"></div>
 
       <div id="vista-lista">
         <div class="card" style="padding:0">
@@ -187,6 +180,7 @@
                 <th>Total de candidatos</th>
                 <th>Total em andamento</th>
                 <th>Criada em</th>
+                <th>Finalizada em</th>
                 <th></th>
               </tr>
             </thead>
@@ -207,8 +201,8 @@
   <script src="/ds/components.js"></script>
   <script src="/people/shell.js"></script>
   <script>
-    const STATUS_CLASSE = { rascunho: 'neutro', nova: 'destaque', em_andamento: 'aviso', pausada: 'aviso', encerrada: 'neutro' };
-    const STATUS_LABEL = { rascunho: 'Rascunho', nova: 'Nova', em_andamento: 'Em andamento', pausada: 'Pausada', encerrada: 'Encerrada' };
+    const STATUS_CLASSE = { rascunho: 'neutro', nova: 'destaque', em_andamento: 'aviso', pausada: 'aviso', encerrada: 'neutro', cancelada: 'perigo' };
+    const STATUS_LABEL = { rascunho: 'Rascunho', nova: 'Nova', em_andamento: 'Em andamento', pausada: 'Pausada', encerrada: 'Encerrada', cancelada: 'Cancelada' };
     const CAMPOS = ['nome', 'empresa', 'cidade', 'descricao', 'salario', 'modalidade', 'tipo_vaga', 'nivel_experiencia', 'requisitos'];
     const CAMPOS_OBRIGATORIOS = ['nome', 'descricao', 'requisitos'];
     const CAMPOS_EXCLUIDOS_DEFAULT = ['idade', 'ano_formatura', 'genero', 'estado_civil', 'nome', 'foto', 'endereco_completo', 'gaps_temporais_nao_justificados'];
@@ -223,14 +217,16 @@
     const CORES_RAIA = ['#F1EEFF', '#E6F9FC', '#E9FBF2', '#FFF6E8'];
 
     function menuAcoesHtml(v) {
+      const podeCancelar = v.status !== 'encerrada' && v.status !== 'cancelada';
       return `
         <div class="menu-acoes">
-          <button class="menu-acoes-btn" type="button" data-abrir-menu="${v.id}" aria-label="Ações" title="Ações">${icon('menu', 18)}</button>
+          <button class="menu-acoes-btn" type="button" data-abrir-menu="${v.id}" aria-label="Ações" title="Ações">${icon('ellipsis-vertical', 18)}</button>
           <div class="menu-acoes-painel" id="menu-acoes-${v.id}" hidden>
             <a href="#" data-editar="${v.id}">Editar</a>
             <a href="#" data-duplicar="${v.id}">Duplicar</a>
             <a href="#" data-candidaturas="${v.id}" data-nome="${v.nome}">Ver candidaturas</a>
             <a href="#" data-link="${v.id}">Copiar link</a>
+            ${podeCancelar ? `<a href="#" class="perigo" data-cancelar="${v.id}" data-nome="${v.nome}">Cancelar vaga</a>` : ''}
           </div>
         </div>
       `;
@@ -256,7 +252,9 @@
     // vagas.find(...) nos handlers de ação), só o que é DESENHADO passa
     // pelo filtro.
     function vagasFiltradas() {
-      return vagasFiltroStatus ? vagas.filter((v) => v.status === vagasFiltroStatus) : vagas;
+      return vagas
+        .filter((v) => !vagasFiltroStatus || v.status === vagasFiltroStatus)
+        .filter(vagaPassaNoFiltroData);
     }
 
     function renderizarLista() {
@@ -268,9 +266,10 @@
           <td>${v.total_candidatos}</td>
           <td>${v.total_em_andamento}</td>
           <td>${new Date(v.criado_em).toLocaleDateString('pt-BR')}</td>
+          <td>${v.finalizada_em ? new Date(v.finalizada_em).toLocaleDateString('pt-BR') : '—'}</td>
           <td>${menuAcoesHtml(v)}</td>
         </tr>
-      `).join('') || '<tr><td colspan="6" class="vazio">Nenhuma vaga cadastrada ainda.</td></tr>';
+      `).join('') || '<tr><td colspan="7" class="vazio">Nenhuma vaga cadastrada ainda.</td></tr>';
     }
 
     // Raia = vaga, coluna = status — cada raia só tem 1 cartão populado
@@ -286,7 +285,12 @@
         html += `<div class="coluna-header">${STATUS_LABEL[status]}</div>`;
       });
 
-      const lista = vagasFiltradas();
+      // Cancelada não entra no Quadro: é um estado abortado, não uma etapa do
+      // fluxo normal (nova > em andamento > pausada > encerrada) — sem
+      // coluna própria, uma raia de vaga cancelada ficaria com todas as
+      // células vazias, o que é confuso. Ela continua visível na Lista e no
+      // filtro de status.
+      const lista = vagasFiltradas().filter((v) => v.status !== 'cancelada');
       lista.forEach((v, indice) => {
         const cor = CORES_RAIA[indice % CORES_RAIA.length];
         html += `<div class="raia-label" style="background:${cor}" title="${v.nome}"></div>`;
@@ -355,10 +359,73 @@
     STATUS_ORDEM.forEach((status) => {
       filtroStatusEl.insertAdjacentHTML('beforeend', `<option value="${status}">${STATUS_LABEL[status]}</option>`);
     });
+    // "Cancelada" fica de fora do STATUS_ORDEM (não tem coluna no Quadro,
+    // ver renderizarKanban) mas ainda precisa aparecer aqui pra dar pra
+    // filtrar a Lista por vagas canceladas.
+    filtroStatusEl.insertAdjacentHTML('beforeend', '<option value="cancelada">Cancelada</option>');
     filtroStatusEl.addEventListener('change', () => {
       vagasFiltroStatus = filtroStatusEl.value;
       renderizar();
     });
+
+    // --- Filtro de data: período (criada→finalizada) OU "a partir de uma
+    // data" num campo escolhido (criada em / finalizada em). Client-side,
+    // mesmo padrão do filtro de status (vagas.length é sempre a fonte
+    // completa, só o que é desenhado passa pelo filtro). ---
+    let filtroData = null; // { modo: 'periodo', criadaDe, finalizadaAte } | { modo: 'apartir', campo, data }
+    const elModo = document.getElementById('filtro-data-modo');
+    const elPeriodo = document.getElementById('filtro-data-periodo');
+    const elApartir = document.getElementById('filtro-data-apartir');
+    const elCriadaDe = document.getElementById('filtro-criada-de');
+    const elFinalizadaAte = document.getElementById('filtro-finalizada-ate');
+    const elApartirCampo = document.getElementById('filtro-apartir-campo');
+    const elApartirData = document.getElementById('filtro-apartir-data');
+    const elErroFiltroData = document.getElementById('erro-filtro-data');
+
+    function aplicarFiltroDataInputs() {
+      elErroFiltroData.textContent = '';
+      const modo = elModo.value;
+      elPeriodo.hidden = modo !== 'periodo';
+      elApartir.hidden = modo !== 'apartir';
+
+      if (modo === 'periodo') {
+        const criadaDe = elCriadaDe.value;
+        const finalizadaAte = elFinalizadaAte.value;
+        if (criadaDe && finalizadaAte && criadaDe > finalizadaAte) {
+          elErroFiltroData.textContent = '"Criada em" não pode ser depois de "Finalizada em".';
+          filtroData = null;
+        } else if (criadaDe || finalizadaAte) {
+          filtroData = { modo, criadaDe: criadaDe || null, finalizadaAte: finalizadaAte || null };
+        } else {
+          filtroData = null;
+        }
+      } else if (modo === 'apartir') {
+        const data = elApartirData.value;
+        filtroData = data ? { modo, campo: elApartirCampo.value, data } : null;
+      } else {
+        filtroData = null;
+      }
+      renderizar();
+    }
+
+    [elModo, elCriadaDe, elFinalizadaAte, elApartirCampo, elApartirData].forEach((el) => {
+      el.addEventListener('change', aplicarFiltroDataInputs);
+    });
+
+    function vagaPassaNoFiltroData(v) {
+      if (!filtroData) return true;
+      if (filtroData.modo === 'periodo') {
+        if (filtroData.criadaDe && v.criado_em.slice(0, 10) < filtroData.criadaDe) return false;
+        if (filtroData.finalizadaAte) {
+          if (!v.finalizada_em || v.finalizada_em.slice(0, 10) > filtroData.finalizadaAte) return false;
+        }
+        return true;
+      }
+      // apartir: campo >= data (vaga sem finalizada_em não casa filtro por esse campo)
+      const valor = v[filtroData.campo];
+      if (!valor) return false;
+      return valor.slice(0, 10) >= filtroData.data;
+    }
 
     async function carregarVagas() {
       const res = await apiFetch('/people/api/vagas');
@@ -385,7 +452,6 @@
     function formularioVaga(vaga, modo) {
       const v = vaga || {};
       const editando = modo === 'editar';
-      const mostrarAvancado = modo !== 'criar';
       return `
         <div class="modal-erro" id="msg-vaga"></div>
         <label for="nome">Nome da vaga *</label>
@@ -440,8 +506,7 @@
             <option value="encerrada" ${v.status === 'encerrada' ? 'selected' : ''}>Encerrada</option>
           </select>
         ` : ''}
-        ${mostrarAvancado ? `
-          <label>Pesos do score de aderência</label>
+        <label>Pesos do score de aderência</label>
           <p class="campo-ajuda">Usados quando a psicóloga lança nota (0-100) em cada componente da candidatura — o "geral" é a média ponderada por esses pesos.</p>
           <div class="grid2" style="grid-template-columns:1fr 1fr 1fr">
             <div><label for="peso-tecnica">Técnica</label><input id="peso-tecnica" type="number" step="0.05" min="0" max="1" value="${(v.pesos && v.pesos.tecnica) ?? 0.4}"></div>
@@ -461,7 +526,6 @@
             <input id="novo-campo-excluido" placeholder="Ex: nome_da_faculdade" style="flex:1">
             <button type="button" class="btn-secundario" id="btn-add-campo-excluido">Adicionar</button>
           </div>
-        ` : ''}
         <div class="modal-acoes">
           <button type="button" class="btn-secundario" id="btn-cancelar-vaga">Cancelar</button>
           <button type="submit" class="btn">${editando ? 'Salvar alterações' : 'Criar vaga'}</button>
@@ -570,16 +634,14 @@
       const dados = coletarDadosForm();
 
       if (modo === 'editar') dados.status = document.getElementById('status').value;
-      if (modo !== 'criar') {
-        dados.pesos = {
-          tecnica: Number(document.getElementById('peso-tecnica').value) || 0,
-          experiencia: Number(document.getElementById('peso-experiencia').value) || 0,
-          entrevista: Number(document.getElementById('peso-entrevista').value) || 0,
-        };
-        sincronizarRequisitosDoDom();
-        dados.requisitos_estruturados = formRequisitos;
-        dados.campos_excluidos_score = [...CAMPOS_EXCLUIDOS_DEFAULT, ...formCamposExtras];
-      }
+      dados.pesos = {
+        tecnica: Number(document.getElementById('peso-tecnica').value) || 0,
+        experiencia: Number(document.getElementById('peso-experiencia').value) || 0,
+        entrevista: Number(document.getElementById('peso-entrevista').value) || 0,
+      };
+      sincronizarRequisitosDoDom();
+      dados.requisitos_estruturados = formRequisitos;
+      dados.campos_excluidos_score = [...CAMPOS_EXCLUIDOS_DEFAULT, ...formCamposExtras];
 
       try {
         const res = modo === 'editar'
@@ -633,36 +695,27 @@
       const titulo = modo === 'editar' ? `Editando: ${vaga.nome}` : modo === 'duplicar' ? `Duplicar vaga: ${vaga.nome || vaga.nomeOriginal || ''}` : 'Nova vaga';
       abrirModal(`<h3>${titulo}</h3>`, `<form id="form-vaga">${formularioVaga(vaga, modo)}</form>`, 'modal-card-larga');
 
-      if (modo !== 'criar') {
+      renderizarRequisitos();
+      renderizarCamposExcluidos();
+      document.getElementById('btn-add-requisito').addEventListener('click', () => {
+        sincronizarRequisitosDoDom();
+        formRequisitos.push({ capacidade: '', categoria: 'tecnica', nivel_exigido: 'importante', peso: 0.5, anos_minimos: null });
         renderizarRequisitos();
+      });
+      document.getElementById('btn-add-campo-excluido').addEventListener('click', () => {
+        const input = document.getElementById('novo-campo-excluido');
+        const valor = input.value.trim();
+        if (!valor || CAMPOS_EXCLUIDOS_DEFAULT.includes(valor) || formCamposExtras.includes(valor)) { input.value = ''; return; }
+        formCamposExtras.push(valor);
+        input.value = '';
         renderizarCamposExcluidos();
-        document.getElementById('btn-add-requisito').addEventListener('click', () => {
-          sincronizarRequisitosDoDom();
-          formRequisitos.push({ capacidade: '', categoria: 'tecnica', nivel_exigido: 'importante', peso: 0.5, anos_minimos: null });
-          renderizarRequisitos();
-        });
-        document.getElementById('btn-add-campo-excluido').addEventListener('click', () => {
-          const input = document.getElementById('novo-campo-excluido');
-          const valor = input.value.trim();
-          if (!valor || CAMPOS_EXCLUIDOS_DEFAULT.includes(valor) || formCamposExtras.includes(valor)) { input.value = ''; return; }
-          formCamposExtras.push(valor);
-          input.value = '';
-          renderizarCamposExcluidos();
-        });
-      }
+      });
 
       document.getElementById('btn-cancelar-vaga').addEventListener('click', () => tentarFecharVaga(modo));
       document.getElementById('form-vaga').addEventListener('submit', async (e) => {
         e.preventDefault();
         await salvarVaga(modo, vaga);
       });
-    }
-
-    async function abrirModalEditar(id) {
-      const res = await apiFetch(`/people/api/vagas/${id}`);
-      const vaga = await res.json();
-      if (!res.ok) { avisar('Erro', vaga.error || 'Falha ao carregar vaga'); return; }
-      abrirModalVaga(vaga, 'editar');
     }
 
     async function abrirModalDuplicar(id) {
@@ -672,301 +725,35 @@
       abrirModalVaga({ ...vaga, nomeOriginal: vaga.nome, nome: '' }, 'duplicar');
     }
 
-    async function abrirModalCandidaturas(id, nome) {
-      const overlay = abrirModal(
-        `<h3>Candidaturas — ${nome}</h3>`,
+    function confirmarCancelarVaga(id, nome) {
+      abrirModal(
+        '<h3>Cancelar vaga</h3>',
         `
-          <div class="candidaturas-lista" id="lista-candidaturas">Carregando...</div>
-          <div class="automacoes-vaga">
-            <h4>Automações só desta vaga</h4>
-            <p class="ajuda" style="margin:-6px 0 10px">Sobrepõem a automação geral da mesma etapa (configurada no Quadro), só pra candidatos desta vaga.</p>
-            <div id="automacoes-vaga-lista">Carregando...</div>
-          </div>
-        `,
-        'modal-card-larga'
-      );
-      const [resCand, resEtapas, resAuto] = await Promise.all([
-        apiFetch(`/people/api/vagas/${id}/candidaturas`),
-        apiFetch('/people/api/etapas'),
-        apiFetch('/people/api/automacoes'),
-      ]);
-      const candidaturas = await resCand.json();
-      document.getElementById('lista-candidaturas').innerHTML = candidaturas.map((c) => `
-        <div class="item">
-          <span>${c.nome} — ${c.whatsapp} — ${c.email}${c.linkedin ? ` — <a class="acao" href="${c.linkedin}" target="_blank">LinkedIn</a>` : ''}</span>
-          <a class="acao" href="#" data-curriculo="${c.id}">Baixar currículo</a>
-        </div>
-      `).join('') || '<div class="vazio">Nenhuma candidatura recebida ainda.</div>';
-
-      const etapas = await resEtapas.json();
-      automacoesDaVaga = await resAuto.json();
-      renderizarListaEtapasAutomacao(id, etapas);
-    }
-
-    // --- Automações específicas desta vaga (⚡ por etapa, escopo = só esta vaga) ---
-    let automacoesDaVaga = [];
-    const CANAL_LABEL_VAGA = { email: 'E-mail', whatsapp: 'WhatsApp' };
-    const CANAL_ICONE_VAGA = { email: 'file-text', whatsapp: 'message-circle' };
-
-    function renderizarListaEtapasAutomacao(vagaId, etapas) {
-      const container = document.getElementById('automacoes-vaga-lista');
-      if (!etapas.length) { container.innerHTML = '<p class="ajuda">Nenhuma etapa cadastrada ainda — crie etapas no Quadro primeiro.</p>'; return; }
-
-      container.innerHTML = etapas.map((etapa) => {
-        const temEspecifica = automacoesDaVaga.some((a) => a.gatilho === 'etapa_alcancada' && a.etapa_id === etapa.id && a.vaga_id === vagaId && a.ativo);
-        return `
-          <div class="automacoes-vaga-linha">
-            <span>${etapa.nome}</span>
-            <button type="button" class="btn-automacao${temEspecifica ? ' tem-automacao' : ''}" data-etapa-automacao="${etapa.id}" data-etapa-nome="${etapa.nome}" title="Automação desta etapa, só nesta vaga">${icon('zap', 16)}</button>
-          </div>
-        `;
-      }).join('');
-
-      container.querySelectorAll('[data-etapa-automacao]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          renderModalListaAutomacoesVaga({ vagaId, etapaId: btn.dataset.etapaAutomacao, etapaNome: btn.dataset.etapaNome }, etapas);
-        });
-      });
-    }
-
-    function itensDoContextoVaga(contexto) {
-      return automacoesDaVaga.filter((a) => a.gatilho === 'etapa_alcancada' && a.etapa_id === contexto.etapaId && a.vaga_id === contexto.vagaId);
-    }
-
-    function itemAutomacaoHtmlVaga(a) {
-      return `
-        <div class="automacao-item">
-          <div class="automacao-item-topo">
-            <span class="automacao-canal">${icon(CANAL_ICONE_VAGA[a.canal], 14)} ${CANAL_LABEL_VAGA[a.canal]}</span>
-            ${a.removivel
-              ? `<button type="button" class="toggle-automacao" data-toggle-automacao="${a.id}" role="switch" aria-checked="${a.ativo}"><span class="bolinha"></span></button>`
-              : '<span class="badge-obrigatoria">Obrigatória</span>'}
-          </div>
-          <div class="automacao-nome">${a.nome}</div>
-          <div class="automacao-acoes">
-            <button type="button" class="btn-link" data-ver-automacao="${a.id}">Editar</button>
-            <button type="button" class="btn-link" data-duplicar-automacao="${a.id}">Duplicar</button>
-            ${a.removivel ? `<button type="button" class="btn-link perigo" data-excluir-automacao="${a.id}">Excluir</button>` : ''}
-          </div>
-        </div>
-      `;
-    }
-
-    async function recarregarAutomacoesDaVaga() {
-      const res = await apiFetch('/people/api/automacoes');
-      automacoesDaVaga = await res.json();
-    }
-
-    function renderModalListaAutomacoesVaga(contexto, etapas) {
-      const itens = itensDoContextoVaga(contexto);
-      const overlay = abrirModal(
-        `<h3>Automação — ${contexto.etapaNome} (só nesta vaga)</h3>`,
-        `
-          <div id="lista-automacoes">${itens.length ? itens.map(itemAutomacaoHtmlVaga).join('') : '<p class="modal-texto">Nenhuma automação específica desta vaga aqui ainda.</p>'}</div>
-          <div class="modal-acoes"><button type="button" class="btn-secundario" id="btn-nova-automacao">+ Nova automação (só desta vaga)</button></div>
-        `,
-        'modal-card-larga'
-      );
-
-      overlay.querySelectorAll('[data-toggle-automacao]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const automacao = automacoesDaVaga.find((a) => a.id === btn.dataset.toggleAutomacao);
-          await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify({ ativo: !automacao.ativo }) });
-          await recarregarAutomacoesDaVaga();
-          renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
-          renderModalListaAutomacoesVaga(contexto, etapas);
-        });
-      });
-      overlay.querySelectorAll('[data-ver-automacao]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          renderModalFormAutomacaoVaga(contexto, etapas, automacoesDaVaga.find((a) => a.id === btn.dataset.verAutomacao));
-        });
-      });
-      overlay.querySelectorAll('[data-duplicar-automacao]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/people/api/automacoes/${btn.dataset.duplicarAutomacao}/duplicar`, { method: 'POST' });
-          await recarregarAutomacoesDaVaga();
-          renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
-          renderModalListaAutomacoesVaga(contexto, etapas);
-        });
-      });
-      overlay.querySelectorAll('[data-excluir-automacao]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/people/api/automacoes/${btn.dataset.excluirAutomacao}`, { method: 'DELETE' });
-          await recarregarAutomacoesDaVaga();
-          renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
-          renderModalListaAutomacoesVaga(contexto, etapas);
-        });
-      });
-      document.getElementById('btn-nova-automacao').addEventListener('click', () => renderModalFormAutomacaoVaga(contexto, etapas, null));
-    }
-
-    const EXEMPLO_PARAMETROS_CORPO_VAGA = ['Maria Silva', 'Desenvolvedora Backend', 'Entrevista'];
-
-    function renderModalFormAutomacaoVaga(contexto, etapas, automacao) {
-      const obrigatoria = !!(automacao && !automacao.removivel);
-      const canalAtual = automacao ? automacao.canal : 'email';
-      const overlay = abrirModal(
-        `<h3>${automacao ? 'Editar automação' : 'Nova automação'}</h3>`,
-        `
-          ${obrigatoria ? '<p class="modal-texto">Automação obrigatória — não pode ser desativada nem excluída, mas você pode trocar o template.</p>' : ''}
-          ${!automacao ? `
-          <div class="campo-automacao">
-            <label>Canal</label>
-            <select id="form-canal">
-              <option value="email">E-mail</option>
-              <option value="whatsapp">WhatsApp</option>
-            </select>
-          </div>` : ''}
-          <div class="campo-automacao" id="wrap-nome" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
-            <label>Nome (só pra identificar na lista)</label>
-            <input type="text" id="form-nome" value="${automacao ? automacao.nome.replace(/"/g, '&quot;') : ''}">
-          </div>
-          <div class="campo-automacao" id="wrap-assunto" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
-            <label>Assunto do e-mail</label>
-            <input type="text" id="form-assunto" value="${automacao && automacao.assunto ? automacao.assunto.replace(/"/g, '&quot;') : ''}">
-          </div>
-          <div class="campo-automacao" id="wrap-mensagem" ${canalAtual === 'whatsapp' ? 'hidden' : ''}>
-            <label>Mensagem</label>
-            <textarea id="form-corpo">${automacao ? automacao.corpo : ''}</textarea>
-            <div class="ajuda">Placeholders disponíveis: {{nome}}, {{vaga}}, {{empresa}}, {{etapa}}</div>
-          </div>
-          <div class="campo-automacao" id="wrap-template" ${canalAtual === 'email' ? 'hidden' : ''}>
-            <label>Template aprovado na Meta (WhatsApp)</label>
-            <select id="form-template-select" hidden></select>
-            <input type="text" id="form-template" value="${automacao && automacao.whatsapp_template ? automacao.whatsapp_template : ''}" placeholder="ex.: candidatura_recebida_pt">
-            <div class="ajuda" id="ajuda-template">Sem template aprovado aqui, o envio fica em modo de teste (só loga, não manda de verdade).</div>
-            <div class="preview-whatsapp" id="preview-whatsapp" hidden>
-              <div class="bolha" id="preview-whatsapp-corpo"></div>
-              <div class="bolha-botao" id="preview-whatsapp-botao" hidden></div>
-            </div>
-          </div>
+          <p class="modal-texto">Tem certeza que deseja cancelar a vaga${nome ? ` "${nome}"` : ''}? Ao realizar o cancelamento a rotina enviará uma notificação para todos os inscritos da vaga.</p>
+          <div class="modal-erro" id="msg-cancelar-vaga"></div>
           <div class="modal-acoes">
-            <button type="button" class="btn-secundario" id="btn-voltar-automacao">Voltar</button>
-            <button type="button" class="btn" id="btn-salvar-automacao">Salvar</button>
+            <button type="button" class="btn-secundario" id="btn-sair-cancelar">Sair</button>
+            <button type="button" class="btn btn-perigo" id="btn-confirmar-cancelar">Confirmar</button>
           </div>
-        `,
-        'modal-card-larga'
+        `
       );
-
-      document.getElementById('btn-voltar-automacao').addEventListener('click', () => renderModalListaAutomacoesVaga(contexto, etapas));
-
-      let templatesCache = [];
-      let templatesCarregados = false;
-      const sincronizarWhatsapp = () => {
-        const nomeTemplate = valorTemplateEscolhidoVaga();
-        const template = templatesCache.find((t) => t.nome === nomeTemplate);
-        atualizarPreviewWhatsappVaga(template);
-        document.getElementById('form-nome').value = nomeTemplate || '';
-        document.getElementById('form-corpo').value = template ? (template.corpo || '') : (nomeTemplate ? 'Mensagem definida pelo template aprovado na Meta.' : '');
-      };
-      if (canalAtual === 'whatsapp') {
-        montarSeletorTemplateVaga(automacao ? automacao.whatsapp_template : '', sincronizarWhatsapp).then((lista) => {
-          templatesCache = lista; templatesCarregados = true; sincronizarWhatsapp();
-        });
-        document.getElementById('form-template').addEventListener('input', sincronizarWhatsapp);
-      }
-
-      const selectCanal = document.getElementById('form-canal');
-      if (selectCanal) {
-        selectCanal.addEventListener('change', () => {
-          const ehWhatsapp = selectCanal.value === 'whatsapp';
-          document.getElementById('wrap-nome').hidden = ehWhatsapp;
-          document.getElementById('wrap-assunto').hidden = ehWhatsapp;
-          document.getElementById('wrap-mensagem').hidden = ehWhatsapp;
-          document.getElementById('wrap-template').hidden = !ehWhatsapp;
-          if (ehWhatsapp) {
-            document.getElementById('form-template').addEventListener('input', sincronizarWhatsapp);
-            if (!templatesCarregados) {
-              templatesCarregados = true;
-              montarSeletorTemplateVaga('', sincronizarWhatsapp).then((lista) => { templatesCache = lista; sincronizarWhatsapp(); });
-            } else {
-              sincronizarWhatsapp();
-            }
-          }
-        });
-      }
-
-      const btnSalvar = document.getElementById('btn-salvar-automacao');
-      btnSalvar.addEventListener('click', async () => {
-        const canal = automacao ? automacao.canal : selectCanal.value;
-        if (canal === 'whatsapp') sincronizarWhatsapp();
-        const nome = document.getElementById('form-nome').value.trim();
-        const corpo = document.getElementById('form-corpo').value.trim();
-        if (!nome || !corpo) { avisar('Erro', canal === 'whatsapp' ? 'Escolha um template' : 'Nome e mensagem são obrigatórios'); return; }
-        const payload = {
-          nome, corpo,
-          assunto: canal === 'email' ? document.getElementById('form-assunto').value.trim() : null,
-          whatsapp_template: canal === 'whatsapp' ? valorTemplateEscolhidoVaga() : null,
-        };
-        btnSalvar.disabled = true;
-        if (automacao) {
-          await apiFetch(`/people/api/automacoes/${automacao.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
-        } else {
-          await apiFetch('/people/api/automacoes', {
-            method: 'POST',
-            body: JSON.stringify({ ...payload, gatilho: 'etapa_alcancada', etapa_id: contexto.etapaId, vaga_id: contexto.vagaId, canal }),
-          });
-        }
-        await recarregarAutomacoesDaVaga();
-        renderizarListaEtapasAutomacao(contexto.vagaId, etapas);
-        renderModalListaAutomacoesVaga(contexto, etapas);
+      document.getElementById('btn-sair-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('btn-confirmar-cancelar').addEventListener('click', async () => {
+        const res = await apiFetch(`/people/api/vagas/${id}/cancelar`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { document.getElementById('msg-cancelar-vaga').textContent = data.error || 'Falha ao cancelar vaga'; return; }
+        fecharModal();
+        carregarVagas();
       });
-    }
-
-    function valorTemplateEscolhidoVaga() {
-      const select = document.getElementById('form-template-select');
-      const input = document.getElementById('form-template');
-      if (!select.hidden && select.value !== '__manual__') return select.value;
-      return input.value.trim();
-    }
-
-    function atualizarPreviewWhatsappVaga(template) {
-      const preview = document.getElementById('preview-whatsapp');
-      if (!template || !template.corpo) { preview.hidden = true; return; }
-      let corpoPreenchido = template.corpo;
-      (template.parametros_corpo || []).forEach((nomeParam, i) => {
-        const chave = template.parametros_nomeados ? nomeParam : String(i + 1);
-        corpoPreenchido = corpoPreenchido.replace(new RegExp(`\\{\\{${chave}\\}\\}`, 'g'), EXEMPLO_PARAMETROS_CORPO_VAGA[i] || '');
-      });
-      document.getElementById('preview-whatsapp-corpo').textContent = corpoPreenchido;
-      const botao = document.getElementById('preview-whatsapp-botao');
-      botao.hidden = !template.tem_botao_url;
-      if (template.tem_botao_url) botao.innerHTML = `${icon('file-text', 14)} ${template.botao_texto || 'Abrir link'}`;
-      preview.hidden = false;
-    }
-
-    async function montarSeletorTemplateVaga(valorAtual, aoMudar) {
-      const select = document.getElementById('form-template-select');
-      const input = document.getElementById('form-template');
-      try {
-        const res = await apiFetch('/people/api/automacoes/templates-whatsapp');
-        const templates = await res.json();
-        if (!Array.isArray(templates) || !templates.length) return [];
-
-        select.innerHTML = templates.map((t) => `
-          <option value="${t.nome}">${t.nome} — ${t.status}${t.tem_botao_url ? '' : ' (sem botão de link!)'}</option>
-        `).join('') + '<option value="__manual__">Digitar nome manualmente…</option>';
-
-        const bateComAlgum = templates.some((t) => t.nome === valorAtual);
-        select.value = bateComAlgum ? valorAtual : (valorAtual ? '__manual__' : templates[0].nome);
-        select.hidden = false;
-        input.hidden = select.value !== '__manual__';
-        select.addEventListener('change', () => {
-          input.hidden = select.value !== '__manual__';
-          aoMudar();
-        });
-        return templates;
-      } catch (err) {
-        return [];
-      }
     }
 
     document.getElementById('btn-nova-vaga').addEventListener('click', () => abrirModalVaga(null, 'criar'));
 
-    // Os links de ação agora vivem dentro do menu sanduíche (por linha na
-    // lista, por card nas colunas) — um único listener no document cobre
-    // as duas visualizações em vez de um por container.
+    // Os links de ação agora vivem dentro do menu "⋮" (por linha na lista,
+    // por card nas colunas) — um único listener no document cobre as duas
+    // visualizações em vez de um por container. Editar e Ver candidaturas
+    // navegam pra tela cheia (vaga-editar.html / vaga-candidaturas.html),
+    // não abrem mais modal.
     document.addEventListener('click', (e) => {
       const abrirBtn = e.target.closest('[data-abrir-menu]');
       if (abrirBtn) {
@@ -980,13 +767,16 @@
       }
 
       const editar = e.target.closest('[data-editar]');
-      if (editar) { e.preventDefault(); fecharMenusAcoes(); abrirModalEditar(editar.dataset.editar); return; }
+      if (editar) { e.preventDefault(); window.location.href = `/people/vaga-editar.html?id=${editar.dataset.editar}`; return; }
 
       const duplicar = e.target.closest('[data-duplicar]');
       if (duplicar) { e.preventDefault(); fecharMenusAcoes(); abrirModalDuplicar(duplicar.dataset.duplicar); return; }
 
       const candidaturas = e.target.closest('[data-candidaturas]');
-      if (candidaturas) { e.preventDefault(); fecharMenusAcoes(); abrirModalCandidaturas(candidaturas.dataset.candidaturas, candidaturas.dataset.nome); return; }
+      if (candidaturas) { e.preventDefault(); window.location.href = `/people/vaga-candidaturas.html?id=${candidaturas.dataset.candidaturas}`; return; }
+
+      const cancelar = e.target.closest('[data-cancelar]');
+      if (cancelar) { e.preventDefault(); fecharMenusAcoes(); confirmarCancelarVaga(cancelar.dataset.cancelar, cancelar.dataset.nome); return; }
 
       const link = e.target.closest('[data-link]');
       if (link) {
@@ -998,29 +788,14 @@
       }
 
       // Clicar na linha (Lista) ou no cartão (Quadro) abre a mesma edição
-      // do menu "⋯" > Editar — já não chega aqui se o clique foi dentro do
+      // do menu "⋮" > Editar — já não chega aqui se o clique foi dentro do
       // menu-acoes (os `return` acima cobrem isso antes).
       const linhaVaga = e.target.closest('tr.linha-vaga');
-      if (linhaVaga) { abrirModalEditar(linhaVaga.dataset.id); return; }
+      if (linhaVaga) { window.location.href = `/people/vaga-editar.html?id=${linhaVaga.dataset.id}`; return; }
       const cartaoVaga = e.target.closest('.cartao[data-cartao-vaga]');
-      if (cartaoVaga) { abrirModalEditar(cartaoVaga.dataset.cartaoVaga); return; }
+      if (cartaoVaga) { window.location.href = `/people/vaga-editar.html?id=${cartaoVaga.dataset.cartaoVaga}`; return; }
 
       if (!e.target.closest('.menu-acoes-painel')) fecharMenusAcoes();
-    });
-
-    document.addEventListener('click', async (e) => {
-      const alvo = e.target.closest('[data-curriculo]');
-      if (!alvo) return;
-      e.preventDefault();
-      const res = await apiFetch(`/people/api/candidaturas/${alvo.dataset.curriculo}/curriculo`);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'curriculo';
-      a.click();
-      URL.revokeObjectURL(url);
     });
 
     carregarVagas();

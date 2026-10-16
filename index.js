@@ -989,7 +989,7 @@ async function build() {
   // dois totais (já saíram do funil).
   fastify.get('/people/api/vagas', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      `select v.id, v.codigo, v.nome, v.cargo, v.status, v.criado_em,
+      `select v.id, v.codigo, v.nome, v.cargo, v.status, v.criado_em, v.finalizada_em,
               count(c.id) as total_candidatos,
               count(c.id) filter (where c.status = 'nova' and c.etapa_id is not null) as total_em_andamento
        from vagas v
@@ -1007,6 +1007,28 @@ async function build() {
     if (!rows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
     return rows[0];
   });
+
+  // Fan-out de notificação a todo inscrito em aberto (status != reprovada) —
+  // usado tanto no encerramento "normal" (PATCH status=encerrada) quanto no
+  // cancelamento explícito (POST .../cancelar) logo abaixo. Mesmo gatilho
+  // (vaga_encerrada) nos dois casos: do ponto de vista de quem se candidatou
+  // a mensagem é a mesma ("a vaga não está mais aberta"), não há automação
+  // separada configurável pra cancelamento.
+  async function notificarFechamentoVaga(pool, tenantId, vagaId, vaga) {
+    const { rows: candidatosEmAberto } = await pool.query(
+      `select p.nome, p.email, p.telefone_e164, p.whatsapp_opt_out, av.token as avaliacao_token
+       from candidaturas c join candidatos p on p.id = c.candidato_id
+       left join avaliacoes av on av.id = c.avaliacao_id
+       where c.vaga_id = $1 and c.status != 'reprovada'`,
+      [vagaId]
+    );
+    for (const candidato of candidatosEmAberto) {
+      await dispararAutomacoes(pool, {
+        tenantId, gatilho: 'vaga_encerrada', candidato, vaga,
+        linkAvaliacao: linkAvaliacaoDe(candidato.avaliacao_token),
+      });
+    }
+  }
 
   fastify.patch('/people/api/vagas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     let dados = request.body || {};
@@ -1039,33 +1061,47 @@ async function build() {
     if (!atualRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
     const statusAnterior = atualRows[0].status;
 
+    // finalizada_em acompanha a transição de/para "encerrada" por aqui — o
+    // cancelamento (que também é uma finalização) só acontece pela rota
+    // dedicada abaixo, nunca por este PATCH genérico (status "cancelada" não
+    // está em STATUS_VAGA_VALIDOS de propósito, ver migration 029).
+    const indoPraEncerrada = dados.status === 'encerrada' && statusAnterior !== 'encerrada';
+    const saindoDeEncerrada = dados.status && dados.status !== 'encerrada' && statusAnterior === 'encerrada';
+    const setsExtras = indoPraEncerrada ? ', finalizada_em = now()' : saindoDeEncerrada ? ', finalizada_em = null' : '';
+
     const sets = campos.map((campo, i) => `${campo} = $${i + 3}`).join(', ');
     const valores = campos.map((campo) => (CAMPOS_VAGA_JSONB.includes(campo) ? JSON.stringify(dados[campo]) : dados[campo]));
     const { rows } = await pool.query(
-      `update vagas set ${sets}, atualizado_em = now() where id = $1 and tenant_id = $2 returning id`,
+      `update vagas set ${sets}, atualizado_em = now()${setsExtras} where id = $1 and tenant_id = $2 returning id`,
       [request.params.id, request.user.tenantId, ...valores]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
 
-    if (dados.status === 'encerrada' && statusAnterior !== 'encerrada') {
+    if (indoPraEncerrada) {
       const vaga = { nome: dados.nome || atualRows[0].nome, empresa: dados.empresa !== undefined ? dados.empresa : atualRows[0].empresa };
-      // avaliacoes.token só serve pra montar o link (linkAvaliacaoDe) — uma
-      // automação de WhatsApp aqui pode ter escolhido um template com botão
-      // de link, mesmo esse não sendo o gatilho "original" desse botão.
-      const { rows: candidatosEmAberto } = await pool.query(
-        `select p.nome, p.email, p.telefone_e164, p.whatsapp_opt_out, av.token as avaliacao_token
-         from candidaturas c join candidatos p on p.id = c.candidato_id
-         left join avaliacoes av on av.id = c.avaliacao_id
-         where c.vaga_id = $1 and c.status != 'reprovada'`,
-        [request.params.id]
-      );
-      for (const candidato of candidatosEmAberto) {
-        await dispararAutomacoes(pool, {
-          tenantId: request.user.tenantId, gatilho: 'vaga_encerrada', candidato, vaga,
-          linkAvaliacao: linkAvaliacaoDe(candidato.avaliacao_token),
-        });
-      }
+      await notificarFechamentoVaga(pool, request.user.tenantId, request.params.id, vaga);
     }
+    return { ok: true };
+  });
+
+  // Cancelamento de vaga (ação dedicada, separada do dropdown de status da
+  // edição — pedido do Bruno: cancelar precisa de confirmação explícita na
+  // tela e sempre notifica os inscritos, não pode ser um valor qualquer de
+  // status escolhido sem querer num select ou arrastando card no Quadro).
+  fastify.post('/people/api/vagas/:id/cancelar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows: atualRows } = await pool.query('select status, nome, empresa from vagas where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!atualRows[0]) return reply.code(404).send({ error: 'Vaga não encontrada' });
+    if (atualRows[0].status === 'encerrada' || atualRows[0].status === 'cancelada') {
+      return reply.code(400).send({ error: 'Esta vaga já está finalizada' });
+    }
+
+    await pool.query(
+      `update vagas set status = 'cancelada', finalizada_em = now(), atualizado_em = now() where id = $1 and tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
+    );
+
+    const vaga = { nome: atualRows[0].nome, empresa: atualRows[0].empresa };
+    await notificarFechamentoVaga(pool, request.user.tenantId, request.params.id, vaga);
     return { ok: true };
   });
 
