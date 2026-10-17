@@ -19,8 +19,14 @@
   html, body { height:100%; }
   body { margin:0; background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif;
     display:flex; flex-direction:column; min-height:100vh; }
-  main { max-width:640px; width:100%; box-sizing:border-box; margin:0 auto; padding:32px 24px 80px; flex:1 0 auto; }
-  .card { background:#fff; border:1px solid #E7EAF2; border-radius:16px; padding:28px; margin-bottom:24px; }
+  main { max-width:1120px; width:100%; box-sizing:border-box; margin:0 auto; padding:32px 24px 80px; flex:1 0 auto; }
+  .card { background:#fff; border:1px solid #E7EAF2; border-radius:16px; padding:28px; }
+  .layout { display:grid; grid-template-columns: 1fr 380px; gap:24px; align-items:start; }
+  .coluna-form { position:sticky; top:24px; }
+  @media (max-width:860px) {
+    .layout { grid-template-columns: 1fr; }
+    .coluna-form { position:static; }
+  }
   h1 { font-family:'Space Grotesk',sans-serif; font-size:20px; margin:0 0 8px; }
   .meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
   .pill { font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; background:#F1F3F8; color:#2B3040; }
@@ -33,13 +39,15 @@
   input[type=file] { width:100%; box-sizing:border-box; background:#F8F9FC; border:1px dashed #D7DCE8;
     border-radius:12px; padding:12px; color:#6B7385; font-size:13px; }
   button { background:#7C5CFC; color:#fff; font-weight:600; border:none; border-radius:12px;
-    height:44px; padding:0 22px; font-size:14px; cursor:pointer; margin-top:20px; }
+    height:44px; padding:0 22px; font-size:14px; cursor:pointer; margin-top:20px; width:100%; }
   button:hover { background:#6344E8; }
   button:disabled { opacity:.5; cursor:default; }
   .erro { color:#F04438; font-size:13px; margin-top:12px; min-height:16px; }
   a.entrar { color:#6B7385; text-decoration:none; font-size:13px; font-weight:600; }
+  .ds-topbar-marca { text-decoration:none; }
   .ds-rodape-publico { border-top:none; }
   .ds-rodape-publico-imagem img { object-fit:contain; }
+  .ds-rodape-publico a { text-decoration:none; }
 </style>
 </head>
 <body>
@@ -54,6 +62,10 @@
 </header>
 <main>
   <div class="card" id="conteudo">Carregando...</div>
+  <div class="layout" id="layout" hidden>
+    <div class="card" id="coluna-vaga"></div>
+    <div class="card coluna-form" id="coluna-form"></div>
+  </div>
 </main>
 
 <footer class="ds-rodape-publico">
@@ -112,19 +124,29 @@
 <script>
   const vagaId = window.location.pathname.split('/').filter(Boolean).pop();
   const conteudo = document.getElementById('conteudo');
+  const layout = document.getElementById('layout');
+  const colunaVaga = document.getElementById('coluna-vaga');
+  const colunaForm = document.getElementById('coluna-form');
 
   function telaErro(msg) {
+    layout.hidden = true;
+    conteudo.hidden = false;
     conteudo.innerHTML = `<h1>Vaga não encontrada</h1><p class="corpo">${msg}</p>`;
   }
 
   function telaSucesso() {
+    layout.hidden = true;
+    conteudo.hidden = false;
     conteudo.innerHTML = `
       <h1>Candidatura enviada com sucesso</h1>
       <p class="corpo">Obrigado por se candidatar! Seus dados e currículo foram recebidos e já estão disponíveis para a equipe de recrutamento.</p>`;
   }
 
   function telaVaga(vaga) {
-    conteudo.innerHTML = `
+    conteudo.hidden = true;
+    layout.hidden = false;
+
+    colunaVaga.innerHTML = `
       <h1>${vaga.nome}</h1>
       ${vaga.empresa || vaga.cidade ? `<p class="corpo">${[vaga.empresa, vaga.cidade].filter(Boolean).join(' · ')}</p>` : ''}
       <div class="meta">
@@ -145,7 +167,9 @@
         <h2>Competências</h2>
         <p class="corpo">${vaga.competencias}</p>
       ` : ''}
+    `;
 
+    colunaForm.innerHTML = `
       <h2>Candidate-se</h2>
       <form id="form-candidatura">
         <label class="campo" for="nome">Nome completo *</label>
