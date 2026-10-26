@@ -9,7 +9,7 @@ const fastifyMultipart = require('@fastify/multipart');
 const { pool, migrar } = require('./lib/db');
 const { calcularResultado, CARACTERISTICAS } = require('./lib/inferencia');
 const { montarResumo } = require('./lib/conteudo');
-const { enviarLinkAvaliacao } = require('./lib/email');
+const { enviarLinkAvaliacao, enviarNotificacaoNovaCandidatura } = require('./lib/email');
 const { gerarRelatorioPdf } = require('./lib/pdf');
 const { extrairTexto, extrairCamposDoTexto } = require('./lib/curriculo');
 const { chamarClaude } = require('./lib/anthropic-service');
@@ -200,6 +200,15 @@ async function build() {
     // People não tem teste grátis, ver migration 014) no primeiro login do
     // tenant. ON CONFLICT DO NOTHING: idempotente, login seguinte não mexe.
     await pool.query('insert into assinaturas (tenant_id) values ($1) on conflict (tenant_id) do nothing', [tenantId]);
+
+    // Cacheia o e-mail do recrutador pra notificações (Configurações >
+    // Notificações) — refrescado a cada login, nunca mexe no toggle
+    // (nova_candidatura) se a linha já existir.
+    await pool.query(
+      `insert into preferencias_notificacao (tenant_id, email) values ($1, $2)
+       on conflict (tenant_id) do update set email = excluded.email`,
+      [tenantId, email]
+    );
 
     // Best-effort: nunca impede o login se o kyvvo-platform estiver
     // instável nesse instante — "trocar de produto" é só um atalho de UX.
@@ -790,6 +799,30 @@ async function build() {
       request.log.error(`[whatsapp-webhook] Falha ao processar: ${err.message}`);
     }
     return reply.code(200).send({ ok: true });
+  });
+
+  // --- Notificações por e-mail do recrutador (Configurações > Notificações) ---
+  // email já foi cacheado no login (preferencias_notificacao) — essas rotas só
+  // leem/alteram o toggle, nunca escrevem email (isso só acontece no login).
+
+  fastify.get('/people/api/notificacoes', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query(
+      'select nova_candidatura from preferencias_notificacao where tenant_id = $1',
+      [request.user.tenantId]
+    );
+    return { nova_candidatura: rows[0] ? rows[0].nova_candidatura : true };
+  });
+
+  fastify.patch('/people/api/notificacoes', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { nova_candidatura: novaCandidatura } = request.body || {};
+    if (typeof novaCandidatura !== 'boolean') {
+      return reply.code(400).send({ error: 'Campo "nova_candidatura" deve ser booleano.' });
+    }
+    await pool.query(
+      `update preferencias_notificacao set nova_candidatura = $2, atualizado_em = now() where tenant_id = $1`,
+      [request.user.tenantId, novaCandidatura]
+    );
+    return { nova_candidatura: novaCandidatura };
   });
 
   // --- Portal da psicóloga (autenticado) ---
@@ -1519,6 +1552,21 @@ async function build() {
     }
   }
 
+  // Best-effort, nunca bloqueia a criação da candidatura — se o recrutador
+  // nunca logou (sem linha em preferencias_notificacao) ou desativou o
+  // toggle, simplesmente não envia.
+  async function notificarNovaCandidatura(tenantId, nomeCandidato, nomeVaga) {
+    const { rows } = await pool.query(
+      'select email, nova_candidatura from preferencias_notificacao where tenant_id = $1',
+      [tenantId]
+    );
+    const pref = rows[0];
+    if (!pref || !pref.nova_candidatura) return;
+    await enviarNotificacaoNovaCandidatura({
+      email: pref.email, nomeCandidato, nomeVaga, link: `${PUBLIC_URL}/people/quadro.html`,
+    });
+  }
+
   async function criarOuReutilizarCandidatura({ vagaId, tenantId, candidatoId, nome, email, telefone, linkedin, origem, curriculo, atorEmail }) {
     const pessoa = candidatoId
       ? (await pool.query('select * from candidatos where id = $1 and tenant_id = $2', [candidatoId, tenantId])).rows[0]
@@ -1589,6 +1637,8 @@ async function build() {
         candidato: pessoa, vaga: vagaInfo,
         linkAvaliacao: linkAvaliacaoDe(tokenParaLink),
       });
+      notificarNovaCandidatura(tenantId, pessoa.nome, vagaInfo.nome)
+        .catch((err) => fastify.log.error({ err, tenantId }, 'Falha ao notificar nova candidatura por e-mail'));
     }
     return { candidatura, pessoa, reaproveitada: false };
   }
